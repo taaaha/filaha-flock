@@ -1,34 +1,48 @@
 {
   "expo": {
-    "name": "فيلاحة",
+    "name": "Filaha Flock",
     "slug": "filaha-monitor",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "scheme": "filaha",
     "newArchEnabled": false,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "backgroundColor": "#0a0f1e"
+    },
     "android": {
       "package": "com.filaha",
       "versionCode": 1,
       "userInterfaceStyle": "dark",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0f1e"
+      },
       "permissions": [
         "android.permission.RECEIVE_SMS",
         "android.permission.READ_SMS",
+        "android.permission.SEND_SMS",
         "android.permission.CALL_PHONE",
         "android.permission.VIBRATE",
         "android.permission.POST_NOTIFICATIONS",
+        "android.permission.WAKE_LOCK",
         "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
       ],
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "pan",
+      "splash": {
+        "backgroundColor": "#0a0f1e"
+      }
     },
     "plugins": [
       "./plugins/withFilahaSms.js"
     ],
+    "ios": {},
     "extra": {
       "eas": {
-        "projectId": "e8c63cd8-3a82-4468-9442-bc762685b5bf"
+        "projectId": "31b0a50a-67b7-4bad-bd5f-04073eaac05a"
       }
     },
-    "owner": "taha999"
+    "owner": "ash9999"
   }
 }

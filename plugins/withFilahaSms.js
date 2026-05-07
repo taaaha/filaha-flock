@@ -11,9 +11,11 @@ const PACKAGE_NAME = 'com.filaha';
 const REQUIRED_PERMISSIONS = [
   'android.permission.RECEIVE_SMS',
   'android.permission.READ_SMS',
+  'android.permission.SEND_SMS',
   'android.permission.CALL_PHONE',
   'android.permission.VIBRATE',
   'android.permission.POST_NOTIFICATIONS',
+  'android.permission.WAKE_LOCK',
   'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
 ];
 

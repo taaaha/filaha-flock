@@ -61,6 +61,7 @@ export default function OnboardingScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
+        <Text style={styles.brand}>Filaha Flock</Text>
         <View style={styles.iconWrap}>
           <Text style={styles.icon}>{slide.icon}</Text>
         </View>
@@ -128,6 +129,15 @@ const styles = StyleSheet.create({
   },
   langChipTextActive: {
     color: '#fff',
+  },
+  brand: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginBottom: 16,
+    textAlign: 'center',
   },
   scroll: {
     flexGrow: 1,

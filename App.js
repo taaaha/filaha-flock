@@ -22,10 +22,12 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import CoopDetailScreen from './src/screens/CoopDetailScreen';
 import AlertsScreen from './src/screens/AlertsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import ToastHost from './src/components/Toast';
 import { colors } from './src/utils/colors';
 import {
   requestSmsPermissions,
   requestCallPermission,
+  requestSendSmsPermission,
   requestNotificationPermission,
   isIgnoringBatteryOptimizations,
   requestIgnoreBatteryOptimizations,
@@ -157,9 +159,12 @@ function StartupPermissions() {
     let cancelled = false;
     (async () => {
       try {
-        await requestSmsPermissions();
-        await requestCallPermission();
+        // Request all critical permissions in sequence so the user
+        // sees one prompt after another rather than missing one.
         await requestNotificationPermission();
+        await requestSmsPermissions();
+        await requestSendSmsPermission();
+        await requestCallPermission();
         const ok = await isIgnoringBatteryOptimizations();
         if (cancelled) return;
         if (!ok) {
@@ -198,6 +203,7 @@ function RootNav() {
     <NavigationContainer theme={navTheme}>
       <StartupPermissions />
       {onboardingDone ? <MainTabs /> : <OnboardingScreen />}
+      <ToastHost />
     </NavigationContainer>
   );
 }

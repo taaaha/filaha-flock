@@ -1,11 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { colors } from '../utils/colors';
 
-export default function Field({ label, value, onChangeText, placeholder, hint, keyboardType, maxLength, autoCapitalize }) {
+export default function Field({
+  label, value, onChangeText, placeholder, hint,
+  keyboardType, maxLength, autoCapitalize,
+}) {
+  const [focused, setFocused] = useState(false);
+
   return (
     <View style={styles.wrap}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {label ? (
+        <Text style={[styles.label, focused && { color: colors.accent }]}>
+          {label}
+        </Text>
+      ) : null}
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -14,7 +23,12 @@ export default function Field({ label, value, onChangeText, placeholder, hint, k
         keyboardType={keyboardType}
         maxLength={maxLength}
         autoCapitalize={autoCapitalize || 'sentences'}
-        style={styles.input}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={[
+          styles.input,
+          focused && styles.inputFocused,
+        ]}
         underlineColorAndroid="transparent"
       />
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
@@ -23,29 +37,35 @@ export default function Field({ label, value, onChangeText, placeholder, hint, k
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    marginBottom: 14,
-  },
+  wrap: { marginBottom: 14 },
   label: {
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     marginBottom: 6,
-    fontWeight: '600',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   input: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderRadius: 12,
     color: colors.textPrimary,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    minHeight: 50,
+    fontWeight: '500',
+    minHeight: 52,
+  },
+  inputFocused: {
+    borderColor: colors.accent,
+    backgroundColor: colors.cardElevated,
   },
   hint: {
     color: colors.textTertiary,
     fontSize: 12,
     marginTop: 6,
+    lineHeight: 16,
   },
 });

@@ -1,9 +1,8 @@
-import React, { memo } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import React, { memo, useRef } from 'react';
+import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import { colors, STATUS, statusColor } from '../utils/colors';
 import SensorMini from './SensorMini';
 import BatteryBar from './BatteryBar';
-import StatusDot from './StatusDot';
 import Pulse from './Pulse';
 import { formatRelativeTime } from '../utils/formatters';
 
@@ -20,60 +19,89 @@ function statusLabel(status, t) {
 
 function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
   const sColor = statusColor(status);
-  const isDanger = status === STATUS.DANGER;
+  const isDanger = status === STATUS.DANGER || status === STATUS.POWER_CUT;
   const isPower = status === STATUS.POWER_CUT;
-
+  const isOffline = status === STATUS.OFFLINE;
   const r = reading || {};
 
+  const ageText = reading ? formatRelativeTime(reading.timestamp, t, now) : null;
+
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, friction: 7 }).start();
+  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5 }).start();
+
   return (
-    <Pulse active={isDanger} color={colors.danger} intensity={0.18} style={styles.wrapper}>
-      <Pressable
-        onPress={onPress}
-        android_ripple={{ color: '#1a2235' }}
-        style={[styles.card, { borderColor: sColor + '55' }]}
-      >
-        <View style={[styles.stripe, { backgroundColor: sColor }]} />
+    <Pulse active={isDanger} color={sColor} intensity={0.55} style={styles.wrapper} borderRadius={18}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Pressable
+          onPress={onPress}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          android_ripple={{ color: sColor + '20', foreground: true }}
+          style={[styles.card, { borderColor: sColor + '50' }]}
+        >
+          {/* Left status stripe */}
+          <View style={[styles.stripe, { backgroundColor: sColor }]} />
+          {isDanger ? (
+            <View style={[styles.tintOverlay, { backgroundColor: sColor + '0a' }]} />
+          ) : null}
 
-        <View style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.name} numberOfLines={1}>{device.name}</Text>
-            <Text style={styles.devId}>{device.id}</Text>
+          {/* Header */}
+          <View style={styles.headerRow}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.name} numberOfLines={1}>{device.name}</Text>
+              <Text style={styles.devId}>{device.id}</Text>
+            </View>
+            <View style={[styles.badge, {
+              backgroundColor: sColor + '20', borderColor: sColor + '70',
+            }]}>
+              <View style={[styles.dot, { backgroundColor: sColor }]} />
+              <Text style={[styles.badgeText, { color: sColor }]}>
+                {statusLabel(status, t)}
+              </Text>
+            </View>
           </View>
-          <View style={[styles.badge, { backgroundColor: sColor + '22', borderColor: sColor + '55' }]}>
-            <StatusDot status={status} size={8} />
-            <Text style={[styles.badgeText, { color: sColor }]}>
-              {statusLabel(status, t)}
-            </Text>
+
+          {/* Power-cut banner */}
+          {isPower ? (
+            <View style={styles.powerBanner}>
+              <Text style={styles.powerBannerText}>
+                ⚡  {t('powerCut')}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Offline banner */}
+          {isOffline && !isPower ? (
+            <View style={styles.offlineBanner}>
+              <Text style={styles.offlineEmoji}>📡</Text>
+              <Text style={styles.offlineBannerText}>{t('offline')}</Text>
+            </View>
+          ) : null}
+
+          {/* 2×2 sensor grid */}
+          {!isOffline || isPower ? (
+            <View style={styles.sensorGrid}>
+              <SensorMini sensorKey="co2"  value={r.co2}  label={t('co2Short')}  thresholds={thresholds} />
+              <SensorMini sensorKey="nh3"  value={r.nh3}  label={t('nh3Short')}  thresholds={thresholds} />
+              <SensorMini sensorKey="temp" value={r.temp} label={t('tempShort')} thresholds={thresholds} />
+              <SensorMini sensorKey="hum"  value={r.hum}  label={t('humShort')}  thresholds={thresholds} />
+            </View>
+          ) : null}
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <View style={styles.batteryWrap}>
+              <BatteryBar value={r.bat} compact label={t('battery')} />
+            </View>
+            <View style={styles.agePill}>
+              <Text style={styles.ageText}>
+                {ageText ? `🕐 ${ageText}` : t('offline')}
+              </Text>
+            </View>
           </View>
-        </View>
-
-        {isPower ? (
-          <View style={styles.powerBanner}>
-            <Text style={styles.powerBannerText}>⚡ {t('powerCut')}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.sensorsRow}>
-          <SensorMini sensorKey="co2" value={r.co2} label={t('co2Short')} thresholds={thresholds} />
-          <SensorMini sensorKey="nh3" value={r.nh3} label={t('nh3Short')} thresholds={thresholds} />
-        </View>
-        <View style={styles.sensorsRow}>
-          <SensorMini sensorKey="temp" value={r.temp} label={t('tempShort')} thresholds={thresholds} />
-          <SensorMini sensorKey="hum" value={r.hum} label={t('humShort')} thresholds={thresholds} />
-        </View>
-
-        <View style={styles.footer}>
-          <View style={{ flex: 1 }}>
-            <BatteryBar value={r.bat} compact label={t('battery')} />
-          </View>
-        </View>
-
-        <Text style={styles.lastUpdate}>
-          {reading
-            ? `${t('lastUpdate')}: ${formatRelativeTime(reading.timestamp, t, now)}`
-            : t('offline')}
-        </Text>
-      </Pressable>
+        </Pressable>
+      </Animated.View>
     </Pulse>
   );
 }
@@ -81,15 +109,17 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
 const styles = StyleSheet.create({
   wrapper: {
     marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 16,
+    marginBottom: 14,
+    borderRadius: 18,
   },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingVertical: 14,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    paddingTop: 14,
+    paddingBottom: 12,
     paddingHorizontal: 14,
+    paddingLeft: 18,
     overflow: 'hidden',
   },
   stripe: {
@@ -97,78 +127,105 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 4,
+    width: 6,
+  },
+  tintOverlay: {
+    position: 'absolute',
+    left: 0, right: 0, top: 0, bottom: 0,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+    gap: 10,
   },
   headerLeft: {
     flex: 1,
-    paddingHorizontal: 6,
   },
   name: {
     color: colors.textPrimary,
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '800',
   },
   devId: {
     color: colors.textTertiary,
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.5,
-    marginTop: 2,
+    marginTop: 3,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
     borderWidth: 1,
-    gap: 6,
+  },
+  dot: {
+    width: 7, height: 7, borderRadius: 4,
   },
   badgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  sensorsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 8,
-    paddingHorizontal: 6,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    marginTop: 4,
-  },
-  lastUpdate: {
-    color: colors.textTertiary,
     fontSize: 11,
-    marginTop: 8,
-    paddingHorizontal: 6,
+    fontWeight: '800',
   },
   powerBanner: {
     backgroundColor: colors.power + '22',
-    borderColor: colors.power + '66',
+    borderColor: colors.power + '70',
     borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     marginBottom: 10,
-    marginHorizontal: 6,
   },
   powerBannerText: {
     color: colors.power,
     fontWeight: '800',
-    textAlign: 'center',
     fontSize: 13,
+  },
+  offlineBanner: {
+    backgroundColor: colors.offline + '15',
+    borderColor: colors.offline + '50',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 22,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  offlineEmoji: { fontSize: 24, marginBottom: 4 },
+  offlineBannerText: {
+    color: colors.offline,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  sensorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 10,
+    marginTop: 4,
+  },
+  batteryWrap: { flex: 1, marginRight: 10 },
+  agePill: {
+    backgroundColor: colors.bgElevated,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  ageText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 

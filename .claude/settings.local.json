@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node scripts/generateIcon.js)",
+      "Bash(node -e \"const b = require\\('fs'\\).readFileSync\\('assets/icon.png'\\); console.log\\('icon.png size:', b.length, 'bytes, PNG sig:', b.slice\\(0,4\\).toString\\('hex'\\)\\)\")",
+      "Bash(npx --yes @babel/parser --version)",
+      "Bash(npm ls *)"
+    ]
+  }
+}

@@ -11,10 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
 import { colors, STATUS, statusColor } from '../utils/colors';
-import {
-  deviceStatus,
-  OFFLINE_THRESHOLD_MS,
-} from '../utils/thresholds';
+import { deviceStatus } from '../utils/thresholds';
 import { isToday, formatRelativeTime, formatTime } from '../utils/formatters';
 import { buildFakeDataSms } from '../utils/smsParser';
 import SensorTile from '../components/SensorTile';
@@ -22,6 +19,8 @@ import BatteryBar from '../components/BatteryBar';
 import PrimaryButton from '../components/PrimaryButton';
 import TrendChart from '../components/TrendChart';
 import StatusDot from '../components/StatusDot';
+import { showToast } from '../components/Toast';
+import { checkCallPermission, requestCallPermission } from '../services/SmsService';
 
 const SENSOR_KEYS = ['co2', 'nh3', 'temp', 'hum'];
 const UNITS = { co2: 'ppm', nh3: 'ppm', temp: '°C', hum: '%' };
@@ -50,40 +49,26 @@ export default function CoopDetailScreen({ route, navigation }) {
     callEmergency, removeDevice, injectMessage, now,
   } = useApp();
 
-  const device = devices.find((d) => d.id === deviceId);
+  // ── Hooks always called in the same order ──
   const [selectedSensor, setSelectedSensor] = useState('co2');
 
-  if (!device) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backText}>‹</Text>
-          </Pressable>
-          <Text style={styles.title}>{t('coopDetails')}</Text>
-          <View style={{ width: 40 }} />
-        </View>
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>—</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const list = readings[deviceId] || [];
+  const device = devices.find((d) => d.id === deviceId);
+  const list = device ? (readings[deviceId] || []) : [];
   const lastReading = list.length > 0 ? list[list.length - 1] : null;
-  const isPowerCut = !!powerCut[deviceId];
-  const status = deviceStatus(device, lastReading, thresholds, now, isPowerCut);
+  const isPowerCut = device ? !!powerCut[deviceId] : false;
+  const status = device
+    ? deviceStatus(device, lastReading, thresholds, now, isPowerCut)
+    : STATUS.OFFLINE;
   const sColor = statusColor(status);
   const isOffline = status === STATUS.OFFLINE && !isPowerCut;
   const offlineMinutes = lastReading
     ? Math.max(0, Math.floor((now - lastReading.timestamp) / 60000))
     : null;
 
-  // Today's min/max per sensor
   const todayStats = useMemo(() => {
     const stats = {};
     SENSOR_KEYS.forEach((k) => { stats[k] = { min: null, max: null }; });
+    if (!device) return stats;
     list.forEach((r) => {
       if (!isToday(r.timestamp)) return;
       SENSOR_KEYS.forEach((k) => {
@@ -94,11 +79,33 @@ export default function CoopDetailScreen({ route, navigation }) {
       });
     });
     return stats;
-  }, [list]);
+  }, [list, device]);
 
   const seriesValues = useMemo(() => {
+    if (!device) return [];
     return list.slice(-20).map((r) => r[selectedSensor]);
-  }, [list, selectedSensor]);
+  }, [list, selectedSensor, device]);
+
+  // ── Now safe to early-return ──
+  if (!device) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+        <View style={styles.header}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Text style={styles.backText}>‹</Text>
+          </Pressable>
+          <View style={styles.titleWrap}>
+            <Text style={styles.title}>{t('coopDetails')}</Text>
+          </View>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.empty}>
+          <Text style={styles.emptyTitle}>—</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const sensorLabel = {
     co2: t('co2'),
@@ -116,15 +123,24 @@ export default function CoopDetailScreen({ route, navigation }) {
       bat: 65 + Math.floor(Math.random() * 30),
     });
     injectMessage(msg, false);
+    showToast(t('testDataSent'), 'info');
   };
 
   const onCall = async () => {
-    const num = (settings && settings.emergencyContact || '').trim();
+    const num = ((settings && settings.emergencyContact) || '').trim();
     if (!num) {
-      Alert.alert(t('callEmergency'), t('emergencyContact'));
+      showToast(t('noEmergencyNumber'), 'warn');
       return;
     }
-    await callEmergency();
+    let granted = await checkCallPermission();
+    if (!granted) granted = await requestCallPermission();
+    if (!granted) {
+      showToast(t('permissionDenied'), 'error');
+      return;
+    }
+    showToast(t('callStarted'), 'info');
+    const ok = await callEmergency();
+    if (!ok) showToast(t('callFailed'), 'error');
   };
 
   const onDelete = () => {
@@ -137,8 +153,11 @@ export default function CoopDetailScreen({ route, navigation }) {
           text: t('delete'),
           style: 'destructive',
           onPress: async () => {
-            await removeDevice(device.id);
+            const idToDelete = device.id;
+            // Navigate first, then remove — this prevents the screen from
+            // re-rendering with `device === undefined` while still mounted.
             navigation.goBack();
+            setTimeout(() => { removeDevice(idToDelete); }, 50);
           },
         },
       ],
@@ -301,14 +320,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42, height: 42, borderRadius: 21,
     backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.border,
   },
   backText: {
     color: colors.textPrimary,
@@ -328,12 +343,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
   },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  badgeText: { fontSize: 11, fontWeight: '800' },
   empty: { padding: 40, alignItems: 'center' },
   emptyTitle: { color: colors.textSecondary, fontSize: 18 },
   offlineBanner: {
@@ -345,11 +355,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 12,
   },
-  offlineText: {
-    color: colors.danger,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
+  offlineText: { color: colors.danger, fontWeight: '800', textAlign: 'center' },
   powerBanner: {
     backgroundColor: colors.power + '22',
     borderColor: colors.power + '66',
@@ -359,23 +365,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 12,
   },
-  powerText: {
-    color: colors.power,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  gridRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 10,
-  },
+  powerText: { color: colors.power, fontWeight: '800', textAlign: 'center' },
+  gridRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   section: { marginTop: 16 },
   sectionTitle: {
     color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
     marginBottom: 8,
   },
   batteryWrap: {
@@ -391,9 +387,5 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: 'center',
   },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 16,
-  },
+  actionsRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
 });

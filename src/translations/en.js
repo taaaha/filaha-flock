@@ -1,9 +1,9 @@
 export default {
-  appName: 'Filaha',
+  appName: 'Filaha Flock',
   appTagline: 'Poultry coop monitor',
 
   // Onboarding
-  onboardingTitle1: 'Welcome to Filaha',
+  onboardingTitle1: 'Welcome to Filaha Flock',
   onboardingDesc1: 'Monitor your chicken coops remotely via SMS',
   onboardingTitle2: 'Instant alerts',
   onboardingDesc2: 'Get alerts for ammonia, CO₂, temperature and humidity',
@@ -141,4 +141,34 @@ export default {
   statusDanger: 'Danger',
   statusOffline: 'Offline',
   statusPowerCut: 'No power',
+
+  // Toasts & feedback
+  saved: 'Saved',
+  profileSaved: 'Profile saved',
+  contactSaved: 'Emergency contact saved',
+  thresholdsSaved: 'Thresholds updated',
+  callStarted: 'Calling…',
+  callFailed: 'Call failed',
+  noEmergencyNumber: 'No emergency contact set',
+  testAlertSent: 'Test alert sent',
+  testDataSent: 'Test data sent',
+  permissionGranted: 'Permission granted',
+  permissionDenied: 'Permission denied',
+
+  // Dashboard buttons
+  testData: 'Test data',
+  testAlert: 'Test alert',
+  testAll: 'Test all',
+  testAllHint: 'Sends notification + SMS + call so you can verify alerts work end-to-end.',
+  testNotificationBody: 'This is a Filaha Flock test notification. If you see this, alerts are working.',
+  longPressForAlert: 'Long-press to send a danger alert',
+  checkNow: 'check now',
+  liveMonitoring: 'Live monitoring',
+  systemReady: 'System ready',
+
+  // SMS
+  autoSms: 'Auto-SMS on danger',
+  sendSmsPermission: 'Send SMS',
+  smsSent: 'SMS sent',
+  smsFailed: 'SMS failed',
 };

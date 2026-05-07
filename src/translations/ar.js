@@ -1,9 +1,9 @@
 export default {
-  appName: 'فيلاحة',
+  appName: 'Filaha Flock',
   appTagline: 'مراقبة قن الدجاج',
 
   // Onboarding
-  onboardingTitle1: 'مرحباً بك في فيلاحة',
+  onboardingTitle1: 'مرحباً بك في Filaha Flock',
   onboardingDesc1: 'راقب قن الدجاج عن بُعد عن طريق الرسائل القصيرة',
   onboardingTitle2: 'تنبيهات فورية',
   onboardingDesc2: 'احصل على تنبيهات للأمونيا، ثاني أكسيد الكربون، الحرارة والرطوبة',
@@ -141,4 +141,34 @@ export default {
   statusDanger: 'خطر',
   statusOffline: 'غير متصل',
   statusPowerCut: 'بدون كهرباء',
+
+  // Toasts & feedback
+  saved: 'تم الحفظ',
+  profileSaved: 'تم حفظ الملف الشخصي',
+  contactSaved: 'تم حفظ رقم الطوارئ',
+  thresholdsSaved: 'تم حفظ الحدود',
+  callStarted: 'جاري الاتصال…',
+  callFailed: 'فشل الاتصال',
+  noEmergencyNumber: 'لم تحدد رقم طوارئ بعد',
+  testAlertSent: 'تم إرسال تنبيه تجريبي',
+  testDataSent: 'تم إرسال بيانات تجريبية',
+  permissionGranted: 'تم منح الإذن',
+  permissionDenied: 'تم رفض الإذن',
+
+  // Dashboard buttons
+  testData: 'بيانات تجريبية',
+  testAlert: 'تنبيه تجريبي',
+  testAll: 'اختبار شامل',
+  testAllHint: 'يرسل إشعار + رسالة + مكالمة للتأكد أن كل شيء يعمل',
+  testNotificationBody: 'هذا إشعار تجريبي من Filaha Flock. إذا رأيته فالتنبيهات تعمل.',
+  longPressForAlert: 'اضغط مطولاً لتجربة تنبيه خطر',
+  checkNow: 'افحص الآن',
+  liveMonitoring: 'مراقبة مباشرة',
+  systemReady: 'النظام جاهز',
+
+  // SMS
+  autoSms: 'إرسال رسالة تلقائي عند الخطر',
+  sendSmsPermission: 'إذن إرسال الرسائل',
+  smsSent: 'تم إرسال الرسالة',
+  smsFailed: 'فشل إرسال الرسالة',
 };

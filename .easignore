@@ -1,0 +1,20 @@
+# Mirror .gitignore but explicitly include plugins/native-android source
+# When this file exists, EAS uses the working directory (not git tree)
+# so uncommitted changes are picked up by the build.
+
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+android/
+ios/
+.idea/
+.DS_Store
+*.log

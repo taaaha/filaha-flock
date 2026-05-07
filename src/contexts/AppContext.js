@@ -7,16 +7,21 @@ import React, {
   useReducer,
   useRef,
 } from 'react';
-import { I18nManager, Vibration } from 'react-native';
+import { I18nManager } from 'react-native';
 import { Storage } from '../services/StorageService';
 import {
   drainSmsQueue,
   subscribeToSmsEvents,
+  saveEmergencyContact,
+  setAlertConfig,
+  showAlertNotification,
+  sendSms,
 } from '../services/SmsService';
-import { makePhoneCall } from '../services/CallService';
+import { makePhoneCall, makeDirectCall } from '../services/CallService';
 import { vibrateDanger, vibrateWarn } from '../services/AlertService';
 import { parseSms } from '../utils/smsParser';
-import { DEFAULT_THRESHOLDS } from '../utils/thresholds';
+import { DEFAULT_THRESHOLDS, sensorStatus } from '../utils/thresholds';
+import { STATUS } from '../utils/colors';
 import { uid } from '../utils/ids';
 import { DEFAULT_LANG, isRTL, makeT } from '../translations';
 
@@ -29,7 +34,13 @@ const DEFAULT_SETTINGS = {
   autoCall: false,
   autoCallOnDanger: false,
   autoCallOnPowerCut: false,
+  autoSmsOnDanger: false,
 };
+
+const SENSOR_KEYS = ['co2', 'nh3', 'temp', 'hum'];
+// Throttle alert re-fires per (device, sensor) so a stuck-in-danger reading
+// doesn't spam the user. Once danger fires, suppress for this window.
+const DANGER_REFIRE_MS = 10 * 60 * 1000; // 10 minutes
 
 function initialState() {
   return {
@@ -38,12 +49,12 @@ function initialState() {
     language: DEFAULT_LANG,
     farms: [],
     devices: [],
-    readings: {}, // deviceId -> Reading[]
+    readings: {},
     alerts: [],
     settings: { ...DEFAULT_SETTINGS },
     thresholds: { ...DEFAULT_THRESHOLDS },
-    powerCut: {}, // deviceId -> boolean
-    now: Date.now(), // ticks every minute for relative timestamps
+    powerCut: {},
+    now: Date.now(),
   };
 }
 
@@ -86,7 +97,13 @@ export function AppProvider({ children }) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  // dangerStateRef tracks per-device per-sensor danger state to detect transitions
+  // shape: { [deviceId]: { [sensorKey]: { status: 'ok'|'warn'|'danger', firedAt: number } } }
+  const dangerStateRef = useRef({});
+
   const t = useMemo(() => makeT(state.language), [state.language]);
+  const tRef = useRef(t);
+  tRef.current = t;
 
   // ---------- Bootstrap ----------
   useEffect(() => {
@@ -112,7 +129,6 @@ export function AppProvider({ children }) {
         Storage.getPowerCut(),
       ]);
 
-      // Load readings for known devices
       const readings = {};
       await Promise.all(
         (devices || []).map(async (d) => {
@@ -124,14 +140,18 @@ export function AppProvider({ children }) {
       const rtl = isRTL(language);
       try {
         I18nManager.allowRTL(rtl);
-        if (I18nManager.isRTL !== rtl) {
-          I18nManager.forceRTL(rtl);
-        }
-      } catch (e) {
-        // ignore
-      }
+        if (I18nManager.isRTL !== rtl) I18nManager.forceRTL(rtl);
+      } catch (e) {}
 
       if (cancelled) return;
+
+      const finalSettings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+
+      // Sync emergency contact to native prefs on boot so SmsReceiver has it
+      if (finalSettings.emergencyContact) {
+        saveEmergencyContact(finalSettings.emergencyContact).catch(() => {});
+      }
+
       dispatch({
         type: 'BOOTSTRAP',
         payload: {
@@ -141,7 +161,7 @@ export function AppProvider({ children }) {
           devices: devices || [],
           readings,
           alerts: alerts || [],
-          settings: { ...DEFAULT_SETTINGS, ...(settings || {}) },
+          settings: finalSettings,
           thresholds: { ...DEFAULT_THRESHOLDS, ...(thresholds || {}) },
           powerCut: powerCut || {},
         },
@@ -150,31 +170,184 @@ export function AppProvider({ children }) {
     return () => { cancelled = true; };
   }, []);
 
-  // ---------- Tick every minute for relative timestamps ----------
+  // ---------- Tick every minute ----------
   useEffect(() => {
     const id = setInterval(() => dispatch({ type: 'TICK' }), 60 * 1000);
     return () => clearInterval(id);
   }, []);
 
+  // ─────────────────────────────────────────────────────────────────────
+  // Core: client-side threshold breach detection.
+  // For each sensor on a reading, compare against thresholds and detect
+  // transitions to/from DANGER. Fire the alert pipeline accordingly.
+  // ─────────────────────────────────────────────────────────────────────
+  const evaluateReadingForDanger = useCallback(async (device, reading, nativeHandled = false) => {
+    if (!device || !reading) return;
+    const s = stateRef.current;
+    const thresholds = s.thresholds;
+    const now = Date.now();
+
+    if (!dangerStateRef.current[device.id]) {
+      dangerStateRef.current[device.id] = {};
+    }
+    const devState = dangerStateRef.current[device.id];
+
+    const sensorMessages = {
+      co2:  tRef.current('co2Danger'),
+      nh3:  tRef.current('ammoniaDanger'),
+      temp: tRef.current('tempDanger'),
+      hum:  tRef.current('humDanger'),
+    };
+    const sensorLabels = {
+      co2:  tRef.current('co2'),
+      nh3:  tRef.current('nh3'),
+      temp: tRef.current('temperature'),
+      hum:  tRef.current('humidity'),
+    };
+    const sensorUnits = { co2: 'ppm', nh3: 'ppm', temp: '°C', hum: '%' };
+
+    let firedAny = false;
+    const newAlerts = [];
+
+    for (const key of SENSOR_KEYS) {
+      const value = reading[key];
+      if (value === null || value === undefined || isNaN(value)) continue;
+
+      const status = sensorStatus(key, value, thresholds);
+      const prev = devState[key] || { status: STATUS.OK, firedAt: 0 };
+
+      // DANGER transition (or refire after cooldown)
+      if (status === STATUS.DANGER) {
+        const isNew = prev.status !== STATUS.DANGER;
+        const cooledDown = now - (prev.firedAt || 0) > DANGER_REFIRE_MS;
+        if (isNew || cooledDown) {
+          firedAny = true;
+          const farm = s.farms.find((f) => f.id === device.farmId);
+          const farmName = farm ? farm.name : (s.settings.farmName || '');
+          newAlerts.push({
+            id: uid('a_'),
+            deviceId: device.id,
+            deviceName: device.name,
+            farmName,
+            type: 'ALERT',
+            subType: key.toUpperCase(),
+            message: `${sensorMessages[key]} (${value.toFixed(1)} ${sensorUnits[key]})`,
+            timestamp: reading.timestamp || now,
+            acknowledged: false,
+          });
+          devState[key] = { status: STATUS.DANGER, firedAt: now };
+
+          // Only fire notification from JS when native didn't already handle.
+          // Real SMS arrivals are handled by SmsReceiver natively.
+          if (!nativeHandled) {
+            showAlertNotification(
+              `⚠️ ${sensorLabels[key]} — ${device.name}`,
+              `${sensorMessages[key]}\n${value.toFixed(1)} ${sensorUnits[key]} (limit: ${thresholds[key].danger})`,
+              true
+            ).catch(() => {});
+          }
+        } else {
+          devState[key] = { ...prev, status: STATUS.DANGER };
+        }
+      } else if (status === STATUS.WARN) {
+        // Track warn but don't fire heavy notifications
+        if (prev.status === STATUS.DANGER) {
+          // Recovered from danger
+          const farm = s.farms.find((f) => f.id === device.farmId);
+          const farmName = farm ? farm.name : (s.settings.farmName || '');
+          newAlerts.push({
+            id: uid('a_'),
+            deviceId: device.id,
+            deviceName: device.name,
+            farmName,
+            type: 'CLEAR',
+            subType: key.toUpperCase(),
+            message: tRef.current('alertCleared'),
+            timestamp: now,
+            acknowledged: false,
+          });
+        }
+        devState[key] = { status: STATUS.WARN, firedAt: 0 };
+      } else {
+        // OK
+        if (prev.status === STATUS.DANGER) {
+          const farm = s.farms.find((f) => f.id === device.farmId);
+          const farmName = farm ? farm.name : (s.settings.farmName || '');
+          newAlerts.push({
+            id: uid('a_'),
+            deviceId: device.id,
+            deviceName: device.name,
+            farmName,
+            type: 'CLEAR',
+            subType: key.toUpperCase(),
+            message: tRef.current('alertCleared'),
+            timestamp: now,
+            acknowledged: false,
+          });
+        }
+        devState[key] = { status: STATUS.OK, firedAt: 0 };
+      }
+    }
+
+    if (newAlerts.length > 0) {
+      const merged = [...newAlerts, ...s.alerts].slice(0, 500);
+      await Storage.setAlerts(merged);
+      dispatch({ type: 'SET_ALERTS', payload: merged });
+    }
+
+    if (firedAny) {
+      // Vibration always fires — it's a foreground UX cue
+      if (s.settings.vibrate) vibrateDanger();
+
+      // Skip call/SMS if native receiver already fired the pipeline
+      if (nativeHandled) return;
+
+      const num = (s.settings.emergencyContact || '').trim();
+      const shouldAutoCall = num && (s.settings.autoCall || s.settings.autoCallOnDanger);
+      if (shouldAutoCall) {
+        makeDirectCall(num).catch(() => {});
+      }
+      if (num && s.settings.autoSmsOnDanger) {
+        const dangerLines = newAlerts
+          .filter((a) => a.type === 'ALERT')
+          .slice(0, 3)
+          .map((a) => `• ${a.message}`)
+          .join('\n');
+        const body =
+          `🚨 Filaha Flock\n` +
+          `Coop: ${device.name} (${device.id})\n` +
+          dangerLines +
+          `\n${new Date().toLocaleTimeString()}`;
+        sendSms(num, body).catch(() => {});
+      }
+    }
+  }, []);
+
   // ---------- SMS handlers ----------
-  const handleParsedMessage = useCallback(async (parsed) => {
+  const handleParsedMessage = useCallback(async (parsed, nativeHandled = false) => {
     if (!parsed) return;
     const s = stateRef.current;
     const deviceId = parsed.deviceId;
     const device = s.devices.find((d) => d.id === deviceId);
-    const deviceName = device ? device.name : deviceId;
-    const farm = device ? s.farms.find((f) => f.id === device.farmId) : null;
+    if (!device) return;
+
+    const deviceName = device.name;
+    const farm = s.farms.find((f) => f.id === device.farmId);
     const farmName = farm ? farm.name : (s.settings.farmName || '');
 
     if (parsed.kind === 'data') {
       const list = await Storage.appendReading(deviceId, parsed.reading);
       dispatch({ type: 'SET_DEVICE_READINGS', deviceId, payload: list });
+
       // Auto-clear power cut on data
       if (s.powerCut[deviceId]) {
         const next = { ...s.powerCut, [deviceId]: false };
         await Storage.setPowerCut(next);
         dispatch({ type: 'SET_POWER_CUT', payload: next });
       }
+
+      // ★ THRESHOLD-BREACH DETECTION
+      await evaluateReadingForDanger(device, parsed.reading, nativeHandled);
       return;
     }
 
@@ -206,26 +379,28 @@ export function AppProvider({ children }) {
         dispatch({ type: 'SET_POWER_CUT', payload: next });
       }
 
-      // Vibration / auto-call
       if (parsed.kind === 'alert') {
         if (s.settings.vibrate) vibrateDanger();
-        const num = (s.settings.emergencyContact || '').trim();
-        const shouldAutoCallDanger = (s.settings.autoCall || s.settings.autoCallOnDanger) &&
-          parsed.subType !== 'POWER_CUT';
-        const shouldAutoCallPower = s.settings.autoCallOnPowerCut && parsed.subType === 'POWER_CUT';
-        if (num && (shouldAutoCallDanger || shouldAutoCallPower)) {
-          makePhoneCall(num).catch(() => {});
+        // Skip native triggers if native already handled
+        if (!nativeHandled) {
+          const num = (s.settings.emergencyContact || '').trim();
+          const shouldAutoCallDanger = (s.settings.autoCall || s.settings.autoCallOnDanger) &&
+            parsed.subType !== 'POWER_CUT';
+          const shouldAutoCallPower = s.settings.autoCallOnPowerCut && parsed.subType === 'POWER_CUT';
+          if (num && (shouldAutoCallDanger || shouldAutoCallPower)) {
+            makeDirectCall(num).catch(() => {});
+          }
         }
       } else if (s.settings.vibrate) {
         vibrateWarn();
       }
     }
-  }, []);
+  }, [evaluateReadingForDanger]);
 
   const handleSmsEvent = useCallback((event) => {
     if (!event || !event.message) return;
     const parsed = parseSms(event.message, event.timestamp);
-    if (parsed) handleParsedMessage(parsed);
+    if (parsed) handleParsedMessage(parsed, !!event.nativeHandled);
   }, [handleParsedMessage]);
 
   // ---------- Drain queue + subscribe to events ----------
@@ -237,7 +412,9 @@ export function AppProvider({ children }) {
       const queue = await drainSmsQueue();
       for (const item of queue) {
         const parsed = parseSms(item.message, item.timestamp);
-        if (parsed) await handleParsedMessage(parsed);
+        // Queue items were already processed by native SmsReceiver when
+        // they arrived — JS just updates the UI now.
+        if (parsed) await handleParsedMessage(parsed, true);
       }
     })();
 
@@ -249,6 +426,40 @@ export function AppProvider({ children }) {
     return () => unsubscribe();
   }, [state.ready, handleSmsEvent, handleParsedMessage]);
 
+  // ---------- Re-evaluate when thresholds change ----------
+  useEffect(() => {
+    if (!state.ready) return;
+    state.devices.forEach((device) => {
+      const list = state.readings[device.id];
+      if (!list || list.length === 0) return;
+      const latest = list[list.length - 1];
+      evaluateReadingForDanger(device, latest);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.thresholds, state.ready]);
+
+  // ---------- Sync ALL alert config to native SharedPreferences ----------
+  // This is the bridge that lets the native BroadcastReceiver fire alerts
+  // (notification + auto-call + auto-SMS) even when the app is killed.
+  useEffect(() => {
+    if (!state.ready) return;
+    setAlertConfig({
+      emergencyContact: state.settings.emergencyContact || '',
+      autoCallOnDanger: !!(state.settings.autoCall || state.settings.autoCallOnDanger),
+      autoSmsOnDanger: !!state.settings.autoSmsOnDanger,
+      autoCallOnPowerCut: !!state.settings.autoCallOnPowerCut,
+      thresholds: state.thresholds,
+    }).catch(() => {});
+  }, [
+    state.ready,
+    state.settings.emergencyContact,
+    state.settings.autoCall,
+    state.settings.autoCallOnDanger,
+    state.settings.autoSmsOnDanger,
+    state.settings.autoCallOnPowerCut,
+    state.thresholds,
+  ]);
+
   // ---------- Public actions ----------
   const setLanguage = useCallback(async (lang) => {
     await Storage.setLanguage(lang);
@@ -256,9 +467,7 @@ export function AppProvider({ children }) {
     try {
       I18nManager.allowRTL(rtl);
       I18nManager.forceRTL(rtl);
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
     dispatch({ type: 'SET_LANGUAGE', payload: lang });
   }, []);
 
@@ -273,10 +482,7 @@ export function AppProvider({ children }) {
     let resolvedFarmId = farmId;
     if (!resolvedFarmId) {
       if (s.farms.length === 0) {
-        const farm = {
-          id: uid('f_'),
-          name: s.settings.farmName || 'My farm',
-        };
+        const farm = { id: uid('f_'), name: s.settings.farmName || 'My farm' };
         farms = [farm];
         await Storage.setFarms(farms);
         resolvedFarmId = farm.id;
@@ -285,12 +491,8 @@ export function AppProvider({ children }) {
       }
     }
 
-    const exists = s.devices.find(
-      (d) => d.id.toUpperCase() === String(deviceId).toUpperCase()
-    );
-    if (exists) {
-      return { ok: false, reason: 'duplicate' };
-    }
+    const exists = s.devices.find((d) => d.id.toUpperCase() === String(deviceId).toUpperCase());
+    if (exists) return { ok: false, reason: 'duplicate' };
 
     const device = {
       id: String(deviceId).toUpperCase(),
@@ -315,6 +517,7 @@ export function AppProvider({ children }) {
     const power = { ...s.powerCut };
     delete power[deviceId];
     await Storage.setPowerCut(power);
+    delete dangerStateRef.current[deviceId];
     dispatch({ type: 'SET_DEVICES', payload: devices });
     dispatch({ type: 'SET_ALERTS', payload: alerts });
     dispatch({ type: 'SET_POWER_CUT', payload: power });
@@ -337,9 +540,26 @@ export function AppProvider({ children }) {
 
   const updateSettings = useCallback(async (patch) => {
     const s = stateRef.current;
-    const next = { ...s.settings, ...patch };
+    let next = { ...s.settings, ...patch };
+
+    // Whenever a non-empty emergency contact is saved, force-enable all
+    // auto-alert toggles so the app actually does something. The user can
+    // turn them off afterward if they want.
+    if (patch.emergencyContact !== undefined && patch.emergencyContact.trim()) {
+      next = {
+        ...next,
+        autoCall: true,
+        autoCallOnDanger: true,
+        autoCallOnPowerCut: true,
+        autoSmsOnDanger: true,
+      };
+    }
+
     await Storage.setSettings(next);
     dispatch({ type: 'SET_SETTINGS', payload: next });
+    if (patch.emergencyContact !== undefined) {
+      saveEmergencyContact(patch.emergencyContact || '').catch(() => {});
+    }
   }, []);
 
   const updateThresholds = useCallback(async (patch) => {
@@ -358,10 +578,9 @@ export function AppProvider({ children }) {
     const s = stateRef.current;
     const num = (s.settings.emergencyContact || '').trim();
     if (!num) return false;
-    return await makePhoneCall(num);
+    return await makeDirectCall(num);
   }, []);
 
-  // Direct hook for testing/simulation buttons
   const injectMessage = useCallback((message, isAlert = false) => {
     handleSmsEvent({
       message,
@@ -370,7 +589,6 @@ export function AppProvider({ children }) {
     });
   }, [handleSmsEvent]);
 
-  // ---------- Derived helpers ----------
   const lastReadingFor = useCallback((deviceId) => {
     const list = state.readings[deviceId];
     if (!list || list.length === 0) return null;

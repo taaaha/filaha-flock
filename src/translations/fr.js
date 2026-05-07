@@ -1,9 +1,9 @@
 export default {
-  appName: 'Filaha',
+  appName: 'Filaha Flock',
   appTagline: 'Surveillance de poulailler',
 
   // Onboarding
-  onboardingTitle1: 'Bienvenue sur Filaha',
+  onboardingTitle1: 'Bienvenue sur Filaha Flock',
   onboardingDesc1: 'Surveillez vos poulaillers à distance par SMS',
   onboardingTitle2: 'Alertes instantanées',
   onboardingDesc2: 'Recevez des alertes pour ammoniac, CO₂, température et humidité',
@@ -141,4 +141,34 @@ export default {
   statusDanger: 'Danger',
   statusOffline: 'Hors ligne',
   statusPowerCut: 'Sans courant',
+
+  // Toasts & feedback
+  saved: 'Enregistré',
+  profileSaved: 'Profil enregistré',
+  contactSaved: "Contact d'urgence enregistré",
+  thresholdsSaved: 'Seuils mis à jour',
+  callStarted: 'Appel en cours…',
+  callFailed: "Échec de l'appel",
+  noEmergencyNumber: "Aucun contact d'urgence défini",
+  testAlertSent: 'Alerte test envoyée',
+  testDataSent: 'Données test envoyées',
+  permissionGranted: 'Autorisation accordée',
+  permissionDenied: 'Autorisation refusée',
+
+  // Dashboard buttons
+  testData: 'Test données',
+  testAlert: 'Test alerte',
+  testAll: 'Test complet',
+  testAllHint: 'Envoie une notification + SMS + appel pour vérifier que tout fonctionne.',
+  testNotificationBody: "Ceci est une notification de test Filaha Flock. Si vous la voyez, les alertes fonctionnent.",
+  longPressForAlert: 'Appui long pour envoyer une alerte',
+  checkNow: 'vérifier',
+  liveMonitoring: 'Surveillance directe',
+  systemReady: 'Système prêt',
+
+  // SMS
+  autoSms: 'SMS auto en cas de danger',
+  sendSmsPermission: 'Envoi de SMS',
+  smsSent: 'SMS envoyé',
+  smsFailed: "Échec de l'envoi du SMS",
 };

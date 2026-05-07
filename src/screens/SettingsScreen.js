@@ -13,13 +13,19 @@ import {
   requestSmsPermissions,
   checkCallPermission,
   requestCallPermission,
+  checkSendSmsPermission,
+  requestSendSmsPermission,
   requestNotificationPermission,
+  checkNotificationsEnabled,
+  showAlertNotification,
+  sendSms,
 } from '../services/SmsService';
+import { makeDirectCall } from '../services/CallService';
 import Field from '../components/Field';
 import ToggleRow from '../components/ToggleRow';
 import ThresholdSlider from '../components/ThresholdSlider';
 import PrimaryButton from '../components/PrimaryButton';
-import { makePhoneCall } from '../services/CallService';
+import { showToast } from '../components/Toast';
 
 export default function SettingsScreen() {
   const {
@@ -32,34 +38,43 @@ export default function SettingsScreen() {
   const [emergencyContact, setEmergencyContact] = useState(settings.emergencyContact || '');
   const [smsGranted, setSmsGranted] = useState(false);
   const [callGranted, setCallGranted] = useState(false);
+  const [sendSmsGranted, setSendSmsGranted] = useState(false);
+  const [notifEnabled, setNotifEnabled] = useState(false);
   const [batteryOk, setBatteryOk] = useState(true);
 
   useEffect(() => { setFarmerName(settings.farmerName || ''); }, [settings.farmerName]);
   useEffect(() => { setFarmName(settings.farmName || ''); }, [settings.farmName]);
   useEffect(() => { setEmergencyContact(settings.emergencyContact || ''); }, [settings.emergencyContact]);
 
-  useEffect(() => {
-    refreshPermissions();
-  }, []);
+  useEffect(() => { refreshPermissions(); }, []);
 
   const refreshPermissions = async () => {
-    const sms = await checkSmsPermission();
-    const call = await checkCallPermission();
-    const battery = await isIgnoringBatteryOptimizations();
+    const [sms, call, send, notif, batt] = await Promise.all([
+      checkSmsPermission(),
+      checkCallPermission(),
+      checkSendSmsPermission(),
+      checkNotificationsEnabled(),
+      isIgnoringBatteryOptimizations(),
+    ]);
     setSmsGranted(sms);
     setCallGranted(call);
-    setBatteryOk(battery);
+    setSendSmsGranted(send);
+    setNotifEnabled(notif);
+    setBatteryOk(batt);
   };
 
-  const onSaveProfile = () => {
-    updateSettings({
+  const onSaveProfile = async () => {
+    await updateSettings({
       farmerName: farmerName.trim(),
       farmName: farmName.trim(),
     });
+    showToast(t('profileSaved'), 'success');
   };
 
-  const onSaveContact = () => {
-    updateSettings({ emergencyContact: emergencyContact.trim() });
+  const onSaveContact = async () => {
+    const trimmed = emergencyContact.trim();
+    await updateSettings({ emergencyContact: trimmed });
+    showToast(trimmed ? t('contactSaved') : t('saved'), 'success');
   };
 
   const onLanguage = (lang) => {
@@ -73,42 +88,111 @@ export default function SettingsScreen() {
   const onResetThresholds = () => {
     Alert.alert(t('resetDefaults'), '', [
       { text: t('cancel'), style: 'cancel' },
-      { text: t('done'), onPress: () => resetThresholds() },
+      {
+        text: t('done'),
+        onPress: async () => {
+          await resetThresholds();
+          showToast(t('thresholdsSaved'), 'success');
+        },
+      },
     ]);
   };
 
   const onTestCall = async () => {
     const num = (emergencyContact || settings.emergencyContact || '').trim();
-    if (!num) {
-      Alert.alert(t('callEmergency'), t('emergencyContact'));
-      return;
+    if (!num) { showToast(t('noEmergencyNumber'), 'warn'); return; }
+    let granted = await checkCallPermission();
+    if (!granted) granted = await requestCallPermission();
+    if (!granted) { showToast(t('permissionDenied'), 'error'); return; }
+    showToast(t('callStarted'), 'info');
+    const ok = await makeDirectCall(num);
+    if (!ok) showToast(t('callFailed'), 'error');
+  };
+
+  // Run a complete end-to-end test: notification + SMS + call
+  const onTestAll = async () => {
+    const num = (emergencyContact || settings.emergencyContact || '').trim();
+    if (!num) { showToast(t('noEmergencyNumber'), 'warn'); return; }
+
+    // 1) Ensure notification permission, then post notification
+    let nOk = await checkNotificationsEnabled();
+    if (!nOk) {
+      await requestNotificationPermission();
+      nOk = await checkNotificationsEnabled();
     }
-    const ok = await makePhoneCall(num);
-    if (!ok) Alert.alert(t('callEmergency'), '✗');
+    const notifResult = await showAlertNotification(
+      `🧪 ${t('testAlert')} — Filaha Flock`,
+      t('testNotificationBody') || 'This is a Filaha Flock test notification. If you see this, alerts are working.',
+      false
+    );
+    showToast(
+      notifResult ? `✓ ${t('notificationPermission')}` : `✗ ${t('notificationPermission')}`,
+      notifResult ? 'success' : 'error'
+    );
+
+    // 2) Send SMS
+    setTimeout(async () => {
+      let smsOk = await checkSendSmsPermission();
+      if (!smsOk) smsOk = await requestSendSmsPermission();
+      if (smsOk) {
+        const sent = await sendSms(num,
+          `🧪 Filaha Flock test SMS\n${new Date().toLocaleString()}`);
+        showToast(
+          sent ? `✓ SMS` : `✗ SMS`,
+          sent ? 'success' : 'error'
+        );
+      } else {
+        showToast(`✗ SMS — ${t('permissionDenied')}`, 'error');
+      }
+    }, 800);
+
+    // 3) Place call
+    setTimeout(async () => {
+      let cOk = await checkCallPermission();
+      if (!cOk) cOk = await requestCallPermission();
+      if (cOk) {
+        showToast(t('callStarted'), 'info');
+        await makeDirectCall(num);
+      } else {
+        showToast(`✗ ${t('callPermission')}`, 'error');
+      }
+    }, 2200);
   };
 
   const onRequestSms = async () => {
-    await requestSmsPermissions();
+    const ok = await requestSmsPermissions();
     refreshPermissions();
+    showToast(ok ? t('permissionGranted') : t('permissionDenied'), ok ? 'success' : 'error');
   };
   const onRequestCall = async () => {
-    await requestCallPermission();
+    const ok = await requestCallPermission();
     refreshPermissions();
+    showToast(ok ? t('permissionGranted') : t('permissionDenied'), ok ? 'success' : 'error');
+  };
+  const onRequestSendSms = async () => {
+    const ok = await requestSendSmsPermission();
+    refreshPermissions();
+    showToast(ok ? t('permissionGranted') : t('permissionDenied'), ok ? 'success' : 'error');
   };
   const onRequestNotif = async () => {
-    await requestNotificationPermission();
-    refreshPermissions();
+    const ok = await requestNotificationPermission();
+    setTimeout(refreshPermissions, 500);
+    showToast(ok ? t('permissionGranted') : t('permissionDenied'), ok ? 'success' : 'error');
   };
   const onRequestBattery = async () => {
     await requestIgnoreBatteryOptimizations();
     setTimeout(refreshPermissions, 1000);
   };
 
+  const onThresholdChange = (key, v) => {
+    updateThresholds({ [key]: v });
+  };
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.screenTitle}>{t('settings')}</Text>
@@ -127,6 +211,7 @@ export default function SettingsScreen() {
         />
         <PrimaryButton
           title={t('save')}
+          icon="✓"
           variant="primary"
           onPress={onSaveProfile}
           style={{ marginBottom: 16 }}
@@ -139,20 +224,13 @@ export default function SettingsScreen() {
             <Pressable
               key={code}
               onPress={() => onLanguage(code)}
-              style={[
-                styles.langRow,
-                language === code && styles.langRowActive,
-              ]}
+              android_ripple={{ color: colors.accent + '22' }}
+              style={[styles.langRow, language === code && styles.langRowActive]}
             >
-              <Text style={[
-                styles.langText,
-                language === code && styles.langTextActive,
-              ]}>
+              <Text style={[styles.langText, language === code && styles.langTextActive]}>
                 {LANGS[code].name}
               </Text>
-              {language === code ? (
-                <Text style={styles.langCheck}>✓</Text>
-              ) : null}
+              {language === code ? <Text style={styles.langCheck}>✓</Text> : null}
             </Pressable>
           ))}
         </View>
@@ -161,58 +239,34 @@ export default function SettingsScreen() {
         <View style={{ marginTop: 16 }}>
           <View style={styles.sectionRow}>
             <Text style={styles.sectionTitle}>{t('thresholds')}</Text>
-            <Pressable onPress={onResetThresholds}>
+            <Pressable onPress={onResetThresholds} android_ripple={{ color: colors.accent + '22' }}>
               <Text style={styles.resetText}>{t('resetDefaults')}</Text>
             </Pressable>
           </View>
 
           <ThresholdSlider
-            label={t('co2')}
-            warnLabel={t('warnLevel')}
-            dangerLabel={t('dangerLevel')}
-            warn={thresholds.co2.warn}
-            danger={thresholds.co2.danger}
-            min={500}
-            max={5000}
-            step={100}
-            unit="ppm"
-            onChange={(v) => updateThresholds({ co2: v })}
+            label={t('co2')} warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
+            warn={thresholds.co2.warn} danger={thresholds.co2.danger}
+            min={500} max={5000} step={100} unit="ppm"
+            onChange={(v) => onThresholdChange('co2', v)}
           />
           <ThresholdSlider
-            label={t('nh3')}
-            warnLabel={t('warnLevel')}
-            dangerLabel={t('dangerLevel')}
-            warn={thresholds.nh3.warn}
-            danger={thresholds.nh3.danger}
-            min={5}
-            max={80}
-            step={1}
-            unit="ppm"
-            onChange={(v) => updateThresholds({ nh3: v })}
+            label={t('nh3')} warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
+            warn={thresholds.nh3.warn} danger={thresholds.nh3.danger}
+            min={5} max={80} step={1} unit="ppm"
+            onChange={(v) => onThresholdChange('nh3', v)}
           />
           <ThresholdSlider
-            label={t('temperature')}
-            warnLabel={t('warnLevel')}
-            dangerLabel={t('dangerLevel')}
-            warn={thresholds.temp.warn}
-            danger={thresholds.temp.danger}
-            min={20}
-            max={50}
-            step={1}
-            unit="°C"
-            onChange={(v) => updateThresholds({ temp: v })}
+            label={t('temperature')} warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
+            warn={thresholds.temp.warn} danger={thresholds.temp.danger}
+            min={20} max={50} step={1} unit="°C"
+            onChange={(v) => onThresholdChange('temp', v)}
           />
           <ThresholdSlider
-            label={t('humidity')}
-            warnLabel={t('warnLevel')}
-            dangerLabel={t('dangerLevel')}
-            warn={thresholds.hum.warn}
-            danger={thresholds.hum.danger}
-            min={30}
-            max={100}
-            step={1}
-            unit="%"
-            onChange={(v) => updateThresholds({ hum: v })}
+            label={t('humidity')} warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
+            warn={thresholds.hum.warn} danger={thresholds.hum.danger}
+            min={30} max={100} step={1} unit="%"
+            onChange={(v) => onThresholdChange('hum', v)}
           />
         </View>
 
@@ -240,21 +294,42 @@ export default function SettingsScreen() {
         />
         <PrimaryButton
           title={t('save')}
+          icon="✓"
           variant="primary"
           onPress={onSaveContact}
-          style={{ marginBottom: 8 }}
+          style={{ marginBottom: 10 }}
         />
-        <PrimaryButton
-          title={t('testCall')}
-          icon="📞"
-          variant="success"
-          onPress={onTestCall}
-          style={{ marginBottom: 12 }}
-        />
+
+        <View style={styles.testRow}>
+          <PrimaryButton
+            title={t('testCall')}
+            icon="📞"
+            variant="success"
+            onPress={onTestCall}
+            style={{ flex: 1 }}
+          />
+          <PrimaryButton
+            title={t('testAll')}
+            icon="🧪"
+            variant="warn"
+            onPress={onTestAll}
+            style={{ flex: 1 }}
+          />
+        </View>
+
+        <Text style={styles.testHint}>
+          {t('testAllHint')}
+        </Text>
+
         <ToggleRow
           label={t('autoCall')}
           value={!!settings.autoCallOnDanger}
           onValueChange={(v) => updateSettings({ autoCallOnDanger: v, autoCall: v })}
+        />
+        <ToggleRow
+          label={t('autoSms')}
+          value={!!settings.autoSmsOnDanger}
+          onValueChange={(v) => updateSettings({ autoSmsOnDanger: v })}
         />
         <ToggleRow
           label={t('autoCallPowerCut')}
@@ -270,7 +345,13 @@ export default function SettingsScreen() {
           grantedLabel={t('granted')}
           deniedLabel={t('enable')}
           onPress={onRequestSms}
-          t={t}
+        />
+        <PermissionRow
+          label={t('sendSmsPermission')}
+          granted={sendSmsGranted}
+          grantedLabel={t('granted')}
+          deniedLabel={t('enable')}
+          onPress={onRequestSendSms}
         />
         <PermissionRow
           label={t('callPermission')}
@@ -278,15 +359,13 @@ export default function SettingsScreen() {
           grantedLabel={t('granted')}
           deniedLabel={t('enable')}
           onPress={onRequestCall}
-          t={t}
         />
         <PermissionRow
           label={t('notificationPermission')}
-          granted={null}
+          granted={notifEnabled}
           deniedLabel={t('enable')}
           grantedLabel={t('granted')}
           onPress={onRequestNotif}
-          t={t}
         />
         <PermissionRow
           label={t('batteryOptimization')}
@@ -295,11 +374,10 @@ export default function SettingsScreen() {
           deniedLabel={t('enable')}
           hint={t('batteryOptimizationDesc')}
           onPress={onRequestBattery}
-          t={t}
         />
 
         <Text style={styles.versionText}>
-          {t('version')}: 1.0.0
+          Filaha Flock • {t('version')} 1.0.0
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -308,12 +386,11 @@ export default function SettingsScreen() {
 
 function PermissionRow({ label, granted, grantedLabel, deniedLabel, hint, onPress }) {
   const isGranted = granted === true;
-  const showStatus = granted !== null && granted !== undefined;
   return (
     <Pressable
       onPress={onPress}
       android_ripple={{ color: '#1a2235' }}
-      style={styles.permRow}
+      style={[styles.permRow, isGranted && styles.permRowOk]}
     >
       <View style={{ flex: 1 }}>
         <Text style={styles.permLabel}>{label}</Text>
@@ -321,13 +398,13 @@ function PermissionRow({ label, granted, grantedLabel, deniedLabel, hint, onPres
       </View>
       <View style={[
         styles.permBadge,
-        showStatus ? (isGranted ? styles.permBadgeOk : styles.permBadgeBad) : styles.permBadgeNeutral,
+        isGranted ? styles.permBadgeOk : styles.permBadgeBad,
       ]}>
         <Text style={[
           styles.permBadgeText,
-          { color: showStatus ? (isGranted ? colors.ok : colors.danger) : colors.accent },
+          { color: isGranted ? colors.ok : colors.danger },
         ]}>
-          {showStatus ? (isGranted ? grantedLabel : deniedLabel) : deniedLabel}
+          {isGranted ? grantedLabel : deniedLabel}
         </Text>
       </View>
     </Pressable>
@@ -338,17 +415,15 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   screenTitle: {
     color: colors.textPrimary,
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '900',
-    marginBottom: 16,
+    marginBottom: 18,
   },
   sectionTitle: {
     color: colors.textSecondary,
     fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginTop: 14,
+    fontWeight: '800',
+    marginTop: 18,
     marginBottom: 10,
   },
   sectionRow: {
@@ -359,56 +434,69 @@ const styles = StyleSheet.create({
   resetText: {
     color: colors.accent,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  langGrid: { gap: 8, marginBottom: 8 },
+  langGrid: { gap: 8 },
   langRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
-    minHeight: 50,
+    minHeight: 52,
   },
   langRowActive: {
     borderColor: colors.accent,
-    backgroundColor: colors.accent + '11',
+    backgroundColor: colors.accent + '14',
   },
   langText: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
-  langTextActive: { color: colors.accent },
+  langTextActive: { color: colors.accent, fontWeight: '800' },
   langCheck: { color: colors.accent, fontSize: 18, fontWeight: '900' },
+
+  testRow: { flexDirection: 'row', gap: 10, marginBottom: 6 },
+  testHint: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+
   permRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: 10,
-    minHeight: 56,
+    minHeight: 60,
+  },
+  permRowOk: {
+    borderColor: colors.ok + '40',
   },
   permLabel: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
-  permHint: { color: colors.textTertiary, fontSize: 11, marginTop: 2 },
+  permHint: { color: colors.textTertiary, fontSize: 11, marginTop: 3, lineHeight: 15 },
   permBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
   },
   permBadgeOk: { backgroundColor: colors.ok + '22', borderColor: colors.ok + '55' },
   permBadgeBad: { backgroundColor: colors.danger + '22', borderColor: colors.danger + '55' },
-  permBadgeNeutral: { backgroundColor: colors.accent + '22', borderColor: colors.accent + '55' },
-  permBadgeText: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  permBadgeText: { fontSize: 11, fontWeight: '800' },
   versionText: {
     color: colors.textTertiary,
     fontSize: 12,
     textAlign: 'center',
-    marginTop: 24,
+    marginTop: 28,
   },
 });
