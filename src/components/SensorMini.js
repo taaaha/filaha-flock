@@ -19,13 +19,15 @@ export default function SensorMini({ sensorKey, value, label, thresholds }) {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.iconBox, { backgroundColor: sColor + '1d' }]}>
-        <Text style={styles.icon}>{meta.icon || '•'}</Text>
+      <View style={styles.iconCol}>
+        <View style={[styles.iconBox, { backgroundColor: sColor + '1d', borderColor: sColor + '40' }]}>
+          <Text style={styles.icon}>{meta.icon || '•'}</Text>
+        </View>
       </View>
       <View style={styles.col}>
         <Text style={styles.label} numberOfLines={1}>{label}</Text>
         <View style={styles.valueRow}>
-          <Text style={[styles.value, { color: noData ? colors.textTertiary : sColor }]}>
+          <Text style={[styles.value, { color: noData ? colors.textTertiary : colors.textPrimary }]}>
             {noData ? '—' : formatNumber(value, meta.decimals || 0)}
           </Text>
           {!noData ? <Text style={styles.unit}>{meta.unit}</Text> : null}
@@ -39,25 +41,28 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
+    gap: 10,
     flexBasis: '50%',
     minWidth: '48%',
-    paddingRight: 6,
-    marginBottom: 10,
+    paddingRight: 8,
+    marginBottom: 12,
   },
+  iconCol: {},
   iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   icon: { fontSize: 18 },
   col: { flex: 1 },
   label: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
+    color: colors.textTertiary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
   valueRow: {
     flexDirection: 'row',
@@ -66,9 +71,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   value: {
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: '800',
-    lineHeight: 23,
+    letterSpacing: -0.3,
+    lineHeight: 24,
   },
   unit: {
     color: colors.textTertiary,

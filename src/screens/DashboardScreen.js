@@ -13,8 +13,9 @@ import {
   NativeModules,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { useApp } from '../contexts/AppContext';
-import { colors, STATUS, statusColor } from '../utils/colors';
+import { colors, STATUS, statusColor, shadows } from '../utils/colors';
 import { deviceStatus, statusPriority } from '../utils/thresholds';
 import { buildFakeDataSms } from '../utils/smsParser';
 import CoopCard from '../components/CoopCard';
@@ -31,13 +32,25 @@ import {
   requestCallPermission,
   requestSendSmsPermission,
   requestNotificationPermission,
-  showAlertNotification,
-  sendSms,
   getNativeVersion,
   listMissingNativeMethods,
   EXPECTED_NATIVE_VERSION,
 } from '../services/SmsService';
-import { makeDirectCall } from '../services/CallService';
+
+function HeroBackdrop({ heroColor }) {
+  // Subtle gradient under the header
+  return (
+    <Svg height="180" width="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Defs>
+        <SvgLinearGradient id="hero" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={heroColor} stopOpacity="0.18" />
+          <Stop offset="1" stopColor={colors.bg} stopOpacity="0" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="180" fill="url(#hero)" />
+    </Svg>
+  );
+}
 
 export default function DashboardScreen({ navigation }) {
   const {
@@ -61,15 +74,9 @@ export default function DashboardScreen({ navigation }) {
       const ver = await getNativeVersion();
       if (cancelled) return;
       if (missing.length > 0) {
-        setBuildIssue({
-          kind: 'missing',
-          detail: missing.join(', '),
-        });
+        setBuildIssue({ kind: 'missing', detail: missing.join(', ') });
       } else if (ver !== EXPECTED_NATIVE_VERSION) {
-        setBuildIssue({
-          kind: 'mismatch',
-          detail: `installed ${ver || 'unknown'} ≠ expected ${EXPECTED_NATIVE_VERSION}`,
-        });
+        setBuildIssue({ kind: 'mismatch', detail: `${ver || 'unknown'} ≠ ${EXPECTED_NATIVE_VERSION}` });
       } else {
         setBuildIssue(null);
       }
@@ -77,7 +84,6 @@ export default function DashboardScreen({ navigation }) {
     return () => { cancelled = true; };
   }, []);
 
-  // Check critical permissions
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -90,7 +96,7 @@ export default function DashboardScreen({ navigation }) {
       if (cancelled) return;
       if (!sms) setPermIssue({ key: 'sms', label: t('smsPermission'), action: requestSmsPermissions });
       else if (!call) setPermIssue({ key: 'call', label: t('callPermission'), action: requestCallPermission });
-      else if (!sendSms) setPermIssue({ key: 'sendSms', label: 'SEND SMS', action: requestSendSmsPermission });
+      else if (!sendSms) setPermIssue({ key: 'sendSms', label: t('sendSmsPermission'), action: requestSendSmsPermission });
       else if (!notif) setPermIssue({ key: 'notif', label: t('notificationPermission'), action: requestNotificationPermission });
       else setPermIssue(null);
     })();
@@ -120,10 +126,10 @@ export default function DashboardScreen({ navigation }) {
   }, [augmented]);
 
   const farmName = (settings && settings.farmName) || '';
+  const farmerName = (settings && settings.farmerName) || '';
   const anyDanger = counts.danger > 0;
-  const anyWarn = counts.warn > 0;
 
-  // Live status pulse on the indicator dot
+  // Live indicator pulse
   const livePulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -136,19 +142,43 @@ export default function DashboardScreen({ navigation }) {
     return () => loop.stop();
   }, [livePulse]);
 
-  // FAB scale
   const fabScale = useRef(new Animated.Value(1)).current;
-  const onFabPressIn = () =>
-    Animated.spring(fabScale, { toValue: 0.92, useNativeDriver: true, friction: 6 }).start();
-  const onFabPressOut = () =>
-    Animated.spring(fabScale, { toValue: 1, useNativeDriver: true, friction: 4 }).start();
+  const onFabPressIn = () => Animated.spring(fabScale, { toValue: 0.92, useNativeDriver: true, friction: 6 }).start();
+  const onFabPressOut = () => Animated.spring(fabScale, { toValue: 1, useNativeDriver: true, friction: 4 }).start();
 
-  // ── Test handlers ──
+  // Status mapping
+  let heroLabel, heroColor, heroEmoji;
+  if (counts.total === 0) {
+    heroLabel = t('noCoopsYet');
+    heroColor = colors.textSecondary;
+    heroEmoji = '🐔';
+  } else if (counts.danger > 0) {
+    heroLabel = `${counts.danger} ${t('danger')}`;
+    heroColor = colors.danger;
+    heroEmoji = '🚨';
+  } else if (counts.warn > 0) {
+    heroLabel = `${counts.warn} ${t('warning')}`;
+    heroColor = colors.warn;
+    heroEmoji = '▲';
+  } else if (counts.offline === counts.total) {
+    heroLabel = t('offline');
+    heroColor = colors.offline;
+    heroEmoji = '○';
+  } else {
+    heroLabel = t('systemReady');
+    heroColor = colors.ok;
+    heroEmoji = '✓';
+  }
+
+  // Time-aware greeting
+  const hour = new Date(now).getHours();
+  const greeting = hour < 5 ? '🌙'
+    : hour < 12 ? '☀️'
+    : hour < 18 ? '🌤️'
+    : '🌆';
+
   const onTestData = () => {
-    if (devices.length === 0) {
-      showToast(t('noCoopsYet'), 'warn');
-      return;
-    }
+    if (devices.length === 0) { showToast(t('noCoopsYet'), 'warn'); return; }
     const target = sorted[0]?.device || devices[0];
     injectMessage(buildFakeDataSms(target.id, {
       co2: 800 + Math.floor(Math.random() * 400),
@@ -161,82 +191,49 @@ export default function DashboardScreen({ navigation }) {
   };
 
   const onTestAlert = async () => {
-    // ★ Explicit native-presence check. If any required method is missing
-    // it means the installed APK was built before these methods existed —
-    // user must rebuild. No silent fallbacks.
     const FS = NativeModules.FilahaSms;
     const required = ['showAlertNotification', 'sendSms', 'makeDirectCall', 'setAlertConfig'];
     const missing = required.filter((k) => !FS || typeof FS[k] !== 'function');
     if (missing.length > 0) {
-      showToast(`APK out of date — rebuild required (missing: ${missing[0]})`, 'error');
+      showToast(`APK out of date — rebuild required (${missing[0]})`, 'error');
       return;
     }
-
     const num = ((settings && settings.emergencyContact) || '').trim();
-    if (!num) {
-      showToast(t('noEmergencyNumber'), 'warn');
-      return;
-    }
+    if (!num) { showToast(t('noEmergencyNumber'), 'warn'); return; }
 
     const targetName = devices.length > 0
       ? (sorted[0]?.device?.name || devices[0].name)
       : 'Test';
 
-    // 1) Notification — direct native call, no fallback
     let nOk = await checkNotificationsEnabled();
-    if (!nOk) {
-      await requestNotificationPermission();
-      nOk = await checkNotificationsEnabled();
-    }
-    if (!nOk) {
-      showToast(`✗ Notifications blocked in system settings`, 'error');
-    } else {
+    if (!nOk) { await requestNotificationPermission(); nOk = await checkNotificationsEnabled(); }
+    if (nOk) {
       try {
-        await FS.showAlertNotification(
-          `🚨 ${targetName} — ${t('danger')}`,
-          t('testNotificationBody'),
-          true
-        );
+        await FS.showAlertNotification(`🚨 ${targetName} — ${t('danger')}`, t('testNotificationBody'), true);
         showToast('✓ Notification', 'success');
-      } catch (e) {
-        showToast(`✗ Notification: ${e?.message || 'unknown'}`, 'error');
-      }
-    }
+      } catch (e) { showToast(`✗ ${e?.message || 'fail'}`, 'error'); }
+    } else { showToast(`✗ ${t('notificationPermission')}`, 'error'); }
 
-    // 2) SMS — direct native call
     setTimeout(async () => {
       let smsOk = await checkSendSmsPermission();
       if (!smsOk) smsOk = await requestSendSmsPermission();
-      if (!smsOk) {
-        showToast(`✗ ${t('sendSmsPermission')} denied`, 'error');
-        return;
-      }
+      if (!smsOk) { showToast(`✗ ${t('sendSmsPermission')}`, 'error'); return; }
       try {
-        await FS.sendSms(num,
-          `🧪 Filaha Flock test\n${targetName} — ${t('danger')}\n${new Date().toLocaleTimeString()}`);
+        await FS.sendSms(num, `🧪 Filaha Flock test\n${targetName}\n${new Date().toLocaleTimeString()}`);
         showToast('✓ SMS sent', 'success');
-      } catch (e) {
-        showToast(`✗ SMS: ${e?.message || 'unknown'}`, 'error');
-      }
+      } catch (e) { showToast(`✗ SMS: ${e?.message}`, 'error'); }
     }, 900);
 
-    // 3) Call — direct native call (no Linking fallback)
     setTimeout(async () => {
       let cOk = await checkCallPermission();
       if (!cOk) cOk = await requestCallPermission();
-      if (!cOk) {
-        showToast(`✗ ${t('callPermission')} denied`, 'error');
-        return;
-      }
+      if (!cOk) { showToast(`✗ ${t('callPermission')}`, 'error'); return; }
       try {
         await FS.makeDirectCall(num);
-        showToast('✓ Calling directly', 'success');
-      } catch (e) {
-        showToast(`✗ Call: ${e?.message || 'unknown'}`, 'error');
-      }
+        showToast('✓ Calling', 'success');
+      } catch (e) { showToast(`✗ Call: ${e?.message}`, 'error'); }
     }, 2400);
 
-    // Also inject threshold breach so the alert list updates
     if (devices.length > 0) {
       const target = sorted[0]?.device || devices[0];
       injectMessage(buildFakeDataSms(target.id, {
@@ -267,278 +264,273 @@ export default function DashboardScreen({ navigation }) {
     showToast(ok ? t('permissionGranted') : t('permissionDenied'), ok ? 'success' : 'error');
   };
 
-  // ── Hero status text ──
-  let heroLabel, heroColor, heroIcon;
-  if (counts.total === 0) {
-    heroLabel = t('noCoopsYet');
-    heroColor = colors.textSecondary;
-    heroIcon = '🐔';
-  } else if (counts.danger > 0) {
-    heroLabel = `${counts.danger} ${t('danger')}`;
-    heroColor = colors.danger;
-    heroIcon = '⚠️';
-  } else if (counts.warn > 0) {
-    heroLabel = `${counts.warn} ${t('warning')}`;
-    heroColor = colors.warn;
-    heroIcon = '▲';
-  } else if (counts.offline === counts.total) {
-    heroLabel = t('offline');
-    heroColor = colors.offline;
-    heroIcon = '○';
-  } else {
-    heroLabel = t('systemReady');
-    heroColor = colors.ok;
-    heroIcon = '✓';
-  }
-
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
+    <View style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+      <HeroBackdrop heroColor={heroColor} />
 
-      {/* ── Top Brand ── */}
-      <View style={styles.topBar}>
-        <View style={styles.brandRow}>
-          <View style={styles.logoSquare}>
-            <Text style={styles.logoEmoji}>🐔</Text>
+      <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
+        {/* ── Header ── */}
+        <View style={styles.header}>
+          <View style={styles.brandLeft}>
+            <View style={[styles.logoWrap, { borderColor: heroColor + '50' }]}>
+              <Text style={styles.logoEmoji}>🐔</Text>
+              <View style={[styles.logoDot, { backgroundColor: heroColor }]} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.brandTitle}>Filaha Flock</Text>
+              <View style={styles.statusRow}>
+                <Animated.View
+                  style={[
+                    styles.liveDot,
+                    {
+                      backgroundColor: heroColor,
+                      opacity: livePulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),
+                      transform: [{
+                        scale: livePulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] }),
+                      }],
+                    },
+                  ]}
+                />
+                <Text style={[styles.statusText, { color: heroColor }]} numberOfLines={1}>
+                  {heroLabel}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.timeEmoji}>{greeting}</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.brandTitle} numberOfLines={1}>Filaha Flock</Text>
-            <View style={styles.statusRow}>
-              <Animated.View
-                style={[
-                  styles.liveDot,
-                  {
-                    backgroundColor: heroColor,
-                    opacity: livePulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }),
-                    transform: [{
-                      scale: livePulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.1] }),
-                    }],
-                  },
-                ]}
-              />
-              <Text style={[styles.statusText, { color: heroColor }]} numberOfLines={1}>
-                {heroLabel}
+
+          {(farmerName || farmName) ? (
+            <View style={styles.farmRow}>
+              {farmerName ? <Text style={styles.farmerLabel}>{farmerName}</Text> : null}
+              {farmerName && farmName ? <Text style={styles.dotSep}>•</Text> : null}
+              {farmName ? (
+                <View style={styles.locationPill}>
+                  <Text style={styles.locationText} numberOfLines={1}>📍 {farmName}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+
+        {/* ── Build issue banner (highest priority) ── */}
+        {buildIssue ? (
+          <View style={styles.buildBanner}>
+            <Text style={styles.buildBannerIcon}>⚠️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.buildBannerTitle}>APK is out of date</Text>
+              <Text style={styles.buildBannerHint} numberOfLines={2}>
+                {buildIssue.kind === 'missing'
+                  ? `missing: ${buildIssue.detail}`
+                  : buildIssue.detail}
               </Text>
             </View>
           </View>
-        </View>
-        {farmName ? (
-          <View style={styles.farmRow}>
-            <Text style={styles.farmIcon}>📍</Text>
-            <Text style={styles.farmText} numberOfLines={1}>{farmName}</Text>
+        ) : null}
+
+        {/* ── Permission banner ── */}
+        {!buildIssue && permIssue ? (
+          <Pressable
+            onPress={onFixPermission}
+            android_ripple={{ color: colors.warn + '33' }}
+            style={styles.permBanner}
+          >
+            <View style={styles.permBannerIconBox}>
+              <Text style={styles.permBannerIcon}>🔒</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.permBannerTitle}>{permIssue.label}</Text>
+              <Text style={styles.permBannerHint}>{t('enable')} →</Text>
+            </View>
+          </Pressable>
+        ) : null}
+
+        {/* ── Danger highlight ── */}
+        {anyDanger ? (
+          <View style={styles.dangerHighlight}>
+            <View style={styles.dangerIconBox}>
+              <Text style={styles.dangerIcon}>{heroEmoji}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dangerTitle}>{counts.danger} {t('danger')}</Text>
+              <Text style={styles.dangerHint}>{t('checkNow')}</Text>
+            </View>
+            <Text style={styles.dangerArrow}>›</Text>
           </View>
         ) : null}
-      </View>
 
-      {/* ── APK out-of-date banner (highest priority) ── */}
-      {buildIssue ? (
-        <View style={styles.buildBanner}>
-          <Text style={styles.buildBannerIcon}>⚠️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.buildBannerTitle}>
-              APK is out of date — rebuild required
-            </Text>
-            <Text style={styles.buildBannerHint} numberOfLines={2}>
-              Run: npx expo prebuild --platform android --clean ; eas build -p android --profile preview
-            </Text>
-            <Text style={styles.buildBannerDetail} numberOfLines={1}>
-              {buildIssue.kind === 'missing'
-                ? `missing native methods: ${buildIssue.detail}`
-                : buildIssue.detail}
-            </Text>
-          </View>
-        </View>
-      ) : null}
+        {/* ── Stats Hero ── */}
+        <SummaryBar counts={counts} t={t} />
 
-      {/* ── Permission warning banner ── */}
-      {permIssue ? (
-        <Pressable
-          onPress={onFixPermission}
-          android_ripple={{ color: colors.warn + '33' }}
-          style={styles.permBanner}
-        >
-          <Text style={styles.permBannerIcon}>🔒</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.permBannerTitle}>
-              {permIssue.label} — {t('enable')}
-            </Text>
-            <Text style={styles.permBannerHint}>
-              {t('permissionRequired')}
-            </Text>
+        {/* ── Section header ── */}
+        {devices.length > 0 ? (
+          <View style={styles.sectionRow}>
+            <Text style={styles.sectionLabel}>{t('totalCoops').toUpperCase()}</Text>
+            <Text style={styles.sectionCount}>{counts.total}</Text>
           </View>
-          <Text style={styles.permBannerArrow}>›</Text>
-        </Pressable>
-      ) : null}
+        ) : null}
 
-      {/* ── Danger banner ── */}
-      {anyDanger ? (
-        <View style={styles.dangerBanner}>
-          <View style={styles.dangerIconBox}>
-            <Text style={styles.dangerIcon}>{heroIcon}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.dangerTitle}>
-              {counts.danger} {t('danger')}
-            </Text>
-            <Text style={styles.dangerHint}>
-              {t('checkNow')}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-
-      {/* ── Stats ── */}
-      <SummaryBar counts={counts} t={t} />
-
-      {/* ── List ── */}
-      <FlatList
-        data={sorted}
-        keyExtractor={(item) => item.device.id}
-        renderItem={({ item }) => (
-          <CoopCard
-            device={item.device}
-            reading={item.reading}
-            status={item.status}
-            thresholds={thresholds}
-            t={t}
-            now={now}
-            onPress={() => navigation.navigate('CoopDetail', { deviceId: item.device.id })}
-          />
-        )}
-        contentContainerStyle={{ paddingTop: 4, paddingBottom: 130 }}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🐔</Text>
-            <Text style={styles.emptyTitle}>{t('noCoopsYet')}</Text>
-            <Text style={styles.emptyHint}>{t('noCoopsHint')}</Text>
-            <Pressable
-              onPress={() => setModalVisible(true)}
-              android_ripple={{ color: '#ffffff44' }}
-              style={styles.emptyBtn}
-            >
-              <Text style={styles.emptyBtnText}>+ {t('addNewCoop')}</Text>
-            </Pressable>
-          </View>
-        }
-        ListFooterComponent={
-          devices.length > 0 ? (
-            <View style={styles.testRow}>
+        {/* ── List ── */}
+        <FlatList
+          data={sorted}
+          keyExtractor={(item) => item.device.id}
+          renderItem={({ item }) => (
+            <CoopCard
+              device={item.device}
+              reading={item.reading}
+              status={item.status}
+              thresholds={thresholds}
+              t={t}
+              now={now}
+              onPress={() => navigation.navigate('CoopDetail', { deviceId: item.device.id })}
+            />
+          )}
+          contentContainerStyle={{ paddingTop: 4, paddingBottom: 130 }}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <View style={styles.emptyIconBox}>
+                <Text style={styles.emptyIcon}>🐔</Text>
+              </View>
+              <Text style={styles.emptyTitle}>{t('noCoopsYet')}</Text>
+              <Text style={styles.emptyHint}>{t('noCoopsHint')}</Text>
               <Pressable
-                onPress={onTestData}
-                android_ripple={{ color: colors.accent + '33' }}
-                style={[styles.testBtn, { borderColor: colors.accent + '60' }]}
+                onPress={() => setModalVisible(true)}
+                android_ripple={{ color: '#ffffff44' }}
+                style={styles.emptyBtn}
               >
-                <Text style={styles.testBtnIcon}>📡</Text>
-                <Text style={[styles.testBtnText, { color: colors.accent }]}>
-                  {t('testData')}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={onTestAlert}
-                android_ripple={{ color: colors.danger + '33' }}
-                style={[styles.testBtn, {
-                  borderColor: colors.danger + '70',
-                  backgroundColor: colors.danger + '0d',
-                }]}
-              >
-                <Text style={styles.testBtnIcon}>🚨</Text>
-                <Text style={[styles.testBtnText, { color: colors.danger }]}>
-                  {t('testAlert')}
-                </Text>
+                <Text style={styles.emptyBtnText}>+ {t('addNewCoop')}</Text>
               </Pressable>
             </View>
-          ) : null
-        }
-      />
+          }
+          ListFooterComponent={
+            devices.length > 0 ? (
+              <View style={styles.testRow}>
+                <Pressable
+                  onPress={onTestData}
+                  android_ripple={{ color: colors.accent + '33' }}
+                  style={[styles.testBtn, { borderColor: colors.accent + '44' }]}
+                >
+                  <Text style={styles.testBtnIcon}>📡</Text>
+                  <Text style={[styles.testBtnText, { color: colors.accentSoft }]}>
+                    {t('testData')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={onTestAlert}
+                  android_ripple={{ color: colors.danger + '33' }}
+                  style={[styles.testBtn, {
+                    borderColor: colors.danger + '50',
+                    backgroundColor: colors.danger + '10',
+                  }]}
+                >
+                  <Text style={styles.testBtnIcon}>🚨</Text>
+                  <Text style={[styles.testBtnText, { color: colors.dangerSoft }]}>
+                    {t('testAlert')}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null
+          }
+        />
 
-      {/* ── FAB ── */}
-      <Animated.View style={[styles.fabWrap, { transform: [{ scale: fabScale }] }]}>
-        <Pressable
-          onPress={() => setModalVisible(true)}
-          onPressIn={onFabPressIn}
-          onPressOut={onFabPressOut}
-          android_ripple={{ color: '#ffffff66', borderless: true }}
-          style={styles.fab}
-        >
-          <Text style={styles.fabIcon}>＋</Text>
-        </Pressable>
-      </Animated.View>
+        {/* ── FAB ── */}
+        <Animated.View style={[styles.fabWrap, { transform: [{ scale: fabScale }] }]}>
+          <Pressable
+            onPress={() => setModalVisible(true)}
+            onPressIn={onFabPressIn}
+            onPressOut={onFabPressOut}
+            android_ripple={{ color: '#ffffff66', borderless: true }}
+            style={styles.fab}
+          >
+            <Text style={styles.fabIcon}>＋</Text>
+          </Pressable>
+        </Animated.View>
 
-      {/* ── Add coop modal ── */}
-      <Modal
-        animationType="slide"
-        transparent
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalBackdrop}
+        {/* ── Add coop modal ── */}
+        <Modal
+          animationType="slide"
+          transparent
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
         >
-          <View style={styles.modalCard}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>{t('addNewCoop')}</Text>
-            <Field
-              label={t('coopName')}
-              value={coopName}
-              onChangeText={setCoopName}
-              placeholder={t('coopNamePlaceholder')}
-            />
-            <Field
-              label={t('deviceId')}
-              value={deviceId}
-              onChangeText={(v) => setDeviceId(v.toUpperCase())}
-              placeholder={t('deviceIdPlaceholder')}
-              autoCapitalize="characters"
-              hint={t('deviceIdHint')}
-              maxLength={32}
-            />
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            <View style={styles.modalActions}>
-              <PrimaryButton
-                title={t('cancel')}
-                variant="subtle"
-                onPress={() => { setModalVisible(false); setError(''); }}
-                style={{ flex: 1 }}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalBackdrop}
+          >
+            <View style={styles.modalCard}>
+              <View style={styles.modalHandle} />
+              <Text style={styles.modalTitle}>{t('addNewCoop')}</Text>
+              <Field
+                label={t('coopName')}
+                value={coopName}
+                onChangeText={setCoopName}
+                placeholder={t('coopNamePlaceholder')}
               />
-              <PrimaryButton
-                title={t('add')}
-                icon="＋"
-                onPress={onSubmitNew}
-                style={{ flex: 1 }}
+              <Field
+                label={t('deviceId')}
+                value={deviceId}
+                onChangeText={(v) => setDeviceId(v.toUpperCase())}
+                placeholder={t('deviceIdPlaceholder')}
+                autoCapitalize="characters"
+                hint={t('deviceIdHint')}
+                maxLength={32}
               />
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              <View style={styles.modalActions}>
+                <PrimaryButton
+                  title={t('cancel')}
+                  variant="subtle"
+                  onPress={() => { setModalVisible(false); setError(''); }}
+                  style={{ flex: 1 }}
+                />
+                <PrimaryButton
+                  title={t('add')}
+                  icon="＋"
+                  onPress={onSubmitNew}
+                  style={{ flex: 1 }}
+                />
+              </View>
             </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    </SafeAreaView>
+          </KeyboardAvoidingView>
+        </Modal>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
 
-  topBar: {
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 12,
+  // Header
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
   },
-  brandRow: {
+  brandLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
   },
-  logoSquare: {
-    width: 52, height: 52, borderRadius: 16,
-    backgroundColor: colors.card,
-    borderWidth: 1, borderColor: colors.border,
+  logoWrap: {
+    width: 54, height: 54, borderRadius: 16,
+    backgroundColor: colors.cardElevated,
+    borderWidth: 1.5,
     alignItems: 'center', justifyContent: 'center',
+    ...shadows.sm,
   },
-  logoEmoji: { fontSize: 26 },
+  logoEmoji: { fontSize: 28 },
+  logoDot: {
+    position: 'absolute',
+    top: 4, right: 4,
+    width: 8, height: 8, borderRadius: 4,
+    borderWidth: 2, borderColor: colors.bg,
+  },
   brandTitle: {
     color: colors.textPrimary,
     fontSize: 22,
     fontWeight: '900',
+    letterSpacing: 0.3,
   },
   statusRow: {
     flexDirection: 'row',
@@ -546,57 +538,62 @@ const styles = StyleSheet.create({
     gap: 7,
     marginTop: 4,
   },
-  liveDot: {
-    width: 9, height: 9, borderRadius: 5,
-  },
-  statusText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  liveDot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: 13, fontWeight: '700' },
+  timeEmoji: { fontSize: 22, opacity: 0.85 },
+
   farmRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-    paddingHorizontal: 4,
+    gap: 8,
+    marginTop: 14,
   },
-  farmIcon: { fontSize: 13 },
-  farmText: {
-    color: colors.textSecondary,
+  farmerLabel: {
+    color: colors.textPrimary,
     fontSize: 13,
+    fontWeight: '700',
+  },
+  dotSep: {
+    color: colors.textTertiary,
+    fontSize: 13,
+  },
+  locationPill: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  locationText: {
+    color: colors.textSecondary,
+    fontSize: 12,
     fontWeight: '600',
-    flex: 1,
   },
 
+  // Build banner
   buildBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
     marginHorizontal: 16,
-    marginBottom: 10,
+    marginBottom: 12,
     padding: 14,
-    backgroundColor: colors.danger + '20',
-    borderWidth: 2,
-    borderColor: colors.danger + '90',
+    backgroundColor: colors.danger + '18',
+    borderWidth: 1.5,
+    borderColor: colors.danger + '70',
     borderRadius: 14,
   },
   buildBannerIcon: { fontSize: 22, marginTop: 1 },
-  buildBannerTitle: {
-    color: colors.danger,
-    fontSize: 14,
-    fontWeight: '900',
-  },
+  buildBannerTitle: { color: colors.danger, fontSize: 14, fontWeight: '900' },
   buildBannerHint: {
     color: colors.textSecondary,
     fontSize: 11,
     marginTop: 4,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
-  buildBannerDetail: {
-    color: colors.textTertiary,
-    fontSize: 10,
-    marginTop: 4,
-  },
+
+  // Permission banner
   permBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -604,49 +601,43 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 12,
     padding: 12,
-    backgroundColor: colors.warn + '18',
+    backgroundColor: colors.warn + '15',
     borderWidth: 1,
-    borderColor: colors.warn + '60',
+    borderColor: colors.warn + '50',
     borderRadius: 14,
   },
-  permBannerIcon: { fontSize: 22 },
-  permBannerTitle: {
-    color: colors.warn,
-    fontSize: 13,
-    fontWeight: '800',
+  permBannerIconBox: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: colors.warn + '25',
+    alignItems: 'center', justifyContent: 'center',
   },
-  permBannerHint: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  permBannerArrow: {
-    color: colors.warn,
-    fontSize: 22,
-    fontWeight: '700',
-  },
+  permBannerIcon: { fontSize: 16 },
+  permBannerTitle: { color: colors.warn, fontSize: 13, fontWeight: '800' },
+  permBannerHint: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
 
-  dangerBanner: {
+  // Danger highlight (premium card style)
+  dangerHighlight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
     marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 14,
+    marginBottom: 14,
+    padding: 16,
     backgroundColor: colors.danger + '15',
     borderWidth: 1.5,
-    borderColor: colors.danger + '70',
-    borderRadius: 14,
+    borderColor: colors.danger + '50',
+    borderRadius: 16,
+    ...shadows.glow(colors.danger),
   },
   dangerIconBox: {
-    width: 38, height: 38, borderRadius: 12,
+    width: 44, height: 44, borderRadius: 12,
     backgroundColor: colors.danger + '30',
     alignItems: 'center', justifyContent: 'center',
   },
-  dangerIcon: { fontSize: 18 },
+  dangerIcon: { fontSize: 20 },
   dangerTitle: {
-    color: colors.danger,
-    fontSize: 15,
+    color: colors.dangerSoft,
+    fontSize: 16,
     fontWeight: '900',
   },
   dangerHint: {
@@ -654,36 +645,66 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  dangerArrow: {
+    color: colors.dangerSoft,
+    fontSize: 26,
+    fontWeight: '300',
+  },
 
+  // Section header above coop list
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  sectionLabel: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  sectionCount: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // Empty state
   empty: {
     alignItems: 'center',
-    paddingTop: 64,
+    paddingTop: 40,
     paddingHorizontal: 40,
   },
-  emptyIcon: { fontSize: 80, marginBottom: 18, opacity: 0.6 },
+  emptyIconBox: {
+    width: 96, height: 96, borderRadius: 24,
+    backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyIcon: { fontSize: 50, opacity: 0.7 },
   emptyTitle: {
     color: colors.textPrimary,
-    fontSize: 20, fontWeight: '800',
-    marginBottom: 8,
-    textAlign: 'center',
+    fontSize: 19, fontWeight: '800',
+    marginBottom: 8, textAlign: 'center',
   },
   emptyHint: {
     color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 26,
-    lineHeight: 22,
+    lineHeight: 21,
+    maxWidth: 260,
   },
   emptyBtn: {
     backgroundColor: colors.accent,
     borderRadius: 14,
     paddingHorizontal: 28,
     paddingVertical: 14,
-    elevation: 4,
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    ...shadows.glow(colors.accent),
   },
   emptyBtnText: { color: '#fff', fontWeight: '900', fontSize: 15 },
 
@@ -691,7 +712,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     gap: 10,
-    marginTop: 8,
+    marginTop: 6,
     marginBottom: 8,
   },
   testBtn: {
@@ -708,30 +729,23 @@ const styles = StyleSheet.create({
   testBtnIcon: { fontSize: 14 },
   testBtnText: { fontWeight: '800', fontSize: 13 },
 
+  // FAB
   fabWrap: {
     position: 'absolute',
     right: 20, bottom: 20,
   },
   fab: {
-    width: 62, height: 62, borderRadius: 31,
+    width: 60, height: 60, borderRadius: 30,
     backgroundColor: colors.accent,
     alignItems: 'center', justifyContent: 'center',
-    elevation: 12,
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 14,
+    ...shadows.glow(colors.accent),
   },
-  fabIcon: {
-    color: '#fff',
-    fontSize: 30,
-    fontWeight: '300',
-    lineHeight: 32,
-  },
+  fabIcon: { color: '#fff', fontSize: 30, fontWeight: '300', lineHeight: 32 },
 
+  // Modal
   modalBackdrop: {
     flex: 1,
-    backgroundColor: '#000000bb',
+    backgroundColor: '#000000cc',
     justifyContent: 'flex-end',
   },
   modalCard: {
