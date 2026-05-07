@@ -104,13 +104,16 @@ function injectKotlin(contents) {
   }
 
   const addLine = 'packages.add(SmsPackage())';
-  if (!contents.includes(addLine)) {
+  if (!contents.includes('SmsPackage()')) {
+    let injected = false;
+
     // Form A: val packages = PackageList(this).packages ... return packages
     if (/val\s+packages\s*=\s*PackageList\(this\)\.packages/.test(contents)) {
       contents = contents.replace(
         /(val\s+packages\s*=\s*PackageList\(this\)\.packages[^\n]*\n)/,
         `$1              ${addLine}\n`
       );
+      injected = true;
     }
     // Form B: PackageList(this).packages.apply { ... }
     else if (/PackageList\(this\)\.packages\.apply\s*\{/.test(contents)) {
@@ -118,13 +121,32 @@ function injectKotlin(contents) {
         /(PackageList\(this\)\.packages\.apply\s*\{)/,
         `$1\n              add(SmsPackage())`
       );
+      injected = true;
     }
-    // Fallback: find "return packages" and insert before it
+    // Form C (Expo SDK 50 template): direct `return PackageList(this).packages`
+    else if (/return\s+PackageList\(this\)\.packages\b/.test(contents)) {
+      contents = contents.replace(
+        /([ \t]*)return\s+PackageList\(this\)\.packages\b[^\n]*/,
+        (match, indent) =>
+          `${indent}val packages = PackageList(this).packages\n${indent}${addLine}\n${indent}return packages`
+      );
+      injected = true;
+    }
+    // Form D: a `return packages` line we can prepend to
     else if (/return\s+packages\s*$/m.test(contents)) {
       contents = contents.replace(
-        /(\s*)return\s+packages\s*$/m,
+        /([ \t]*)return\s+packages\s*$/m,
         (match, indent) =>
-          `${indent}${addLine}${indent}return packages`
+          `${indent}${addLine}\n${indent}return packages`
+      );
+      injected = true;
+    }
+
+    if (!injected) {
+      throw new Error(
+        '[withFilahaSms] Could not find a known getPackages() template ' +
+        'in MainApplication.kt to inject SmsPackage(). The native module ' +
+        'will NOT be registered. Inspect MainApplication.kt and update the plugin.'
       );
     }
   }
@@ -140,17 +162,30 @@ function injectJava(contents) {
     );
   }
   const addLine = 'packages.add(new SmsPackage());';
-  if (!contents.includes(addLine)) {
+  if (!contents.includes('new SmsPackage()')) {
+    let injected = false;
     if (/List<ReactPackage>\s+packages\s*=\s*new\s+PackageList\(this\)\.getPackages\(\);/.test(contents)) {
       contents = contents.replace(
         /(List<ReactPackage>\s+packages\s*=\s*new\s+PackageList\(this\)\.getPackages\(\);)/,
         `$1\n              ${addLine}`
       );
+      injected = true;
+    } else if (/return\s+new\s+PackageList\(this\)\.getPackages\(\)\s*;/.test(contents)) {
+      contents = contents.replace(
+        /([ \t]*)return\s+new\s+PackageList\(this\)\.getPackages\(\)\s*;/,
+        (match, indent) =>
+          `${indent}List<ReactPackage> packages = new PackageList(this).getPackages();\n${indent}${addLine}\n${indent}return packages;`
+      );
+      injected = true;
     } else if (/return\s+packages\s*;/.test(contents)) {
       contents = contents.replace(
-        /(\s*)return\s+packages\s*;/,
-        (match, indent) => `${indent}${addLine}${indent}return packages;`
+        /([ \t]*)return\s+packages\s*;/,
+        (match, indent) => `${indent}${addLine}\n${indent}return packages;`
       );
+      injected = true;
+    }
+    if (!injected) {
+      throw new Error('[withFilahaSms] Could not inject SmsPackage in MainApplication.java');
     }
   }
   return contents;
