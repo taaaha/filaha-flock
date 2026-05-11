@@ -229,10 +229,10 @@ function RootNav() {
       </View>
     );
   }
-  // key={themeMode} forces a remount of the navigator on theme switch so
-  // every screen rebuilds its styles with the new palette.
+  // Theme is applied via the Proxy `colors` + useStyles hook. The screens
+  // re-render when `themeMode` changes because they subscribe via useTheme.
   return (
-    <NavigationContainer key={themeMode} theme={{
+    <NavigationContainer theme={{
       ...navTheme,
       colors: {
         ...navTheme.colors,

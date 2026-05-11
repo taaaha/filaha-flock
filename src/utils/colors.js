@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 // ── Theme palettes ─────────────────────────────────────────────────────
 const DARK = {
   // Backgrounds
@@ -78,9 +80,13 @@ const LIGHT = {
 };
 
 // ── Theme state ────────────────────────────────────────────────────────
-let activePalette = DARK;
 let activeMode = 'dark';
 const listeners = new Set();
+
+// Plain mutable object — we swap its contents on theme change.
+// Every `import { colors }` shares this same reference; reading `colors.bg`
+// at render time always returns the current palette's value.
+export const colors = { ...DARK };
 
 export function getActiveTheme() { return activeMode; }
 
@@ -88,7 +94,10 @@ export function setActiveTheme(mode) {
   if (mode !== 'dark' && mode !== 'light') return;
   if (mode === activeMode) return;
   activeMode = mode;
-  activePalette = mode === 'light' ? LIGHT : DARK;
+  const next = mode === 'light' ? LIGHT : DARK;
+  // Replace all keys in-place so the same reference reflects the new palette.
+  for (const k of Object.keys(colors)) delete colors[k];
+  Object.assign(colors, next);
   listeners.forEach((l) => { try { l(mode); } catch (e) {} });
 }
 
@@ -96,17 +105,6 @@ export function subscribeTheme(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
-
-// Proxy so every existing `import { colors }` keeps reading the *current*
-// palette without needing to touch any component.
-export const colors = new Proxy({}, {
-  get(_, key) { return activePalette[key]; },
-  has(_, key) { return key in activePalette; },
-  ownKeys() { return Object.keys(activePalette); },
-  getOwnPropertyDescriptor(_, key) {
-    return { enumerable: true, configurable: true, value: activePalette[key] };
-  },
-});
 
 // ── Status helpers ─────────────────────────────────────────────────────
 export const STATUS = {
@@ -163,7 +161,6 @@ export const shadows = {
 // React hook that forces re-render on theme change. Components don't need
 // to use it explicitly — the Proxy will read the new palette anyway — but
 // top-level screens should call it so styles recompute.
-import { useEffect, useState } from 'react';
 export function useTheme() {
   const [mode, setMode] = useState(activeMode);
   useEffect(() => subscribeTheme(setMode), []);

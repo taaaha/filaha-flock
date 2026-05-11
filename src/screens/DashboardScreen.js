@@ -149,62 +149,71 @@ export default function DashboardScreen({ navigation }) {
   const farmerName = (settings && settings.farmerName) || '';
   const anyDanger = counts.danger > 0;
 
-  // Per-coop danger details for the actionable banner
+  // Per-coop danger details for the actionable banner. Defensive against any
+  // missing device/reading fields so a corrupt entry doesn't white-screen the app.
   const dangerDetails = useMemo(() => {
-    const SENSOR_LABEL = {
-      co2: t('co2Short'), nh3: t('nh3Short'),
-      temp: t('tempShort'), hum: t('humShort'),
-    };
-    const SENSOR_UNIT = { co2: 'ppm', nh3: 'ppm', temp: '°C', hum: '%' };
-    const out = [];
-    augmented.forEach(({ device, reading, status }) => {
-      if (status === STATUS.POWER_CUT) {
-        out.push({
-          device,
-          sensorKey: 'power_cut',
-          sensorLabel: t('powerCut'),
-          valueText: '',
-          action: actionFor('power_cut', language),
-        });
-        return;
-      }
+    try {
+      const SENSOR_LABEL = {
+        co2: t('co2Short'), nh3: t('nh3Short'),
+        temp: t('tempShort'), hum: t('humShort'),
+      };
+      const SENSOR_UNIT = { co2: 'ppm', nh3: 'ppm', temp: '°C', hum: '%' };
+      const out = [];
+      augmented.forEach(({ device, reading, status }) => {
+        if (!device) return;
 
-      // ★ Heat-stress check (THI on temp + humidity)
-      if (reading && reading.temp != null && reading.hum != null) {
-        const hs = heatStressTHI(reading.temp, reading.hum);
-        if (hs && (hs.tier === 'danger' || hs.tier === 'emergency')) {
+        if (status === STATUS.POWER_CUT) {
           out.push({
             device,
-            sensorKey: 'heat_stress',
-            sensorLabel: `${t('heatStress')} • THI ${hs.thi}`,
-            valueText: hs.tier === 'emergency' ? t('heatStressEmergency') : t('heatStressDanger'),
-            action: actionFor('temp', language),
-            highPriority: hs.tier === 'emergency',
+            sensorKey: 'power_cut',
+            sensorLabel: t('powerCut'),
+            valueText: '',
+            action: actionFor('power_cut', language),
           });
-          // Don't return — also check threshold danger below
+          return;
         }
-      }
 
-      if (status !== STATUS.DANGER || !reading) return;
-      for (const k of ['co2','nh3','temp','hum']) {
-        const v = reading[k];
-        if (v === null || v === undefined || isNaN(v)) continue;
-        const st = sensorStatus(k, v, thresholds);
-        if (st === STATUS.DANGER) {
-          out.push({
-            device,
-            sensorKey: k,
-            sensorLabel: SENSOR_LABEL[k],
-            valueText: `${Math.round(v * 10) / 10} ${SENSOR_UNIT[k]}`,
-            action: actionFor(k, language),
-          });
-          break;
+        // Heat-stress check (THI on temp + humidity)
+        if (reading && typeof reading.temp === 'number' && typeof reading.hum === 'number'
+            && !isNaN(reading.temp) && !isNaN(reading.hum)) {
+          try {
+            const hs = heatStressTHI(reading.temp, reading.hum);
+            if (hs && (hs.tier === 'danger' || hs.tier === 'emergency')) {
+              out.push({
+                device,
+                sensorKey: 'heat_stress',
+                sensorLabel: `${t('heatStress')} • THI ${hs.thi}`,
+                valueText: hs.tier === 'emergency' ? t('heatStressEmergency') : t('heatStressDanger'),
+                action: actionFor('temp', language),
+                highPriority: hs.tier === 'emergency',
+              });
+            }
+          } catch (e) { /* swallow */ }
         }
-      }
-    });
-    // Sort: emergency THI first, then everything else
-    out.sort((a, b) => (b.highPriority ? 1 : 0) - (a.highPriority ? 1 : 0));
-    return out;
+
+        if (status !== STATUS.DANGER || !reading) return;
+        for (const k of ['co2','nh3','temp','hum']) {
+          const v = reading[k];
+          if (v === null || v === undefined || isNaN(v)) continue;
+          const st = sensorStatus(k, v, thresholds);
+          if (st === STATUS.DANGER) {
+            out.push({
+              device,
+              sensorKey: k,
+              sensorLabel: SENSOR_LABEL[k],
+              valueText: `${Math.round(v * 10) / 10} ${SENSOR_UNIT[k]}`,
+              action: actionFor(k, language),
+            });
+            break;
+          }
+        }
+      });
+      out.sort((a, b) => (b.highPriority ? 1 : 0) - (a.highPriority ? 1 : 0));
+      return out;
+    } catch (e) {
+      if (__DEV__) console.warn('dangerDetails computation failed:', e?.message);
+      return [];
+    }
   }, [augmented, thresholds, language, t]);
 
   // Live indicator pulse

@@ -73,7 +73,7 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
               <Text style={styles.name} numberOfLines={1}>{device.name}</Text>
               <View style={styles.metaRow}>
                 <Text style={styles.devId}>{device.id}</Text>
-                {device.strain ? (
+                {device.strain && strainLabel(device.strain) ? (
                   <>
                     <Text style={styles.dot}>·</Text>
                     <View style={styles.strainBadge}>

@@ -217,39 +217,42 @@ export default function CoopDetailScreen({ route, navigation }) {
               </View>
             ) : null}
             {device.chickArrivalDate ? (() => {
-              const age = Math.max(1, Math.floor((now - device.chickArrivalDate) / 86400000) + 1);
-              const env = envTargetsAt(device.breed || 'broiler', age);
-              const hs = lastReading?.temp != null && lastReading?.hum != null
-                ? heatStressTHI(lastReading.temp, lastReading.hum) : null;
-              return (
-                <>
-                  <View style={styles.strainInfoRow}>
-                    <Text style={styles.strainInfoLabel}>{t('day')}</Text>
-                    <Text style={styles.strainInfoValue}>{age}</Text>
-                  </View>
-                  {env.temp != null ? (
+              try {
+                const age = Math.max(1, Math.floor((now - device.chickArrivalDate) / 86400000) + 1);
+                const env = envTargetsAt(device.breed || 'broiler', age) || {};
+                const hs = lastReading && typeof lastReading.temp === 'number' &&
+                           typeof lastReading.hum === 'number' && !isNaN(lastReading.temp) && !isNaN(lastReading.hum)
+                  ? heatStressTHI(lastReading.temp, lastReading.hum) : null;
+                return (
+                  <>
                     <View style={styles.strainInfoRow}>
-                      <Text style={styles.strainInfoLabel}>{t('optimalTemp')}</Text>
-                      <Text style={styles.strainInfoValue}>{env.temp.toFixed(1)}°C</Text>
+                      <Text style={styles.strainInfoLabel}>{t('day')}</Text>
+                      <Text style={styles.strainInfoValue}>{age}</Text>
                     </View>
-                  ) : null}
-                  {hs ? (
-                    <View style={styles.strainInfoRow}>
-                      <Text style={styles.strainInfoLabel}>{t('thi')}</Text>
-                      <Text style={[styles.strainInfoValue, {
-                        color: hs.tier === 'emergency' ? colors.danger
-                             : hs.tier === 'danger' ? colors.warn
-                             : hs.tier === 'alert' ? colors.warnSoft : colors.ok
-                      }]}>
-                        {hs.thi} • {hs.tier === 'emergency' ? t('heatStressEmergency')
-                          : hs.tier === 'danger' ? t('heatStressDanger')
-                          : hs.tier === 'alert' ? t('heatStressAlert')
-                          : t('heatStressSafe')}
-                      </Text>
-                    </View>
-                  ) : null}
-                </>
-              );
+                    {env.temp != null ? (
+                      <View style={styles.strainInfoRow}>
+                        <Text style={styles.strainInfoLabel}>{t('optimalTemp')}</Text>
+                        <Text style={styles.strainInfoValue}>{env.temp.toFixed(1)}°C</Text>
+                      </View>
+                    ) : null}
+                    {hs ? (
+                      <View style={styles.strainInfoRow}>
+                        <Text style={styles.strainInfoLabel}>{t('thi')}</Text>
+                        <Text style={[styles.strainInfoValue, {
+                          color: hs.tier === 'emergency' ? colors.danger
+                               : hs.tier === 'danger' ? colors.warn
+                               : hs.tier === 'alert' ? colors.warnSoft : colors.ok
+                        }]}>
+                          {hs.thi} • {hs.tier === 'emergency' ? t('heatStressEmergency')
+                            : hs.tier === 'danger' ? t('heatStressDanger')
+                            : hs.tier === 'alert' ? t('heatStressAlert')
+                            : t('heatStressSafe')}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </>
+                );
+              } catch (e) { return null; }
             })() : null}
           </View>
         ) : null}

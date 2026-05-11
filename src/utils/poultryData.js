@@ -744,14 +744,17 @@ export const DISEASES = [
  *  - emergency:   > 83 (mortality risk, especially heavy birds)
  */
 export function heatStressTHI(tempC, humidityPct) {
-  if (tempC == null) return null;
-  const rh = humidityPct == null ? 60 : humidityPct;
-  const thi = tempC - (0.55 - 0.0055 * rh) * (tempC - 14.5);
-  let tier = 'safe';
-  if (thi >= 83) tier = 'emergency';
-  else if (thi >= 75) tier = 'danger';
-  else if (thi >= 70) tier = 'alert';
-  return { thi: Math.round(thi * 10) / 10, tier };
+  try {
+    if (tempC == null || typeof tempC !== 'number' || isNaN(tempC)) return null;
+    const rh = (humidityPct == null || isNaN(humidityPct)) ? 60 : humidityPct;
+    const thi = tempC - (0.55 - 0.0055 * rh) * (tempC - 14.5);
+    if (isNaN(thi)) return null;
+    let tier = 'safe';
+    if (thi >= 83) tier = 'emergency';
+    else if (thi >= 75) tier = 'danger';
+    else if (thi >= 70) tier = 'alert';
+    return { thi: Math.round(thi * 10) / 10, tier };
+  } catch (e) { return null; }
 }
 
 // ─────────────────────────────────────────────────────────────────────
