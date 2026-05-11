@@ -434,6 +434,7 @@ export default function SettingsScreen() {
 }
 
 function PermissionRow({ label, granted, grantedLabel, deniedLabel, hint, onPress }) {
+  const styles = useStyles(makeStyles);
   const isGranted = granted === true;
   return (
     <Pressable

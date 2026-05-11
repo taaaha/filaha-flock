@@ -23,6 +23,7 @@ function AnimatedCount({ value, color, size = 28 }) {
 }
 
 function StatPill({ label, count, color, accent = false }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={[styles.pill, accent && { borderColor: color + '40', backgroundColor: color + '10' }]}>
       <View style={styles.pillTopRow}>
