@@ -491,14 +491,18 @@ export function AppProvider({ children }) {
   ]);
 
   // ---------- Auto-start the foreground monitoring service ----------
-  // This is what makes the app "always running" — Android will not kill us
-  // because we hold an ongoing low-priority notification.
+  // Delayed by 3s so the JS bundle has fully rendered before we tell the OS
+  // to spin up a foreground service — avoids ForegroundServiceDidNotStartInTimeException
+  // crashes that present as a white screen on Android 14.
   useEffect(() => {
     if (!state.ready) return;
-    startMonitoring(
-      t('monitoringActive') || 'Filaha Flock',
-      t('monitoringActiveBody') || 'Watching your coops 24/7'
-    ).catch(() => {});
+    const id = setTimeout(() => {
+      startMonitoring(
+        t('monitoringActive') || 'Filaha Flock',
+        t('monitoringActiveBody') || 'Watching your coops 24/7'
+      ).catch(() => {});
+    }, 3000);
+    return () => clearTimeout(id);
   }, [state.ready, t]);
 
   // ---------- Public actions ----------

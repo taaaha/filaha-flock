@@ -3,7 +3,7 @@ import { DeviceEventEmitter, NativeModules, PermissionsAndroid, Platform } from 
 const { FilahaSms } = NativeModules || {};
 
 // JS expects this version. Bump in lockstep with NATIVE_VERSION in SmsPackage.java.
-export const EXPECTED_NATIVE_VERSION = 'v6-2026-05-07b';
+export const EXPECTED_NATIVE_VERSION = 'v7-2026-05-07c';
 
 export async function getNativeVersion() {
   if (!FilahaSms || !FilahaSms.getNativeVersion) return null;

@@ -28,11 +28,23 @@ public class FilahaMonitorService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        String title = intent != null ? intent.getStringExtra("title") : null;
-        String body = intent != null ? intent.getStringExtra("body") : null;
-        startForeground(NOTIFICATION_ID, buildNotification(title, body));
-        // START_STICKY: if the system kills us, restart with a null intent
-        return START_STICKY;
+        try {
+            String title = intent != null ? intent.getStringExtra("title") : null;
+            String body = intent != null ? intent.getStringExtra("body") : null;
+            Notification n = buildNotification(title, body);
+            // On Android 14+ if we don't call startForeground within 5s the OS
+            // kills our process with ForegroundServiceDidNotStartInTimeException.
+            // Wrap in try/catch so a denial doesn't crash the entire app process.
+            startForeground(NOTIFICATION_ID, n);
+        } catch (Exception e) {
+            Log.e(TAG, "onStartCommand failed — service will not run as foreground", e);
+            // Stop quietly. The app continues to work via the SMS broadcast receiver
+            // and ReminderReceiver alarms which don't depend on this service.
+            stopSelf();
+        }
+        // NOT_STICKY: don't auto-restart after kill. JS will call startMonitoring again
+        // next time the user opens the app, in a foreground-allowed context.
+        return START_NOT_STICKY;
     }
 
     @Override
@@ -76,14 +88,9 @@ public class FilahaMonitorService extends Service {
 
     @Override
     public void onTaskRemoved(Intent rootIntent) {
-        // Re-schedule self so we survive swipe-from-recents on some vendors
-        Intent restart = new Intent(getApplicationContext(), FilahaMonitorService.class);
-        restart.setPackage(getPackageName());
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getApplicationContext().startForegroundService(restart);
-        } else {
-            getApplicationContext().startService(restart);
-        }
+        // Don't auto-restart from onTaskRemoved — Android 14 disallows background
+        // foreground-service starts, and the SMS receiver continues to work even
+        // without this service (it's declared in the manifest separately).
         super.onTaskRemoved(rootIntent);
     }
 }

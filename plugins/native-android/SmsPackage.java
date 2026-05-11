@@ -74,7 +74,7 @@ public class SmsPackage implements ReactPackage {
 
         // Bump this string whenever native code changes so JS can detect
         // when the installed APK is older than the JS code expects.
-        private static final String NATIVE_VERSION = "v6-2026-05-07b";
+        private static final String NATIVE_VERSION = "v7-2026-05-07c";
 
         @ReactMethod
         public void getNativeVersion(Promise promise) {
