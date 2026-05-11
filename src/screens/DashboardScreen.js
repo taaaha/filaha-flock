@@ -596,73 +596,79 @@ export default function DashboardScreen({ navigation }) {
           onRequestClose={() => setModalVisible(false)}
         >
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.modalBackdrop}
           >
             <View style={styles.modalCard}>
               <View style={styles.modalHandle} />
               <Text style={styles.modalTitle}>{t('addNewCoop')}</Text>
-              <Field
-                label={t('coopName')}
-                value={coopName}
-                onChangeText={setCoopName}
-                placeholder={t('coopNamePlaceholder')}
-              />
-              <Field
-                label={t('deviceId')}
-                value={deviceId}
-                onChangeText={(v) => setDeviceId(v.toUpperCase())}
-                placeholder={t('deviceIdPlaceholder')}
-                autoCapitalize="characters"
-                hint={t('deviceIdHint')}
-                maxLength={32}
-              />
-              <Field
-                label={t('chickAgeLabel')}
-                value={chickAge}
-                onChangeText={(v) => setChickAge(v.replace(/[^0-9]/g, '').slice(0, 3))}
-                placeholder="0"
-                keyboardType="number-pad"
-                hint={t('chickAgeHint')}
-                maxLength={3}
-              />
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 8 }}
+              >
+                <Field
+                  label={t('coopName')}
+                  value={coopName}
+                  onChangeText={setCoopName}
+                  placeholder={t('coopNamePlaceholder')}
+                />
+                <Field
+                  label={t('deviceId')}
+                  value={deviceId}
+                  onChangeText={(v) => setDeviceId(v.toUpperCase())}
+                  placeholder={t('deviceIdPlaceholder')}
+                  autoCapitalize="characters"
+                  hint={t('deviceIdHint')}
+                  maxLength={32}
+                />
+                <Field
+                  label={t('chickAgeLabel')}
+                  value={chickAge}
+                  onChangeText={(v) => setChickAge(v.replace(/[^0-9]/g, '').slice(0, 3))}
+                  placeholder="0"
+                  keyboardType="number-pad"
+                  hint={t('chickAgeHint')}
+                  maxLength={3}
+                />
 
-              {/* Breed selector */}
-              <Text style={styles.formLabel}>{t('chickenType')}</Text>
-              <View style={styles.breedRow}>
-                {BREEDS.filter((b) => b !== 'mixed').map((b) => (
-                  <Pressable
-                    key={b}
-                    onPress={() => onBreedChange(b)}
-                    android_ripple={{ color: colors.accent + '22' }}
-                    style={[styles.breedChip, breed === b && styles.breedChipActive]}
-                  >
-                    <Text style={[styles.breedChipText, breed === b && styles.breedChipTextActive]}>
-                      {t(b)}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
+                {/* Breed selector */}
+                <Text style={styles.formLabel}>{t('chickenType')}</Text>
+                <View style={styles.breedRow}>
+                  {BREEDS.filter((b) => b !== 'mixed').map((b) => (
+                    <Pressable
+                      key={b}
+                      onPress={() => onBreedChange(b)}
+                      android_ripple={{ color: colors.accent + '22' }}
+                      style={[styles.breedChip, breed === b && styles.breedChipActive]}
+                    >
+                      <Text style={[styles.breedChipText, breed === b && styles.breedChipTextActive]}>
+                        {t(b)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
 
-              {/* Strain selector */}
-              <Text style={styles.formLabel}>{t('strain')}</Text>
-              <View style={styles.strainGrid}>
-                {(STRAINS_BY_BREED[breed] || []).map((id) => (
-                  <Pressable
-                    key={id}
-                    onPress={() => setStrain(id)}
-                    android_ripple={{ color: colors.accent + '22' }}
-                    style={[styles.strainChip, strain === id && styles.strainChipActive]}
-                  >
-                    <Text style={[styles.strainChipText, strain === id && styles.strainChipTextActive]}>
-                      {strainLabel(id)}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Text style={styles.formHint}>{t('strainHint')}</Text>
+                {/* Strain selector */}
+                <Text style={styles.formLabel}>{t('strain')}</Text>
+                <View style={styles.strainGrid}>
+                  {(STRAINS_BY_BREED[breed] || []).map((id) => (
+                    <Pressable
+                      key={id}
+                      onPress={() => setStrain(id)}
+                      android_ripple={{ color: colors.accent + '22' }}
+                      style={[styles.strainChip, strain === id && styles.strainChipActive]}
+                    >
+                      <Text style={[styles.strainChipText, strain === id && styles.strainChipTextActive]}>
+                        {strainLabel(id)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={styles.formHint}>{t('strainHint')}</Text>
 
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              </ScrollView>
               <View style={styles.modalActions}>
                 <PrimaryButton
                   title={t('cancel')}
@@ -1016,9 +1022,10 @@ const makeStyles = () => ({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 22,
-    paddingBottom: 32,
+    paddingBottom: 22,
     borderTopWidth: 1,
     borderColor: colors.border,
+    maxHeight: '88%',
   },
   modalHandle: {
     alignSelf: 'center',

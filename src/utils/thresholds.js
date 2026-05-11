@@ -3,8 +3,9 @@ import { STATUS } from './colors';
 export const DEFAULT_THRESHOLDS = {
   co2: { warn: 1500, danger: 2500 },
   nh3: { warn: 25, danger: 35 },
-  temp: { warn: 32, danger: 38 },
-  hum: { warn: 75, danger: 85 },
+  // temp & hum have BOTH directions — too cold/dry is as dangerous as too hot/humid
+  temp: { warn: 32, danger: 38, warnLow: 16, dangerLow: 12 },
+  hum: { warn: 75, danger: 85, warnLow: 35, dangerLow: 25 },
   battery: { low: 20 },
 };
 
@@ -21,8 +22,12 @@ export function sensorStatus(key, value, thresholds) {
   if (value === null || value === undefined || isNaN(value)) return STATUS.OFFLINE;
   const t = thresholds[key];
   if (!t) return STATUS.OK;
-  if (value >= t.danger) return STATUS.DANGER;
-  if (value >= t.warn) return STATUS.WARN;
+  // High-side breach
+  if (t.danger != null && value >= t.danger) return STATUS.DANGER;
+  if (t.warn != null && value >= t.warn) return STATUS.WARN;
+  // Low-side breach (only sensors with both: temp, hum)
+  if (t.dangerLow != null && value <= t.dangerLow) return STATUS.DANGER;
+  if (t.warnLow != null && value <= t.warnLow) return STATUS.WARN;
   return STATUS.OK;
 }
 

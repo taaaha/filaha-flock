@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
 import { colors } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 import PrimaryButton from '../components/PrimaryButton';
 import { LANGS } from '../translations';
 
@@ -23,6 +24,7 @@ const SLIDES = [
 ];
 
 export default function OnboardingScreen() {
+  const styles = useStyles(makeStyles);
   const { t, language, setLanguage, completeOnboarding } = useApp();
   const [step, setStep] = useState(0);
   const isLast = step === SLIDES.length - 1;
@@ -97,7 +99,7 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   safe: {
     flex: 1,
     backgroundColor: colors.bg,

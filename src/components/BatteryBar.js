@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { colors } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 
 export default function BatteryBar({ value, lowAt = 20, label, compact = false }) {
+  const styles = useStyles(makeStyles);
   const v = typeof value === 'number' ? Math.max(0, Math.min(100, value)) : null;
   let color = colors.ok;
   if (v === null) color = colors.offline;
@@ -27,7 +29,7 @@ export default function BatteryBar({ value, lowAt = 20, label, compact = false }
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -307,15 +307,21 @@ export default function SettingsScreen() {
             onChange={(v) => onThresholdChange('nh3', v)}
           />
           <ThresholdSlider
-            label={t('temperature')} warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
+            label={t('temperature')}
+            warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
+            warnLowLabel={t('warnLow')} dangerLowLabel={t('dangerLow')}
             warn={thresholds.temp.warn} danger={thresholds.temp.danger}
-            min={20} max={50} step={1} unit="°C"
+            warnLow={thresholds.temp.warnLow} dangerLow={thresholds.temp.dangerLow}
+            min={0} max={50} step={1} unit="°C"
             onChange={(v) => onThresholdChange('temp', v)}
           />
           <ThresholdSlider
-            label={t('humidity')} warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
+            label={t('humidity')}
+            warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
+            warnLowLabel={t('warnLow')} dangerLowLabel={t('dangerLow')}
             warn={thresholds.hum.warn} danger={thresholds.hum.danger}
-            min={30} max={100} step={1} unit="%"
+            warnLow={thresholds.hum.warnLow} dangerLow={thresholds.hum.dangerLow}
+            min={0} max={100} step={1} unit="%"
             onChange={(v) => onThresholdChange('hum', v)}
           />
         </View>

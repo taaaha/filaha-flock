@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Polyline, Line, Circle, Path } from 'react-native-svg';
 import { colors } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -12,6 +13,7 @@ export default function TrendChart({
   unit,
   emptyLabel,
 }) {
+  const styles = useStyles(makeStyles);
   const data = useMemo(() => (values || []).filter(
     (v) => v !== null && v !== undefined && !isNaN(v)
   ), [values]);
@@ -91,7 +93,7 @@ export default function TrendChart({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   wrap: {
     backgroundColor: colors.card,
     borderRadius: 14,

@@ -20,6 +20,7 @@ import {
   startMonitoring,
 } from '../services/SmsService';
 import { actionFor } from '../utils/actionSteps';
+import { startRemoteContentRefresh } from '../services/RemoteContent';
 import { makePhoneCall, makeDirectCall } from '../services/CallService';
 import { vibrateDanger, vibrateWarn } from '../services/AlertService';
 import { parseSms } from '../utils/smsParser';
@@ -489,6 +490,17 @@ export function AppProvider({ children }) {
     state.thresholds,
     t,
   ]);
+
+  // ---------- Silently fetch & refresh remote Guide content ----------
+  // Runs in background once app is ready. Failure is non-fatal — bundled
+  // content is the fallback.
+  useEffect(() => {
+    if (!state.ready) return;
+    const stop = startRemoteContentRefresh(() => {
+      // Future: dispatch event so Guide screen re-renders with new content
+    });
+    return () => stop();
+  }, [state.ready]);
 
   // ---------- Auto-start the foreground monitoring service ----------
   // Delayed by 3s so the JS bundle has fully rendered before we tell the OS

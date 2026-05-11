@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { Pressable, View, Text, StyleSheet } from 'react-native';
 import { colors, statusColor } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 import { sensorStatus } from '../utils/thresholds';
 import { formatNumber } from '../utils/formatters';
 
@@ -12,6 +13,7 @@ const SENSOR_META = {
 };
 
 function SensorTile({ sensorKey, label, value, min, max, thresholds, selected, onPress, t }) {
+  const styles = useStyles(makeStyles);
   const meta = SENSOR_META[sensorKey] || {};
   const status = sensorStatus(sensorKey, value, thresholds || {});
   const sColor = statusColor(status);
@@ -53,7 +55,7 @@ function SensorTile({ sensorKey, label, value, min, max, thresholds, selected, o
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   tile: {
     flex: 1,
     backgroundColor: colors.card,

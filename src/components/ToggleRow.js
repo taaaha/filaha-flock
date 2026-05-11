@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Text, Switch, StyleSheet } from 'react-native';
+import { View, Text, Switch } from 'react-native';
 import { colors } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 
 export default function ToggleRow({ label, hint, value, onValueChange, disabled }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.row}>
       <View style={styles.textCol}>
@@ -20,7 +22,7 @@ export default function ToggleRow({ label, hint, value, onValueChange, disabled 
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -33,18 +35,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     minHeight: 56,
   },
-  textCol: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  label: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  hint: {
-    color: colors.textTertiary,
-    fontSize: 12,
-    marginTop: 2,
-  },
+  textCol: { flex: 1, paddingRight: 10 },
+  label: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
+  hint: { color: colors.textTertiary, fontSize: 12, marginTop: 2 },
 });

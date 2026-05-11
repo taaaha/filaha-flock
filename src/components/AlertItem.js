@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { colors } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 import { formatRelativeTime, formatTime } from '../utils/formatters';
 
 function alertColor(alert) {
@@ -23,6 +24,7 @@ function alertTitle(alert, t) {
 }
 
 function AlertItem({ alert, onPress, t, now }) {
+  const styles = useStyles(makeStyles);
   const color = alertColor(alert);
   const title = alertTitle(alert, t);
 
@@ -60,7 +62,7 @@ function AlertItem({ alert, onPress, t, now }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   item: {
     flexDirection: 'row',
     backgroundColor: colors.card,

@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
 import { colors, STATUS, statusColor } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 import { deviceStatus } from '../utils/thresholds';
 import { isToday, formatRelativeTime, formatTime } from '../utils/formatters';
 import { buildFakeDataSms } from '../utils/smsParser';
@@ -44,6 +45,7 @@ function statusLabel(status, t) {
 }
 
 export default function CoopDetailScreen({ route, navigation }) {
+  const styles = useStyles(makeStyles);
   const { deviceId } = route.params || {};
   const {
     t, devices, readings, thresholds, powerCut, settings,
@@ -361,7 +363,7 @@ export default function CoopDetailScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row',

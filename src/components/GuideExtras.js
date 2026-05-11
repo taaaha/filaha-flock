@@ -212,28 +212,103 @@ export function MarketPrices({ t }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Wilaya picker — sets climate profile for heat-stress logic
+// Wilaya picker — full searchable dropdown of all 58 Algerian wilayas
 // ─────────────────────────────────────────────────────────────────────
+
+import { Modal as RNModal } from 'react-native';
 
 export function WilayaPicker({ t, current, onPick }) {
   const styles = useStyles(makeStyles);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const currentWilaya = WILAYAS.find((w) => w.id === current);
+  const list = WILAYAS.filter((w) => {
+    if (!query.trim()) return true;
+    const q = query.trim().toLowerCase();
+    return w.name.toLowerCase().includes(q) || String(w.code).startsWith(q);
+  });
+
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
-      {WILAYAS.map((w) => {
-        const active = current === w.id;
-        return (
-          <Pressable
-            key={w.id}
-            onPress={() => onPick(w.id)}
-            android_ripple={{ color: colors.accent + '22' }}
-            style={[styles.wilayaChip, active && styles.wilayaChipActive]}
-          >
-            <Icon name="mapPin" size={12} color={active ? colors.accent : colors.textSecondary} />
-            <Text style={[styles.wilayaText, active && styles.wilayaTextActive]}>{w.name}</Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        android_ripple={{ color: colors.accent + '22' }}
+        style={styles.wilayaDropdown}
+      >
+        <Icon name="mapPin" size={16} color={colors.accent} />
+        <Text style={[styles.wilayaDropdownText, !currentWilaya && { color: colors.textTertiary }]}>
+          {currentWilaya ? `${currentWilaya.code}. ${currentWilaya.name}` : t('pickWilaya')}
+        </Text>
+        <Icon name="chevronDown" size={16} color={colors.textTertiary} />
+      </Pressable>
+
+      <RNModal
+        visible={open}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setOpen(false)}
+      >
+        <View style={styles.wilayaModalBackdrop}>
+          <View style={styles.wilayaModalCard}>
+            <View style={styles.wilayaModalHandle} />
+            <Text style={styles.wilayaModalTitle}>{t('pickWilaya')}</Text>
+            <View style={styles.wilayaSearch}>
+              <Icon name="search" size={16} color={colors.textTertiary} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={t('searchCoops')}
+                placeholderTextColor={colors.textTertiary}
+                style={styles.wilayaSearchInput}
+                autoFocus
+              />
+              {query ? (
+                <Pressable onPress={() => setQuery('')} hitSlop={10}>
+                  <Icon name="x" size={14} color={colors.textSecondary} />
+                </Pressable>
+              ) : null}
+            </View>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 460 }}
+            >
+              {list.length === 0 ? (
+                <Text style={styles.wilayaNoResults}>{t('noResults')}</Text>
+              ) : null}
+              {list.map((w) => (
+                <Pressable
+                  key={w.id}
+                  onPress={() => { onPick(w.id); setOpen(false); setQuery(''); }}
+                  android_ripple={{ color: colors.accent + '22' }}
+                  style={[styles.wilayaItem, current === w.id && styles.wilayaItemActive]}
+                >
+                  <Text style={styles.wilayaItemCode}>{String(w.code).padStart(2, '0')}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[
+                      styles.wilayaItemName,
+                      current === w.id && { color: colors.accent },
+                    ]}>{w.name}</Text>
+                    <Text style={styles.wilayaItemMeta}>
+                      {w.region} • {w.climate}
+                    </Text>
+                  </View>
+                  {current === w.id ? <Icon name="check" size={16} color={colors.accent} /> : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable
+              onPress={() => setOpen(false)}
+              style={styles.wilayaCloseBtn}
+              android_ripple={{ color: '#ffffff22' }}
+            >
+              <Text style={styles.wilayaCloseBtnText}>{t('cancel')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </RNModal>
+    </>
   );
 }
 
@@ -358,17 +433,75 @@ const makeStyles = () => ({
     color: colors.textTertiary, fontSize: 11, fontWeight: '600',
   },
 
-  // Wilaya
-  wilayaChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8,
+  // Wilaya — dropdown trigger
+  wilayaDropdown: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingVertical: 14,
     backgroundColor: colors.card,
-    borderRadius: 999,
+    borderRadius: 12,
+    borderWidth: 1.5, borderColor: colors.border,
+  },
+  wilayaDropdownText: {
+    color: colors.textPrimary, fontSize: 14, fontWeight: '700', flex: 1,
+  },
+  // Wilaya — modal
+  wilayaModalBackdrop: {
+    flex: 1, backgroundColor: '#000000cc', justifyContent: 'flex-end',
+  },
+  wilayaModalCard: {
+    backgroundColor: colors.bgElevated,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 18, paddingTop: 10, paddingBottom: 22,
+    borderTopWidth: 1, borderColor: colors.border,
+    maxHeight: '85%',
+  },
+  wilayaModalHandle: {
+    alignSelf: 'center', width: 42, height: 4, borderRadius: 2,
+    backgroundColor: colors.borderLight, marginBottom: 12,
+  },
+  wilayaModalTitle: {
+    color: colors.textPrimary, fontSize: 17, fontWeight: '900', marginBottom: 12,
+  },
+  wilayaSearch: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: colors.card,
+    borderRadius: 10,
+    borderWidth: 1, borderColor: colors.border,
+    marginBottom: 8,
+  },
+  wilayaSearchInput: {
+    flex: 1, color: colors.textPrimary, fontSize: 14, padding: 0,
+  },
+  wilayaItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, paddingHorizontal: 10,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  wilayaItemActive: {
+    backgroundColor: colors.accent + '10',
+  },
+  wilayaItemCode: {
+    color: colors.textTertiary, fontSize: 12, fontWeight: '900',
+    width: 24, textAlign: 'center',
+  },
+  wilayaItemName: {
+    color: colors.textPrimary, fontSize: 14, fontWeight: '800',
+  },
+  wilayaItemMeta: {
+    color: colors.textTertiary, fontSize: 11, marginTop: 2,
+    textTransform: 'capitalize',
+  },
+  wilayaNoResults: {
+    color: colors.textTertiary, textAlign: 'center',
+    paddingVertical: 24, fontSize: 13,
+  },
+  wilayaCloseBtn: {
+    marginTop: 12, paddingVertical: 12,
+    backgroundColor: colors.card, borderRadius: 12, alignItems: 'center',
     borderWidth: 1, borderColor: colors.border,
   },
-  wilayaChipActive: { borderColor: colors.accent, backgroundColor: colors.accent + '14' },
-  wilayaText: { color: colors.textSecondary, fontSize: 12, fontWeight: '700' },
-  wilayaTextActive: { color: colors.accent },
+  wilayaCloseBtnText: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
 
   // Feed phases
   phaseRow: {

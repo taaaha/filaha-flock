@@ -5,12 +5,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
 import { colors } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 import { isToday } from '../utils/formatters';
 import AlertItem from '../components/AlertItem';
 
 const FILTERS = ['all', 'alerts', 'cleared', 'today'];
 
 export default function AlertsScreen() {
+  const styles = useStyles(makeStyles);
   const { t, alerts, acknowledgeAlert, clearAllAlerts, now } = useApp();
   const [filter, setFilter] = useState('all');
 
@@ -105,7 +107,7 @@ export default function AlertsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row',
