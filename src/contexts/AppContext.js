@@ -51,7 +51,7 @@ function initialState() {
     ready: false,
     onboardingDone: false,
     language: DEFAULT_LANG,
-    theme: 'dark',
+    theme: 'light',
     farms: [],
     devices: [],
     readings: {},
@@ -138,7 +138,7 @@ export function AppProvider({ children }) {
         Storage.getPowerCut(),
       ]);
 
-      const theme = savedTheme || 'dark';
+      const theme = savedTheme || 'light';
       setActiveTheme(theme);
 
       const readings = {};

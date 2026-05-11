@@ -51,7 +51,7 @@ export const Storage = {
   },
 
   async getTheme() {
-    return await safeGet(KEYS.THEME, 'dark');
+    return await safeGet(KEYS.THEME, 'light');
   },
   async setTheme(theme) {
     return safeSet(KEYS.THEME, theme);

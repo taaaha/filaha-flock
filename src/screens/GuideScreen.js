@@ -147,12 +147,8 @@ export default function GuideScreen() {
         </View>
       </View>
 
-      {/* ── Tab strip ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabStrip}
-      >
+      {/* ── Tab grid: 2 rows × 3 cards, fixed size, no horizontal scroll ── */}
+      <View style={styles.tabGrid}>
         {TABS.map((tab) => {
           const active = activeTab === tab.id;
           return (
@@ -161,26 +157,32 @@ export default function GuideScreen() {
               onPress={() => setActiveTab(tab.id)}
               android_ripple={{ color: tab.color + '22' }}
               style={[
-                styles.tab,
-                active && { borderColor: tab.color + '90', backgroundColor: tab.color + '14' },
+                styles.tabCard,
+                active && {
+                  borderColor: tab.color,
+                  backgroundColor: tab.color + '18',
+                },
               ]}
             >
               <Icon
                 name={tab.icon}
-                size={16}
+                size={20}
                 color={active ? tab.color : colors.textSecondary}
-                strokeWidth={active ? 2.4 : 2}
+                strokeWidth={2}
               />
-              <Text style={[
-                styles.tabLabel,
-                active && { color: tab.color, fontWeight: '900' },
-              ]}>
+              <Text
+                style={[
+                  styles.tabCardLabel,
+                  { color: active ? tab.color : colors.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
                 {t(TAB_LABELS[tab.id])}
               </Text>
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
 
       {/* ── Active tab content ── */}
       <ScrollView
@@ -480,23 +482,32 @@ const makeStyles = () => ({
   title: { color: colors.textPrimary, fontSize: 20, fontWeight: '900', letterSpacing: 0.2 },
   subtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 3, lineHeight: 17 },
 
-  tabStrip: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 8,
-  },
-  tab: {
+  // 2 rows × 3 cards. Fixed size — never changes on selection.
+  tabGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    paddingBottom: 10,
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+  },
+  tabCard: {
+    width: '32%',                 // 3 cards per row
+    height: 60,                   // fixed height so active state never resizes
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 4,
     backgroundColor: colors.card,
-    borderRadius: 999,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: colors.border,
   },
-  tabLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '800' },
+  tabCardLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
 
   tabContent: { paddingHorizontal: 16, gap: 10 },
 

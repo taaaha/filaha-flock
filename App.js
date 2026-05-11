@@ -105,11 +105,12 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: colors.bgElevated,
           borderTopColor: colors.border,
-          borderTopWidth: 1,
+          borderTopWidth: 0.5,
           height: 70,
           paddingBottom: 10,
           paddingTop: 8,
-          elevation: 12,
+          elevation: 0,             // no shadow → no ghost line under bar
+          shadowOpacity: 0,
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textSecondary,

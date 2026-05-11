@@ -80,13 +80,14 @@ const LIGHT = {
 };
 
 // ── Theme state ────────────────────────────────────────────────────────
-let activeMode = 'dark';
+// Default theme is LIGHT — most farmers will open the app in daylight.
+let activeMode = 'light';
 const listeners = new Set();
 
 // Plain mutable object — we swap its contents on theme change.
 // Every `import { colors }` shares this same reference; reading `colors.bg`
 // at render time always returns the current palette's value.
-export const colors = { ...DARK };
+export const colors = { ...LIGHT };
 
 export function getActiveTheme() { return activeMode; }
 

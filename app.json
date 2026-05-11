@@ -11,10 +11,14 @@
     "splash": {
       "backgroundColor": "#0a0f1e"
     },
+    "androidNavigationBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#070b14"
+    },
     "android": {
       "package": "com.filaha",
       "versionCode": 1,
-      "userInterfaceStyle": "dark",
+      "userInterfaceStyle": "automatic",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0a0f1e"
