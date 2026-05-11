@@ -26,6 +26,7 @@ import GuideScreen from './src/screens/GuideScreen';
 import ToastHost from './src/components/Toast';
 import Icon from './src/components/Icon';
 import Tutorial, { shouldShowTutorial } from './src/components/Tutorial';
+import ErrorBoundary from './src/components/ErrorBoundary';
 import { useTheme } from './src/utils/colors';
 import { colors } from './src/utils/colors';
 import {
@@ -257,14 +258,16 @@ function RootNav() {
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <SafeAreaProvider>
-        <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-        <AppProvider>
-          <RootNav />
-        </AppProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
+        <SafeAreaProvider>
+          <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+          <AppProvider>
+            <RootNav />
+          </AppProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 
