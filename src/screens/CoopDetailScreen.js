@@ -21,6 +21,7 @@ import TrendChart from '../components/TrendChart';
 import StatusDot from '../components/StatusDot';
 import { showToast } from '../components/Toast';
 import { checkCallPermission, requestCallPermission } from '../services/SmsService';
+import { strainLabel, envTargetsAt, heatStressTHI } from '../utils/poultryData';
 
 const SENSOR_KEYS = ['co2', 'nh3', 'temp', 'hum'];
 const UNITS = { co2: 'ppm', nh3: 'ppm', temp: '°C', hum: '%' };
@@ -206,6 +207,53 @@ export default function CoopDetailScreen({ route, navigation }) {
           </View>
         ) : null}
 
+        {/* Strain & age-target info */}
+        {(device.strain || device.chickArrivalDate) ? (
+          <View style={styles.strainInfo}>
+            {device.strain ? (
+              <View style={styles.strainInfoRow}>
+                <Text style={styles.strainInfoLabel}>{t('strain')}</Text>
+                <Text style={styles.strainInfoValue}>{strainLabel(device.strain)}</Text>
+              </View>
+            ) : null}
+            {device.chickArrivalDate ? (() => {
+              const age = Math.max(1, Math.floor((now - device.chickArrivalDate) / 86400000) + 1);
+              const env = envTargetsAt(device.breed || 'broiler', age);
+              const hs = lastReading?.temp != null && lastReading?.hum != null
+                ? heatStressTHI(lastReading.temp, lastReading.hum) : null;
+              return (
+                <>
+                  <View style={styles.strainInfoRow}>
+                    <Text style={styles.strainInfoLabel}>{t('day')}</Text>
+                    <Text style={styles.strainInfoValue}>{age}</Text>
+                  </View>
+                  {env.temp != null ? (
+                    <View style={styles.strainInfoRow}>
+                      <Text style={styles.strainInfoLabel}>{t('optimalTemp')}</Text>
+                      <Text style={styles.strainInfoValue}>{env.temp.toFixed(1)}°C</Text>
+                    </View>
+                  ) : null}
+                  {hs ? (
+                    <View style={styles.strainInfoRow}>
+                      <Text style={styles.strainInfoLabel}>{t('thi')}</Text>
+                      <Text style={[styles.strainInfoValue, {
+                        color: hs.tier === 'emergency' ? colors.danger
+                             : hs.tier === 'danger' ? colors.warn
+                             : hs.tier === 'alert' ? colors.warnSoft : colors.ok
+                      }]}>
+                        {hs.thi} • {hs.tier === 'emergency' ? t('heatStressEmergency')
+                          : hs.tier === 'danger' ? t('heatStressDanger')
+                          : hs.tier === 'alert' ? t('heatStressAlert')
+                          : t('heatStressSafe')}
+                      </Text>
+                    </View>
+                  ) : null}
+                </>
+              );
+            })() : null}
+          </View>
+        ) : null}
+
         <View style={styles.gridRow}>
           <SensorTile
             sensorKey="co2"
@@ -366,6 +414,32 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   powerText: { color: colors.power, fontWeight: '800', textAlign: 'center' },
+
+  strainInfo: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    gap: 6,
+  },
+  strainInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  strainInfoLabel: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  strainInfoValue: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '800',
+  },
   gridRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   section: { marginTop: 16 },
   sectionTitle: {

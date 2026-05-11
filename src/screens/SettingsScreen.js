@@ -4,7 +4,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
-import { colors } from '../utils/colors';
+import { colors, useTheme } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
+import Icon from '../components/Icon';
+import { WilayaPicker } from '../components/GuideExtras';
 import { LANGS } from '../translations';
 import {
   isIgnoringBatteryOptimizations,
@@ -29,9 +32,10 @@ import { showToast } from '../components/Toast';
 
 export default function SettingsScreen() {
   const {
-    t, language, settings, thresholds,
-    setLanguage, updateSettings, updateThresholds, resetThresholds,
+    t, language, theme, settings, thresholds,
+    setLanguage, setTheme, updateSettings, updateThresholds, resetThresholds,
   } = useApp();
+  const styles = useStyles(makeStyles);
 
   const [farmerName, setFarmerName] = useState(settings.farmerName || '');
   const [farmName, setFarmName] = useState(settings.farmName || '');
@@ -235,6 +239,52 @@ export default function SettingsScreen() {
           ))}
         </View>
 
+        {/* Appearance */}
+        <Text style={styles.sectionTitle}>{t('appearance') || 'Appearance'}</Text>
+        <View style={styles.themeRow}>
+          <Pressable
+            onPress={() => setTheme('dark')}
+            android_ripple={{ color: colors.accent + '22' }}
+            style={[styles.themeBtn, theme === 'dark' && styles.themeBtnActive]}
+          >
+            <View style={[styles.themePreview, { backgroundColor: '#070b14', borderColor: '#1e2a44' }]}>
+              <View style={[styles.themePreviewBar, { backgroundColor: '#3b82f6' }]} />
+              <View style={[styles.themePreviewCard, { backgroundColor: '#11182a' }]} />
+            </View>
+            <View style={styles.themeBtnLabelRow}>
+              <Icon name="moon" size={16} color={theme === 'dark' ? colors.accent : colors.textSecondary} />
+              <Text style={[styles.themeBtnLabel, theme === 'dark' && { color: colors.accent }]}>
+                {t('darkMode') || 'Dark'}
+              </Text>
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={() => setTheme('light')}
+            android_ripple={{ color: colors.accent + '22' }}
+            style={[styles.themeBtn, theme === 'light' && styles.themeBtnActive]}
+          >
+            <View style={[styles.themePreview, { backgroundColor: '#f5f7fb', borderColor: '#e2e8f0' }]}>
+              <View style={[styles.themePreviewBar, { backgroundColor: '#2563eb' }]} />
+              <View style={[styles.themePreviewCard, { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0' }]} />
+            </View>
+            <View style={styles.themeBtnLabelRow}>
+              <Icon name="sun" size={16} color={theme === 'light' ? colors.accent : colors.textSecondary} />
+              <Text style={[styles.themeBtnLabel, theme === 'light' && { color: colors.accent }]}>
+                {t('lightMode') || 'Light'}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Wilaya (region) */}
+        <Text style={styles.sectionTitle}>{t('wilaya')}</Text>
+        <Text style={styles.wilayaHint}>{t('wilayaHint')}</Text>
+        <WilayaPicker
+          t={t}
+          current={settings.wilaya}
+          onPick={(w) => { updateSettings({ wilaya: w }); showToast(t('saved'), 'success'); }}
+        />
+
         {/* Thresholds */}
         <View style={{ marginTop: 16 }}>
           <View style={styles.sectionRow}>
@@ -286,7 +336,6 @@ export default function SettingsScreen() {
         {/* Emergency */}
         <Text style={styles.sectionTitle}>{t('emergencyContact')}</Text>
         <Field
-          label={t('emergencyContact')}
           value={emergencyContact}
           onChangeText={setEmergencyContact}
           placeholder={t('emergencyContactPlaceholder')}
@@ -411,7 +460,7 @@ function PermissionRow({ label, granted, grantedLabel, deniedLabel, hint, onPres
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   screenTitle: {
     color: colors.textPrimary,
@@ -458,6 +507,60 @@ const styles = StyleSheet.create({
   langText: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
   langTextActive: { color: colors.accent, fontWeight: '800' },
   langCheck: { color: colors.accent, fontSize: 18, fontWeight: '900' },
+
+  themeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 4,
+  },
+  themeBtn: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    padding: 12,
+    alignItems: 'center',
+    gap: 10,
+  },
+  themeBtnActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '12',
+  },
+  themePreview: {
+    width: '100%',
+    height: 68,
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 8,
+    gap: 6,
+    justifyContent: 'flex-start',
+  },
+  themePreviewBar: {
+    height: 6,
+    width: '50%',
+    borderRadius: 3,
+  },
+  themePreviewCard: {
+    flex: 1,
+    borderRadius: 6,
+  },
+  themeBtnLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  themeBtnLabel: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  wilayaHint: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    marginBottom: 10,
+    lineHeight: 15,
+  },
 
   testRow: { flexDirection: 'row', gap: 10, marginBottom: 6 },
   testHint: {

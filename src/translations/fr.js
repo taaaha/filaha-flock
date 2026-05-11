@@ -165,10 +165,163 @@ export default {
   checkNow: 'vérifier',
   liveMonitoring: 'Surveillance directe',
   systemReady: 'Système prêt',
+  whatToDo: 'Que faire',
+  monitoringActive: 'Filaha Flock surveille',
+  monitoringActiveBody: 'Actif 24h/24 — vous ne manquerez aucune alerte',
+
+  // Appearance
+  appearance: 'Apparence',
+  darkMode: 'Sombre',
+  lightMode: 'Clair',
+
+  // Breeds
+  broiler: 'Poulet de chair',
+  layer: 'Poule pondeuse',
+  beldi: 'Beldi (local)',
+  mixed: 'Mixte',
+  chickenType: 'Type de poulet',
+  chickenTypeHint: 'Choisissez le type — les conseils s\'adaptent',
+
+  // Calculators
+  calculators: 'Calculateurs',
+  brooderCalc: 'Température de l\'éleveuse',
+  brooderCalcHint: 'Température cible selon l\'âge des poussins',
+  densityCalc: 'Calcul de densité',
+  densityCalcHint: 'Combien d\'oiseaux dans votre poulailler',
+  profitCalc: 'Estimation du profit',
+  profitCalcHint: 'Revenu approximatif pour ce cycle',
+  vaccineCalc: 'Calendrier vaccinal',
+  vaccineCalcHint: 'Dates personnalisées selon l\'arrivée des poussins',
+  ageInDays: 'Âge (jours)',
+  areaInM2: 'Surface (m²)',
+  birdsPerM2: 'Oiseaux par m²',
+  birdsTotal: 'Total oiseaux',
+  feedCostPerKg: 'Coût aliment (DZD/kg)',
+  marketPricePerKg: 'Prix de vente (DZD/kg)',
+  estimatedFeed: 'Aliment nécessaire',
+  estimatedRevenue: 'Revenu',
+  estimatedProfit: 'Profit',
+  perBird: 'par oiseau',
+  sourcedFrom: 'Source : ',
+  basedOn: 'Selon',
+
+  // Strains
+  strain: 'Souche',
+  strainHint: 'Lignée génétique — influence croissance, alimentation, vaccins',
+  pickStrain: 'Choisir une souche',
+  strainComparison: 'Comparaison des souches',
+  growthCurve: 'Courbe de croissance',
+  growthCurveHint: 'Poids cible et FCR jour par jour',
+  benchmark: 'Référence',
+  breederStandard: 'Standard sélectionneur',
+  algerianField: 'Réel algérien',
+  algerianFieldHint: 'Moyenne réelle des fermes algériennes',
+  itelvNorm: 'Norme ITELV',
+
+  // Diseases
+  diseases: 'Maladies',
+  diseaseAlgeria: 'Maladies surveillées en Algérie',
+  diseaseSymptoms: 'Symptômes',
+  diseaseAction: 'Que faire',
+  diseaseTriggers: 'Facteurs',
+  diseaseSeverity: 'Gravité',
+  severityCritical: 'Critique',
+  severityHigh: 'Élevée',
+  severityMedium: 'Moyenne',
+
+  // Wilaya
+  wilaya: 'Wilaya',
+  wilayaHint: 'Le climat influe sur la ventilation et les alertes de chaleur',
+  pickWilaya: 'Choisir votre wilaya',
+
+  // Heat stress
+  heatStress: 'Stress thermique',
+  heatStressSafe: 'Sûr',
+  heatStressAlert: 'Alerte',
+  heatStressDanger: 'Danger',
+  heatStressEmergency: 'URGENCE',
+  thi: 'Indice THI',
+
+  // Markets
+  marketPrices: 'Prix de référence Algérie',
+  marketAsOf: 'À la date du',
+  priceDocBroiler: 'Poussin d\'un jour chair',
+  priceLivePerKg: 'Vif sortie ferme',
+  priceRetailPerKg: 'Détail',
+  priceFeedPerKg: 'Aliment complet',
+  priceEggPerUnit: 'Œuf',
+
+  // Feed phases
+  feedPhases: 'Programme alimentaire',
+  feedPhaseStarter: 'Démarrage',
+  feedPhaseGrower: 'Croissance',
+  feedPhaseFinisher: 'Finition',
+  protein: 'Protéine',
+  energy: 'Énergie',
+  calcium: 'Calcium',
 
   // SMS
   autoSms: 'SMS auto en cas de danger',
   sendSmsPermission: 'Envoi de SMS',
   smsSent: 'SMS envoyé',
   smsFailed: "Échec de l'envoi du SMS",
+
+  // Tutorial
+  tutStep1Title: 'Tableau de bord',
+  tutStep1Body: 'Suivez tous vos poulaillers en un seul endroit. État en direct, capteurs et batteries.',
+  tutStep2Title: 'Ajouter un poulailler',
+  tutStep2Body: "Appuyez sur + pour en ajouter un. Saisissez le nom, l'ID de l'appareil et l'âge des poussins.",
+  tutStep3Title: 'Alertes réelles',
+  tutStep3Body: "En cas de danger, l'app appelle et envoie un SMS à votre contact d'urgence automatiquement.",
+  tutStep4Title: 'Guide pratique',
+  tutStep4Body: "L'onglet Guide contient les tâches quotidiennes, le calendrier de vaccination et des conseils pour l'été algérien.",
+  tutStep5Title: 'Soyez prêt',
+  tutStep5Body: 'Activez les rappels quotidiens dans le Guide pour ne jamais oublier les contrôles du matin et du soir.',
+
+  // Coop age
+  day: 'Jour',
+  chickAgeLabel: 'Âge des poussins (jours, 0 = aujourd\'hui)',
+  chickAgeHint: 'Quel âge ont les poussins maintenant ? Laissez vide s\'ils viennent d\'arriver.',
+
+  // Search & filter
+  searchCoops: 'Rechercher un poulailler…',
+  noResults: 'Aucun résultat',
+
+  // Min/max thresholds
+  minLevel: 'Minimum',
+  maxLevel: 'Maximum',
+  warnLow: 'Alerte basse',
+  dangerLow: 'Danger bas',
+
+  // Guide
+  guide: 'Guide',
+  guideTitle: 'Guide de la ferme',
+  guideIntro: "Conseils pratiques pour l'élevage de poulets en Algérie",
+  dailyChecklist: "Tâches du jour",
+  dailyChecklistHint: 'Tâches quotidiennes pour garder vos poulets en bonne santé',
+  ageBased: 'Par âge',
+  ageBasedHint: "Les conseils changent selon l'âge des poulets",
+  topicTemperature: 'Température et chauffage',
+  topicVentilation: "Ventilation et qualité de l'air",
+  topicFeeding: 'Alimentation et eau',
+  topicHealth: 'Santé et prévention',
+  topicVaccination: 'Calendrier de vaccination',
+  topicLighting: 'Éclairage',
+  topicSummer: "Conseils d'été",
+  topicWinter: "Conseils d'hiver",
+  topicBeldi: 'Poulet Beldi local',
+  optimalTemp: 'Température optimale',
+  whatToCheck: 'Que vérifier',
+  whyItMatters: 'Pourquoi est-ce important',
+  warningSigns: "Signes d'alerte",
+  readMore: 'Lire plus',
+  markDone: 'Fait',
+  remindMe: 'Me rappeler',
+  remindersEnabled: 'Rappels activés',
+  remindersDisabled: 'Rappels désactivés',
+  dailyReminders: 'Rappels quotidiens',
+  morningReminderTitle: 'Contrôle du matin',
+  morningReminderBody: "Vérifier l'eau, l'aliment, la température, la ventilation et les oiseaux malades",
+  eveningReminderTitle: 'Contrôle du soir',
+  eveningReminderBody: 'Vérifier les portes, éclairage, ventilation et retirer les oiseaux morts',
 };

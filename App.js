@@ -22,7 +22,11 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import CoopDetailScreen from './src/screens/CoopDetailScreen';
 import AlertsScreen from './src/screens/AlertsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import GuideScreen from './src/screens/GuideScreen';
 import ToastHost from './src/components/Toast';
+import Icon from './src/components/Icon';
+import Tutorial, { shouldShowTutorial } from './src/components/Tutorial';
+import { useTheme } from './src/utils/colors';
 import { colors } from './src/utils/colors';
 import {
   requestSmsPermissions,
@@ -75,12 +79,14 @@ function TabBarLabel({ focused, color, label }) {
   );
 }
 
-function TabBarIcon({ icon, focused }) {
+function TabBarIcon({ name, focused }) {
   return (
-    <Text style={{
-      fontSize: 22,
-      opacity: focused ? 1 : 0.7,
-    }}>{icon}</Text>
+    <Icon
+      name={name}
+      size={focused ? 24 : 22}
+      color={focused ? colors.accent : colors.textSecondary}
+      strokeWidth={focused ? 2.4 : 2}
+    />
   );
 }
 
@@ -98,9 +104,11 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: colors.bgElevated,
           borderTopColor: colors.border,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 6,
+          borderTopWidth: 1,
+          height: 70,
+          paddingBottom: 10,
+          paddingTop: 8,
+          elevation: 12,
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textSecondary,
@@ -114,7 +122,19 @@ function MainTabs() {
             <TabBarLabel focused={focused} label={t('dashboard')} />
           ),
           tabBarIcon: ({ focused }) => (
-            <TabBarIcon icon="🏡" focused={focused} />
+            <TabBarIcon name="home" focused={focused} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Guide"
+        component={GuideScreen}
+        options={{
+          tabBarLabel: ({ focused }) => (
+            <TabBarLabel focused={focused} label={t('guide')} />
+          ),
+          tabBarIcon: ({ focused }) => (
+            <TabBarIcon name="book" focused={focused} />
           ),
         }}
       />
@@ -127,12 +147,13 @@ function MainTabs() {
             backgroundColor: colors.danger,
             color: '#fff',
             fontSize: 11,
+            fontWeight: '800',
           },
           tabBarLabel: ({ focused }) => (
             <TabBarLabel focused={focused} label={t('alerts')} />
           ),
           tabBarIcon: ({ focused }) => (
-            <TabBarIcon icon="🔔" focused={focused} />
+            <TabBarIcon name="bell" focused={focused} />
           ),
         }}
       />
@@ -144,7 +165,7 @@ function MainTabs() {
             <TabBarLabel focused={focused} label={t('settings')} />
           ),
           tabBarIcon: ({ focused }) => (
-            <TabBarIcon icon="⚙️" focused={focused} />
+            <TabBarIcon name="settings" focused={focused} />
           ),
         }}
       />
@@ -191,18 +212,44 @@ function StartupPermissions() {
 }
 
 function RootNav() {
-  const { ready, onboardingDone } = useApp();
+  const { ready, onboardingDone, t } = useApp();
+  const themeMode = useTheme(); // subscribes to theme changes
+  const [showTutorial, setShowTutorial] = React.useState(false);
+
+  React.useEffect(() => {
+    if (onboardingDone) {
+      shouldShowTutorial().then((should) => setShowTutorial(should));
+    }
+  }, [onboardingDone]);
+
   if (!ready) {
     return (
-      <View style={styles.splash}>
+      <View style={[styles.splash, { backgroundColor: colors.bg }]}>
         <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
   }
+  // key={themeMode} forces a remount of the navigator on theme switch so
+  // every screen rebuilds its styles with the new palette.
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer key={themeMode} theme={{
+      ...navTheme,
+      colors: {
+        ...navTheme.colors,
+        background: colors.bg,
+        card: colors.bg,
+        text: colors.textPrimary,
+        border: colors.border,
+        primary: colors.accent,
+      },
+    }}>
       <StartupPermissions />
       {onboardingDone ? <MainTabs /> : <OnboardingScreen />}
+      <Tutorial
+        visible={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        t={t}
+      />
       <ToastHost />
     </NavigationContainer>
   );

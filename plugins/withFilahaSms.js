@@ -16,6 +16,8 @@ const REQUIRED_PERMISSIONS = [
   'android.permission.VIBRATE',
   'android.permission.POST_NOTIFICATIONS',
   'android.permission.WAKE_LOCK',
+  'android.permission.FOREGROUND_SERVICE',
+  'android.permission.FOREGROUND_SERVICE_DATA_SYNC',
   'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
 ];
 
@@ -75,6 +77,35 @@ function ensureSmsReceiver(application) {
       ],
     });
   }
+  // Daily reminder receiver
+  const reminderExists = application.receiver.some(
+    (r) => r && r.$ && r.$['android:name'] === '.ReminderReceiver'
+  );
+  if (!reminderExists) {
+    application.receiver.push({
+      $: {
+        'android:name': '.ReminderReceiver',
+        'android:exported': 'false',
+      },
+    });
+  }
+}
+
+function ensureForegroundService(application) {
+  if (!application.service) application.service = [];
+  const exists = application.service.some(
+    (s) => s && s.$ && s.$['android:name'] === '.FilahaMonitorService'
+  );
+  if (!exists) {
+    application.service.push({
+      $: {
+        'android:name': '.FilahaMonitorService',
+        'android:exported': 'false',
+        'android:foregroundServiceType': 'dataSync',
+        'android:stopWithTask': 'false',
+      },
+    });
+  }
 }
 
 function withFilahaManifest(config) {
@@ -87,6 +118,7 @@ function withFilahaManifest(config) {
 
     if (manifest.application && manifest.application[0]) {
       ensureSmsReceiver(manifest.application[0]);
+      ensureForegroundService(manifest.application[0]);
     }
 
     return cfg;
@@ -225,7 +257,12 @@ function withFilahaJavaFiles(config) {
       }
 
       const sourceDir = path.join(projectRoot, 'plugins', 'native-android');
-      const files = ['SmsReceiver.java', 'SmsPackage.java'];
+      const files = [
+        'SmsReceiver.java',
+        'SmsPackage.java',
+        'ReminderReceiver.java',
+        'FilahaMonitorService.java',
+      ];
 
       files.forEach((file) => {
         const src = path.join(sourceDir, file);

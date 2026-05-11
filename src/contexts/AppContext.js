@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { I18nManager } from 'react-native';
 import { Storage } from '../services/StorageService';
+import { setActiveTheme, useTheme } from '../utils/colors';
 import {
   drainSmsQueue,
   subscribeToSmsEvents,
@@ -16,7 +17,9 @@ import {
   setAlertConfig,
   showAlertNotification,
   sendSms,
+  startMonitoring,
 } from '../services/SmsService';
+import { actionFor } from '../utils/actionSteps';
 import { makePhoneCall, makeDirectCall } from '../services/CallService';
 import { vibrateDanger, vibrateWarn } from '../services/AlertService';
 import { parseSms } from '../utils/smsParser';
@@ -47,6 +50,7 @@ function initialState() {
     ready: false,
     onboardingDone: false,
     language: DEFAULT_LANG,
+    theme: 'dark',
     farms: [],
     devices: [],
     readings: {},
@@ -64,6 +68,8 @@ function reducer(state, action) {
       return { ...state, ...action.payload, ready: true };
     case 'SET_LANGUAGE':
       return { ...state, language: action.payload };
+    case 'SET_THEME':
+      return { ...state, theme: action.payload };
     case 'SET_ONBOARDING_DONE':
       return { ...state, onboardingDone: action.payload };
     case 'SET_FARMS':
@@ -112,6 +118,7 @@ export function AppProvider({ children }) {
       const [
         onboardingDone,
         savedLang,
+        savedTheme,
         farms,
         devices,
         alerts,
@@ -121,6 +128,7 @@ export function AppProvider({ children }) {
       ] = await Promise.all([
         Storage.getOnboardingDone(),
         Storage.getLanguage(),
+        Storage.getTheme(),
         Storage.getFarms(),
         Storage.getDevices(),
         Storage.getAlerts(),
@@ -128,6 +136,9 @@ export function AppProvider({ children }) {
         Storage.getThresholds(),
         Storage.getPowerCut(),
       ]);
+
+      const theme = savedTheme || 'dark';
+      setActiveTheme(theme);
 
       const readings = {};
       await Promise.all(
@@ -157,6 +168,7 @@ export function AppProvider({ children }) {
         payload: {
           onboardingDone: !!onboardingDone,
           language,
+          theme,
           farms: farms || [],
           devices: devices || [],
           readings,
@@ -240,9 +252,12 @@ export function AppProvider({ children }) {
           // Only fire notification from JS when native didn't already handle.
           // Real SMS arrivals are handled by SmsReceiver natively.
           if (!nativeHandled) {
+            const action = actionFor(key, s.language);
+            const whatToDo = tRef.current('whatToDo') || 'What to do';
+            const body = `${sensorMessages[key]}\n${value.toFixed(1)} ${sensorUnits[key]} (${tRef.current('maxLevel') || 'max'} ${thresholds[key].danger})\n\n▶ ${whatToDo}:\n${action}`;
             showAlertNotification(
-              `⚠️ ${sensorLabels[key]} — ${device.name}`,
-              `${sensorMessages[key]}\n${value.toFixed(1)} ${sensorUnits[key]} (limit: ${thresholds[key].danger})`,
+              `🚨 ${device.name} — ${sensorLabels[key]}`,
+              body,
               true
             ).catch(() => {});
           }
@@ -308,15 +323,16 @@ export function AppProvider({ children }) {
         makeDirectCall(num).catch(() => {});
       }
       if (num && s.settings.autoSmsOnDanger) {
-        const dangerLines = newAlerts
-          .filter((a) => a.type === 'ALERT')
-          .slice(0, 3)
-          .map((a) => `• ${a.message}`)
-          .join('\n');
+        const lang = s.language;
+        const dangerAlerts = newAlerts.filter((a) => a.type === 'ALERT').slice(0, 3);
+        const dangerLines = dangerAlerts.map((a) => `• ${a.message}`).join('\n');
+        const primaryKey = (dangerAlerts[0]?.subType || 'GENERIC').toLowerCase();
+        const action = actionFor(primaryKey, lang);
+        const whatToDo = tRef.current('whatToDo') || 'What to do';
         const body =
-          `🚨 Filaha Flock\n` +
-          `Coop: ${device.name} (${device.id})\n` +
+          `🚨 Filaha Flock\n${device.name} (${device.id}):\n` +
           dangerLines +
+          `\n\n▶ ${whatToDo}: ${action}` +
           `\n${new Date().toLocaleTimeString()}`;
         sendSms(num, body).catch(() => {});
       }
@@ -438,27 +454,52 @@ export function AppProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.thresholds, state.ready]);
 
-  // ---------- Sync ALL alert config to native SharedPreferences ----------
-  // This is the bridge that lets the native BroadcastReceiver fire alerts
-  // (notification + auto-call + auto-SMS) even when the app is killed.
+  // ---------- Sync ALL alert config + i18n action steps to native SharedPreferences ----------
   useEffect(() => {
     if (!state.ready) return;
+    const lang = state.language;
     setAlertConfig({
+      language: lang,
       emergencyContact: state.settings.emergencyContact || '',
       autoCallOnDanger: !!(state.settings.autoCall || state.settings.autoCallOnDanger),
       autoSmsOnDanger: !!state.settings.autoSmsOnDanger,
       autoCallOnPowerCut: !!state.settings.autoCallOnPowerCut,
       thresholds: state.thresholds,
+      // Localized action steps so background notifications/SMS speak the user's language
+      actionCo2: actionFor('co2', lang),
+      actionNh3: actionFor('nh3', lang),
+      actionTemp: actionFor('temp', lang),
+      actionTempLow: actionFor('temp_low', lang),
+      actionHum: actionFor('hum', lang),
+      actionPowerCut: actionFor('power_cut', lang),
+      actionBattery: actionFor('battery', lang),
+      actionGeneric: actionFor('generic', lang),
+      alertLabel: t('danger'),
+      checkNowLabel: t('checkNow'),
+      whatToDoLabel: t('whatToDo'),
     }).catch(() => {});
   }, [
     state.ready,
+    state.language,
     state.settings.emergencyContact,
     state.settings.autoCall,
     state.settings.autoCallOnDanger,
     state.settings.autoSmsOnDanger,
     state.settings.autoCallOnPowerCut,
     state.thresholds,
+    t,
   ]);
+
+  // ---------- Auto-start the foreground monitoring service ----------
+  // This is what makes the app "always running" — Android will not kill us
+  // because we hold an ongoing low-priority notification.
+  useEffect(() => {
+    if (!state.ready) return;
+    startMonitoring(
+      t('monitoringActive') || 'Filaha Flock',
+      t('monitoringActiveBody') || 'Watching your coops 24/7'
+    ).catch(() => {});
+  }, [state.ready, t]);
 
   // ---------- Public actions ----------
   const setLanguage = useCallback(async (lang) => {
@@ -471,12 +512,18 @@ export function AppProvider({ children }) {
     dispatch({ type: 'SET_LANGUAGE', payload: lang });
   }, []);
 
+  const setTheme = useCallback(async (theme) => {
+    setActiveTheme(theme);
+    await Storage.setTheme(theme);
+    dispatch({ type: 'SET_THEME', payload: theme });
+  }, []);
+
   const completeOnboarding = useCallback(async () => {
     await Storage.setOnboardingDone(true);
     dispatch({ type: 'SET_ONBOARDING_DONE', payload: true });
   }, []);
 
-  const addDevice = useCallback(async ({ name, deviceId, farmId }) => {
+  const addDevice = useCallback(async ({ name, deviceId, farmId, chickAgeDays, breed, strain }) => {
     const s = stateRef.current;
     let farms = s.farms;
     let resolvedFarmId = farmId;
@@ -494,11 +541,19 @@ export function AppProvider({ children }) {
     const exists = s.devices.find((d) => d.id.toUpperCase() === String(deviceId).toUpperCase());
     if (exists) return { ok: false, reason: 'duplicate' };
 
+    // Compute chick arrival date from age input (defaults to today = day 1)
+    const now = Date.now();
+    const ageDays = Number.isFinite(chickAgeDays) ? Math.max(0, Math.floor(chickAgeDays)) : 0;
+    const chickArrivalDate = now - ageDays * 24 * 60 * 60 * 1000;
+
     const device = {
       id: String(deviceId).toUpperCase(),
       name: name || deviceId,
       farmId: resolvedFarmId,
-      createdAt: Date.now(),
+      createdAt: now,
+      chickArrivalDate,
+      breed: breed || 'broiler',
+      strain: strain || null,
     };
     const devices = [...s.devices, device];
     await Storage.setDevices(devices);
@@ -600,6 +655,7 @@ export function AppProvider({ children }) {
     t,
     rtl: isRTL(state.language),
     setLanguage,
+    setTheme,
     completeOnboarding,
     addDevice,
     removeDevice,
@@ -613,7 +669,7 @@ export function AppProvider({ children }) {
     lastReadingFor,
   }), [
     state, t,
-    setLanguage, completeOnboarding,
+    setLanguage, setTheme, completeOnboarding,
     addDevice, removeDevice,
     acknowledgeAlert, clearAllAlerts,
     updateSettings, updateThresholds, resetThresholds,

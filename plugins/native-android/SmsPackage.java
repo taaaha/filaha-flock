@@ -2,6 +2,7 @@ package com.filaha;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlarmManager;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -16,6 +17,8 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import android.telephony.SmsManager;
 import android.util.Log;
+
+import java.util.Calendar;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -71,7 +74,7 @@ public class SmsPackage implements ReactPackage {
 
         // Bump this string whenever native code changes so JS can detect
         // when the installed APK is older than the JS code expects.
-        private static final String NATIVE_VERSION = "v4-2026-05-06";
+        private static final String NATIVE_VERSION = "v6-2026-05-07b";
 
         @ReactMethod
         public void getNativeVersion(Promise promise) {
@@ -242,6 +245,20 @@ public class SmsPackage implements ReactPackage {
                     editor.putBoolean("auto_call_on_power_cut",
                             config.getBoolean("autoCallOnPowerCut"));
                 }
+                // Localized action steps used by SmsReceiver in notifications + SMS body
+                String[] actionKeys = {
+                    "actionCo2", "actionNh3", "actionTemp", "actionTempLow",
+                    "actionHum", "actionPowerCut", "actionBattery", "actionGeneric",
+                    "alertLabel", "checkNowLabel", "whatToDoLabel",
+                };
+                for (String key : actionKeys) {
+                    if (config.hasKey(key) && !config.isNull(key)) {
+                        editor.putString("i18n_" + key, config.getString(key));
+                    }
+                }
+                if (config.hasKey("language") && !config.isNull("language")) {
+                    editor.putString("i18n_language", config.getString("language"));
+                }
                 if (config.hasKey("thresholds") && !config.isNull("thresholds")) {
                     ReadableMap thresholds = config.getMap("thresholds");
                     JSONObject json = new JSONObject();
@@ -263,6 +280,108 @@ public class SmsPackage implements ReactPackage {
                 promise.resolve(true);
             } catch (Exception e) {
                 promise.reject("CONFIG_ERROR", e.getMessage());
+            }
+        }
+
+        /**
+         * Schedule a daily repeating reminder at a specific hour/minute.
+         * Survives reboots IF the user disables battery optimization.
+         */
+        @ReactMethod
+        public void scheduleDailyReminder(int hour, int minute, String title, String body,
+                                          int reqCode, Promise promise) {
+            try {
+                Context context = getReactApplicationContext();
+                AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+                if (am == null) { promise.resolve(false); return; }
+
+                Intent intent = new Intent(context, ReminderReceiver.class);
+                intent.setPackage(context.getPackageName());
+                intent.putExtra("title", title == null ? "Filaha Flock" : title);
+                intent.putExtra("body", body == null ? "" : body);
+                intent.putExtra("notifId", 7000 + reqCode);
+
+                int piFlags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                        ? PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
+                        : PendingIntent.FLAG_UPDATE_CURRENT;
+                PendingIntent pi = PendingIntent.getBroadcast(context, reqCode, intent, piFlags);
+
+                Calendar cal = Calendar.getInstance();
+                cal.setTimeInMillis(System.currentTimeMillis());
+                cal.set(Calendar.HOUR_OF_DAY, hour);
+                cal.set(Calendar.MINUTE, minute);
+                cal.set(Calendar.SECOND, 0);
+                cal.set(Calendar.MILLISECOND, 0);
+                if (cal.getTimeInMillis() <= System.currentTimeMillis()) {
+                    cal.add(Calendar.DAY_OF_YEAR, 1);
+                }
+
+                am.setInexactRepeating(
+                        AlarmManager.RTC_WAKEUP,
+                        cal.getTimeInMillis(),
+                        AlarmManager.INTERVAL_DAY,
+                        pi
+                );
+                Log.i(TAG, "Scheduled reminder #" + reqCode + " for " + hour + ":" + minute);
+                promise.resolve(true);
+            } catch (Exception e) {
+                Log.e(TAG, "scheduleDailyReminder failed", e);
+                promise.reject("ALARM_ERROR", e.getMessage());
+            }
+        }
+
+        /**
+         * Start the always-on monitoring foreground service.
+         * The persistent low-priority notification keeps Android from killing
+         * the app even when the user swipes it away.
+         */
+        @ReactMethod
+        public void startMonitoring(String title, String body, Promise promise) {
+            try {
+                Context context = getReactApplicationContext();
+                Intent intent = new Intent(context, FilahaMonitorService.class);
+                intent.setPackage(context.getPackageName());
+                if (title != null) intent.putExtra("title", title);
+                if (body != null) intent.putExtra("body", body);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent);
+                } else {
+                    context.startService(intent);
+                }
+                promise.resolve(true);
+            } catch (Exception e) {
+                Log.e(TAG, "startMonitoring failed", e);
+                promise.reject("MONITOR_START_ERROR", e.getMessage());
+            }
+        }
+
+        @ReactMethod
+        public void stopMonitoring(Promise promise) {
+            try {
+                Context context = getReactApplicationContext();
+                Intent intent = new Intent(context, FilahaMonitorService.class);
+                context.stopService(intent);
+                promise.resolve(true);
+            } catch (Exception e) {
+                promise.resolve(false);
+            }
+        }
+
+        @ReactMethod
+        public void cancelDailyReminder(int reqCode, Promise promise) {
+            try {
+                Context context = getReactApplicationContext();
+                AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+                Intent intent = new Intent(context, ReminderReceiver.class);
+                intent.setPackage(context.getPackageName());
+                int piFlags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                        ? PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
+                        : PendingIntent.FLAG_UPDATE_CURRENT;
+                PendingIntent pi = PendingIntent.getBroadcast(context, reqCode, intent, piFlags);
+                if (am != null) am.cancel(pi);
+                promise.resolve(true);
+            } catch (Exception e) {
+                promise.reject("ALARM_CANCEL_ERROR", e.getMessage());
             }
         }
 

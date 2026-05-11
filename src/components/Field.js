@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { colors } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 
 export default function Field({
   label, value, onChangeText, placeholder, hint,
   keyboardType, maxLength, autoCapitalize,
 }) {
+  const styles = useStyles(makeStyles);
   const [focused, setFocused] = useState(false);
 
   return (
@@ -36,7 +38,7 @@ export default function Field({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   wrap: { marginBottom: 14 },
   label: {
     color: colors.textSecondary,

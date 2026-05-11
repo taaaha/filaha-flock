@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Pressable, Text, ActivityIndicator, StyleSheet, View, Animated } from 'react-native';
 import { colors, shadows } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 
 const PALETTES = {
   primary: { bg: colors.accent, fg: '#ffffff', glow: colors.accent },
@@ -15,6 +16,7 @@ export default function PrimaryButton({
   title, onPress, disabled, loading,
   variant = 'primary', icon, style,
 }) {
+  const styles = useStyles(makeStyles);
   const palette = PALETTES[variant] || PALETTES.primary;
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, friction: 7 }).start();
@@ -52,7 +54,7 @@ export default function PrimaryButton({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   btn: {
     minHeight: 50,
     paddingHorizontal: 18,

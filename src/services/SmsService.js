@@ -3,7 +3,7 @@ import { DeviceEventEmitter, NativeModules, PermissionsAndroid, Platform } from 
 const { FilahaSms } = NativeModules || {};
 
 // JS expects this version. Bump in lockstep with NATIVE_VERSION in SmsPackage.java.
-export const EXPECTED_NATIVE_VERSION = 'v4-2026-05-06';
+export const EXPECTED_NATIVE_VERSION = 'v6-2026-05-07b';
 
 export async function getNativeVersion() {
   if (!FilahaSms || !FilahaSms.getNativeVersion) return null;
@@ -14,10 +14,46 @@ export function listMissingNativeMethods() {
   const required = [
     'showAlertNotification', 'sendSms', 'makeDirectCall',
     'setAlertConfig', 'saveEmergencyContact', 'drainQueue',
-    'getNativeVersion',
+    'getNativeVersion', 'scheduleDailyReminder', 'cancelDailyReminder',
+    'startMonitoring', 'stopMonitoring',
   ];
   if (!FilahaSms) return required;
   return required.filter((k) => typeof FilahaSms[k] !== 'function');
+}
+
+export async function startMonitoring(title, body) {
+  if (!FilahaSms || !FilahaSms.startMonitoring) return false;
+  try {
+    await FilahaSms.startMonitoring(String(title || ''), String(body || ''));
+    return true;
+  } catch (e) {
+    if (__DEV__) console.warn('startMonitoring failed:', e?.message);
+    return false;
+  }
+}
+
+export async function stopMonitoring() {
+  if (!FilahaSms || !FilahaSms.stopMonitoring) return false;
+  try { await FilahaSms.stopMonitoring(); return true; } catch (e) { return false; }
+}
+
+export async function scheduleDailyReminder({ hour, minute, title, body, reqCode }) {
+  if (!FilahaSms || !FilahaSms.scheduleDailyReminder) return false;
+  try {
+    await FilahaSms.scheduleDailyReminder(hour, minute, title, body, reqCode);
+    return true;
+  } catch (e) {
+    if (__DEV__) console.warn('scheduleDailyReminder failed:', e?.message);
+    return false;
+  }
+}
+
+export async function cancelDailyReminder(reqCode) {
+  if (!FilahaSms || !FilahaSms.cancelDailyReminder) return false;
+  try {
+    await FilahaSms.cancelDailyReminder(reqCode);
+    return true;
+  } catch (e) { return false; }
 }
 
 // ── Permissions ───────────────────────────────────────────────────────

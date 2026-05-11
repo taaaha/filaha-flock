@@ -179,10 +179,24 @@ public class SmsReceiver extends BroadcastReceiver {
             }
 
             if (!dangerLines.isEmpty()) {
-                String body = "Critical: \n• " + join(dangerLines, "\n• ");
-                showAlertNotification(context, "🚨 " + deviceId + " — DANGER", body, contact, true);
+                String alertLabel = prefs.getString("i18n_alertLabel", "DANGER");
+                String whatToDo = prefs.getString("i18n_whatToDoLabel", "What to do");
+                String checkNow = prefs.getString("i18n_checkNowLabel", "Check the coop NOW");
+
+                // Build action steps based on which sensor breached first
+                String primarySensor = dangerLines.size() > 0
+                        ? extractFirstSensor(dangerLines.get(0))
+                        : "generic";
+                String action = actionFor(prefs, primarySensor);
+
+                String body = join(dangerLines, "\n")
+                        + "\n\n▶ " + whatToDo + ":\n" + action;
+                String title = "🚨 " + deviceId + " — " + alertLabel;
+                showAlertNotification(context, title, body, contact, true);
+
                 if (!contact.isEmpty()) {
-                    if (autoSms) sendSmsBackground(context, contact, buildSmsBody(deviceId, dangerLines));
+                    String smsBody = buildSmsBody(deviceId, dangerLines, action, whatToDo);
+                    if (autoSms) sendSmsBackground(context, contact, smsBody);
                     if (autoCall) placeBackgroundCall(context, contact);
                 }
             }
@@ -192,22 +206,90 @@ public class SmsReceiver extends BroadcastReceiver {
         if (isAlert) {
             if (!cooldownPassed(prefs, deviceId + "-alert")) return;
             String subType = parseAlertSubtype(message);
+            String sensorKey = parseAlertSensorKey(message);
+            String action = actionFor(prefs, sensorKey);
+            String whatToDo = prefs.getString("i18n_whatToDoLabel", "What to do");
+            String body = subType + "\n\n▶ " + whatToDo + ":\n" + action;
+
             showAlertNotification(context, "⚠️ " + deviceId + " — " + subType,
-                    message, contact, true);
+                    body, contact, true);
             if (!contact.isEmpty()) {
                 boolean shouldCall = isPowerCut ? autoCallPower : autoCall;
-                if (autoSms) sendSmsBackground(context, contact,
-                        "🚨 Filaha Flock\nCoop: " + deviceId + "\n" + subType + "\n"
-                                + new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date()));
+                String smsBody = "🚨 Filaha Flock\n"
+                        + deviceId + ": " + subType + "\n"
+                        + "▶ " + whatToDo + ": " + action + "\n"
+                        + new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
+                if (autoSms) sendSmsBackground(context, contact, smsBody);
                 if (shouldCall) placeBackgroundCall(context, contact);
             }
             return;
         }
 
         if (isClear) {
-            showAlertNotification(context, "✅ " + deviceId + " — All clear",
+            showAlertNotification(context, "✅ " + deviceId,
                     "Sensor readings returned to normal", "", false);
         }
+    }
+
+    private static String extractFirstSensor(String dangerLine) {
+        // dangerLine format: "CO₂ 3500ppm (≥2500)"
+        String lower = dangerLine.toLowerCase();
+        if (lower.contains("co₂") || lower.contains("co2")) return "co2";
+        if (lower.contains("nh₃") || lower.contains("nh3") || lower.contains("ammon")) return "nh3";
+        if (lower.contains("temp")) return "temp";
+        if (lower.contains("hum")) return "hum";
+        return "generic";
+    }
+
+    private static String parseAlertSensorKey(String message) {
+        if (message.contains("|NH3|")) return "nh3";
+        if (message.contains("|CO2|")) return "co2";
+        if (message.contains("|TEMP|")) return "temp";
+        if (message.contains("|HUM|")) return "hum";
+        if (message.contains("|POWER_CUT|")) return "power_cut";
+        if (message.contains("|BATTERY|")) return "battery";
+        return "generic";
+    }
+
+    private static String actionFor(SharedPreferences prefs, String sensorKey) {
+        // Fallback English action steps so notifications always have content
+        // even if the JS layer never synced its translations.
+        String prefKey;
+        String fallback;
+        switch (sensorKey == null ? "generic" : sensorKey) {
+            case "co2":
+                prefKey = "i18n_actionCo2";
+                fallback = "Open all vents NOW. Turn on fans. Check ventilation.";
+                break;
+            case "nh3":
+                prefKey = "i18n_actionNh3";
+                fallback = "Open vents. Replace wet litter. Reduce density.";
+                break;
+            case "temp":
+                prefKey = "i18n_actionTemp";
+                fallback = "Spray roof, run fans, add electrolytes to water.";
+                break;
+            case "temp_low":
+                prefKey = "i18n_actionTempLow";
+                fallback = "Turn on heating, close doors, check young chicks.";
+                break;
+            case "hum":
+                prefKey = "i18n_actionHum";
+                fallback = "Increase ventilation, fix water leaks, dry litter.";
+                break;
+            case "power_cut":
+                prefKey = "i18n_actionPowerCut";
+                fallback = "POWER CUT! Start generator NOW. Watch temperature.";
+                break;
+            case "battery":
+                prefKey = "i18n_actionBattery";
+                fallback = "Sensor battery low — replace soon.";
+                break;
+            default:
+                prefKey = "i18n_actionGeneric";
+                fallback = "Check the coop immediately.";
+        }
+        return prefs.getString(prefKey, fallback);
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -412,11 +494,14 @@ public class SmsReceiver extends BroadcastReceiver {
         return sb.toString();
     }
 
-    private static String buildSmsBody(String deviceId, ArrayList<String> dangerLines) {
-        StringBuilder sb = new StringBuilder("🚨 Filaha Flock\nCoop: ");
-        sb.append(deviceId).append("\n");
+    private static String buildSmsBody(String deviceId, ArrayList<String> dangerLines,
+                                       String action, String whatToDo) {
+        StringBuilder sb = new StringBuilder("🚨 Filaha Flock\n");
+        sb.append(deviceId).append(":\n");
         sb.append(join(dangerLines, "\n"));
-        sb.append("\n").append(new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date()));
+        sb.append("\n\n▶ ").append(whatToDo == null ? "Action" : whatToDo).append(":\n");
+        sb.append(action == null ? "Check the coop now." : action);
+        sb.append("\n").append(new SimpleDateFormat("HH:mm", Locale.US).format(new Date()));
         return sb.toString();
     }
 

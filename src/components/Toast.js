@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, DeviceEventEmitter, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 
 const TOAST_EVENT = 'FilahaToast';
 
@@ -17,6 +18,7 @@ const PALETTES = {
 };
 
 export default function ToastHost() {
+  const styles = useStyles(makeStyles);
   const [toast, setToast] = useState(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(60)).current;
@@ -78,7 +80,7 @@ export default function ToastHost() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   host: {
     position: 'absolute',
     bottom: 96,

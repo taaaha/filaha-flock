@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { colors, statusColor } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 import { sensorStatus } from '../utils/thresholds';
 import { formatNumber } from '../utils/formatters';
 
@@ -12,6 +13,7 @@ const SENSOR_META = {
 };
 
 export default function SensorMini({ sensorKey, value, label, thresholds }) {
+  const styles = useStyles(makeStyles);
   const meta = SENSOR_META[sensorKey] || {};
   const status = sensorStatus(sensorKey, value, thresholds || {});
   const sColor = statusColor(status);
@@ -37,7 +39,7 @@ export default function SensorMini({ sensorKey, value, label, thresholds }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   container: {
     flexDirection: 'row',
     alignItems: 'center',

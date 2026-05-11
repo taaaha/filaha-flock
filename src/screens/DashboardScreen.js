@@ -14,10 +14,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
+import { TextInput } from 'react-native';
+import Icon from '../components/Icon';
 import { useApp } from '../contexts/AppContext';
 import { colors, STATUS, statusColor, shadows } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 import { deviceStatus, statusPriority } from '../utils/thresholds';
 import { buildFakeDataSms } from '../utils/smsParser';
+import { actionFor } from '../utils/actionSteps';
+import { sensorStatus } from '../utils/thresholds';
+import { BREEDS, STRAINS_BY_BREED, strainLabel, heatStressTHI } from '../utils/poultryData';
 import CoopCard from '../components/CoopCard';
 import SummaryBar from '../components/SummaryBar';
 import PrimaryButton from '../components/PrimaryButton';
@@ -54,7 +60,7 @@ function HeroBackdrop({ heroColor }) {
 
 export default function DashboardScreen({ navigation }) {
   const {
-    t,
+    t, language,
     devices, settings, thresholds, powerCut,
     lastReadingFor, addDevice, injectMessage, now,
   } = useApp();
@@ -62,9 +68,14 @@ export default function DashboardScreen({ navigation }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [coopName, setCoopName] = useState('');
   const [deviceId, setDeviceId] = useState('');
+  const [chickAge, setChickAge] = useState('');
+  const [breed, setBreed] = useState('broiler');
+  const [strain, setStrain] = useState('cobb500');
   const [error, setError] = useState('');
   const [permIssue, setPermIssue] = useState(null);
   const [buildIssue, setBuildIssue] = useState(null);
+  const [query, setQuery] = useState('');
+  const styles = useStyles(makeStyles);
 
   // Detect outdated APK
   useEffect(() => {
@@ -114,6 +125,15 @@ export default function DashboardScreen({ navigation }) {
     [...augmented].sort((a, b) => statusPriority(a.status) - statusPriority(b.status)),
     [augmented]);
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter(({ device }) =>
+      device.name.toLowerCase().includes(q) ||
+      device.id.toLowerCase().includes(q)
+    );
+  }, [sorted, query]);
+
   const counts = useMemo(() => {
     let ok = 0, warn = 0, danger = 0, offline = 0;
     augmented.forEach(({ status }) => {
@@ -128,6 +148,64 @@ export default function DashboardScreen({ navigation }) {
   const farmName = (settings && settings.farmName) || '';
   const farmerName = (settings && settings.farmerName) || '';
   const anyDanger = counts.danger > 0;
+
+  // Per-coop danger details for the actionable banner
+  const dangerDetails = useMemo(() => {
+    const SENSOR_LABEL = {
+      co2: t('co2Short'), nh3: t('nh3Short'),
+      temp: t('tempShort'), hum: t('humShort'),
+    };
+    const SENSOR_UNIT = { co2: 'ppm', nh3: 'ppm', temp: '°C', hum: '%' };
+    const out = [];
+    augmented.forEach(({ device, reading, status }) => {
+      if (status === STATUS.POWER_CUT) {
+        out.push({
+          device,
+          sensorKey: 'power_cut',
+          sensorLabel: t('powerCut'),
+          valueText: '',
+          action: actionFor('power_cut', language),
+        });
+        return;
+      }
+
+      // ★ Heat-stress check (THI on temp + humidity)
+      if (reading && reading.temp != null && reading.hum != null) {
+        const hs = heatStressTHI(reading.temp, reading.hum);
+        if (hs && (hs.tier === 'danger' || hs.tier === 'emergency')) {
+          out.push({
+            device,
+            sensorKey: 'heat_stress',
+            sensorLabel: `${t('heatStress')} • THI ${hs.thi}`,
+            valueText: hs.tier === 'emergency' ? t('heatStressEmergency') : t('heatStressDanger'),
+            action: actionFor('temp', language),
+            highPriority: hs.tier === 'emergency',
+          });
+          // Don't return — also check threshold danger below
+        }
+      }
+
+      if (status !== STATUS.DANGER || !reading) return;
+      for (const k of ['co2','nh3','temp','hum']) {
+        const v = reading[k];
+        if (v === null || v === undefined || isNaN(v)) continue;
+        const st = sensorStatus(k, v, thresholds);
+        if (st === STATUS.DANGER) {
+          out.push({
+            device,
+            sensorKey: k,
+            sensorLabel: SENSOR_LABEL[k],
+            valueText: `${Math.round(v * 10) / 10} ${SENSOR_UNIT[k]}`,
+            action: actionFor(k, language),
+          });
+          break;
+        }
+      }
+    });
+    // Sort: emergency THI first, then everything else
+    out.sort((a, b) => (b.highPriority ? 1 : 0) - (a.highPriority ? 1 : 0));
+    return out;
+  }, [augmented, thresholds, language, t]);
 
   // Live indicator pulse
   const livePulse = useRef(new Animated.Value(0)).current;
@@ -250,12 +328,28 @@ export default function DashboardScreen({ navigation }) {
     setError('');
     const cleanId = deviceId.trim().toUpperCase();
     const cleanName = coopName.trim();
+    const ageNum = parseInt(chickAge, 10);
     if (!cleanId) { setError(t('deviceIdHint')); return; }
     if (!cleanName) { setError(t('coopName')); return; }
-    const result = await addDevice({ name: cleanName, deviceId: cleanId });
+    const result = await addDevice({
+      name: cleanName,
+      deviceId: cleanId,
+      chickAgeDays: Number.isFinite(ageNum) ? ageNum : 0,
+      breed,
+      strain,
+    });
     if (!result.ok) { setError(t('deviceId') + ' ✗'); return; }
-    setCoopName(''); setDeviceId(''); setModalVisible(false);
+    setCoopName(''); setDeviceId(''); setChickAge('');
+    setBreed('broiler'); setStrain('cobb500');
+    setModalVisible(false);
     showToast(t('saved'), 'success');
+  };
+
+  // Reset strain when breed changes
+  const onBreedChange = (b) => {
+    setBreed(b);
+    const firstStrain = STRAINS_BY_BREED[b]?.[0];
+    if (firstStrain) setStrain(firstStrain);
   };
 
   const onFixPermission = async () => {
@@ -345,34 +439,73 @@ export default function DashboardScreen({ navigation }) {
           </Pressable>
         ) : null}
 
-        {/* ── Danger highlight ── */}
-        {anyDanger ? (
-          <View style={styles.dangerHighlight}>
-            <View style={styles.dangerIconBox}>
-              <Text style={styles.dangerIcon}>{heroEmoji}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.dangerTitle}>{counts.danger} {t('danger')}</Text>
-              <Text style={styles.dangerHint}>{t('checkNow')}</Text>
-            </View>
-            <Text style={styles.dangerArrow}>›</Text>
+        {/* ── Actionable danger list ── */}
+        {dangerDetails.length > 0 ? (
+          <View style={styles.dangerList}>
+            {dangerDetails.slice(0, 4).map((d, i) => (
+              <Pressable
+                key={d.device.id + d.sensorKey}
+                onPress={() => navigation.navigate('CoopDetail', { deviceId: d.device.id })}
+                android_ripple={{ color: colors.danger + '22' }}
+                style={[styles.dangerItem, i === 0 && styles.dangerItemFirst]}
+              >
+                <View style={styles.dangerItemHead}>
+                  <View style={styles.dangerItemHeadLeft}>
+                    <Icon name="alertTriangle" size={18} color={colors.danger} strokeWidth={2.4} />
+                    <Text style={styles.dangerItemTitle} numberOfLines={1}>
+                      {d.device.name} — {d.sensorLabel}
+                      {d.valueText ? `  ${d.valueText}` : ''}
+                    </Text>
+                  </View>
+                  <Icon name="chevronRight" size={18} color={colors.danger} />
+                </View>
+                <Text style={styles.dangerItemAction} numberOfLines={2}>
+                  ▶ {d.action}
+                </Text>
+              </Pressable>
+            ))}
+            {dangerDetails.length > 4 ? (
+              <Text style={styles.dangerMore}>
+                +{dangerDetails.length - 4} {t('danger').toLowerCase()}
+              </Text>
+            ) : null}
           </View>
         ) : null}
 
         {/* ── Stats Hero ── */}
         <SummaryBar counts={counts} t={t} />
 
-        {/* ── Section header ── */}
+        {/* ── Section header + search ── */}
         {devices.length > 0 ? (
-          <View style={styles.sectionRow}>
-            <Text style={styles.sectionLabel}>{t('totalCoops').toUpperCase()}</Text>
-            <Text style={styles.sectionCount}>{counts.total}</Text>
-          </View>
+          <>
+            <View style={styles.sectionRow}>
+              <Text style={styles.sectionLabel}>{t('totalCoops').toUpperCase()}</Text>
+              <Text style={styles.sectionCount}>
+                {filtered.length}{filtered.length !== counts.total ? ` / ${counts.total}` : ''}
+              </Text>
+            </View>
+            <View style={styles.searchWrap}>
+              <Icon name="search" size={18} color={colors.textTertiary} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={t('searchCoops')}
+                placeholderTextColor={colors.textTertiary}
+                style={styles.searchInput}
+                underlineColorAndroid="transparent"
+              />
+              {query.length > 0 ? (
+                <Pressable onPress={() => setQuery('')} hitSlop={10}>
+                  <Icon name="x" size={16} color={colors.textSecondary} />
+                </Pressable>
+              ) : null}
+            </View>
+          </>
         ) : null}
 
         {/* ── List ── */}
         <FlatList
-          data={sorted}
+          data={filtered}
           keyExtractor={(item) => item.device.id}
           renderItem={({ item }) => (
             <CoopCard
@@ -475,6 +608,51 @@ export default function DashboardScreen({ navigation }) {
                 hint={t('deviceIdHint')}
                 maxLength={32}
               />
+              <Field
+                label={t('chickAgeLabel')}
+                value={chickAge}
+                onChangeText={(v) => setChickAge(v.replace(/[^0-9]/g, '').slice(0, 3))}
+                placeholder="0"
+                keyboardType="number-pad"
+                hint={t('chickAgeHint')}
+                maxLength={3}
+              />
+
+              {/* Breed selector */}
+              <Text style={styles.formLabel}>{t('chickenType')}</Text>
+              <View style={styles.breedRow}>
+                {BREEDS.filter((b) => b !== 'mixed').map((b) => (
+                  <Pressable
+                    key={b}
+                    onPress={() => onBreedChange(b)}
+                    android_ripple={{ color: colors.accent + '22' }}
+                    style={[styles.breedChip, breed === b && styles.breedChipActive]}
+                  >
+                    <Text style={[styles.breedChipText, breed === b && styles.breedChipTextActive]}>
+                      {t(b)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {/* Strain selector */}
+              <Text style={styles.formLabel}>{t('strain')}</Text>
+              <View style={styles.strainGrid}>
+                {(STRAINS_BY_BREED[breed] || []).map((id) => (
+                  <Pressable
+                    key={id}
+                    onPress={() => setStrain(id)}
+                    android_ripple={{ color: colors.accent + '22' }}
+                    style={[styles.strainChip, strain === id && styles.strainChipActive]}
+                  >
+                    <Text style={[styles.strainChipText, strain === id && styles.strainChipTextActive]}>
+                      {strainLabel(id)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.formHint}>{t('strainHint')}</Text>
+
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
               <View style={styles.modalActions}>
                 <PrimaryButton
@@ -498,7 +676,7 @@ export default function DashboardScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   safe: { flex: 1, backgroundColor: colors.bg },
 
   // Header
@@ -651,6 +829,61 @@ const styles = StyleSheet.create({
     fontWeight: '300',
   },
 
+  dangerList: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: colors.danger + '12',
+    borderWidth: 1.5,
+    borderColor: colors.danger + '60',
+    borderRadius: 16,
+    padding: 6,
+    ...shadows.glow(colors.danger),
+  },
+  dangerItem: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.danger + '40',
+    backgroundColor: colors.danger + '12',
+    marginBottom: 6,
+  },
+  dangerItemFirst: {
+    backgroundColor: colors.danger + '18',
+    borderColor: colors.danger + '60',
+  },
+  dangerItemHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  dangerItemHeadLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  dangerItemTitle: {
+    color: colors.dangerSoft,
+    fontSize: 14,
+    fontWeight: '900',
+    flex: 1,
+  },
+  dangerItemAction: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 6,
+    lineHeight: 19,
+  },
+  dangerMore: {
+    textAlign: 'center',
+    color: colors.dangerSoft,
+    fontSize: 12,
+    fontWeight: '700',
+    paddingVertical: 6,
+  },
+
   // Section header above coop list
   sectionRow: {
     flexDirection: 'row',
@@ -670,6 +903,27 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     fontSize: 11,
     fontWeight: '700',
+  },
+
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '500',
+    padding: 0,
   },
 
   // Empty state
@@ -770,5 +1024,61 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   errorText: { color: colors.danger, fontSize: 13, marginBottom: 8, fontWeight: '600' },
+
+  formLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 6,
+    marginTop: 4,
+    letterSpacing: 0.5,
+  },
+  formHint: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  breedRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  breedChip: {
+    flex: 1,
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  breedChipActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '14',
+  },
+  breedChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '800' },
+  breedChipTextActive: { color: colors.accent },
+  strainGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+  },
+  strainChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    backgroundColor: colors.card,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  strainChipActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '18',
+  },
+  strainChipText: { color: colors.textSecondary, fontSize: 11, fontWeight: '700' },
+  strainChipTextActive: { color: colors.accent },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
 });

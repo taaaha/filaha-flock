@@ -1,4 +1,5 @@
-export const colors = {
+// ── Theme palettes ─────────────────────────────────────────────────────
+const DARK = {
   // Backgrounds
   bg: '#070b14',
   bgElevated: '#0d1322',
@@ -32,7 +33,7 @@ export const colors = {
   textTertiary: '#64748b',
   textDim: '#475569',
 
-  // Sensor accents (kept for SensorMini)
+  // Sensor accents
   co2: '#60a5fa',
   nh3: '#a78bfa',
   temp: '#fb923c',
@@ -40,6 +41,74 @@ export const colors = {
   battery: '#facc15',
 };
 
+const LIGHT = {
+  bg: '#f5f7fb',
+  bgElevated: '#ffffff',
+  card: '#ffffff',
+  cardElevated: '#f1f5f9',
+  cardHover: '#e2e8f0',
+
+  border: '#e2e8f0',
+  borderLight: '#cbd5e1',
+  borderStrong: '#94a3b8',
+
+  accent: '#2563eb',
+  accentSoft: '#3b82f6',
+  accentGlow: '#2563eb40',
+
+  ok: '#059669',
+  okSoft: '#10b981',
+  warn: '#d97706',
+  warnSoft: '#f59e0b',
+  danger: '#dc2626',
+  dangerSoft: '#ef4444',
+  offline: '#64748b',
+  power: '#ea580c',
+
+  textPrimary: '#0f172a',
+  textSecondary: '#475569',
+  textTertiary: '#64748b',
+  textDim: '#94a3b8',
+
+  co2: '#2563eb',
+  nh3: '#7c3aed',
+  temp: '#ea580c',
+  hum: '#0891b2',
+  battery: '#ca8a04',
+};
+
+// ── Theme state ────────────────────────────────────────────────────────
+let activePalette = DARK;
+let activeMode = 'dark';
+const listeners = new Set();
+
+export function getActiveTheme() { return activeMode; }
+
+export function setActiveTheme(mode) {
+  if (mode !== 'dark' && mode !== 'light') return;
+  if (mode === activeMode) return;
+  activeMode = mode;
+  activePalette = mode === 'light' ? LIGHT : DARK;
+  listeners.forEach((l) => { try { l(mode); } catch (e) {} });
+}
+
+export function subscribeTheme(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+// Proxy so every existing `import { colors }` keeps reading the *current*
+// palette without needing to touch any component.
+export const colors = new Proxy({}, {
+  get(_, key) { return activePalette[key]; },
+  has(_, key) { return key in activePalette; },
+  ownKeys() { return Object.keys(activePalette); },
+  getOwnPropertyDescriptor(_, key) {
+    return { enumerable: true, configurable: true, value: activePalette[key] };
+  },
+});
+
+// ── Status helpers ─────────────────────────────────────────────────────
 export const STATUS = {
   OK: 'ok',
   WARN: 'warn',
@@ -59,26 +128,26 @@ export function statusColor(status) {
   }
 }
 
-// Shadow presets for elevation
+// ── Shadow presets ─────────────────────────────────────────────────────
 export const shadows = {
   sm: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.18,
     shadowRadius: 4,
     elevation: 2,
   },
   md: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.28,
     shadowRadius: 8,
     elevation: 5,
   },
   lg: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
+    shadowOpacity: 0.38,
     shadowRadius: 14,
     elevation: 10,
   },
@@ -90,3 +159,13 @@ export const shadows = {
     elevation: 8,
   }),
 };
+
+// React hook that forces re-render on theme change. Components don't need
+// to use it explicitly — the Proxy will read the new palette anyway — but
+// top-level screens should call it so styles recompute.
+import { useEffect, useState } from 'react';
+export function useTheme() {
+  const [mode, setMode] = useState(activeMode);
+  useEffect(() => subscribeTheme(setMode), []);
+  return mode;
+}

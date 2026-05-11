@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const KEYS = {
   ONBOARDING_DONE: '@filaha:onboardingDone',
   LANGUAGE: '@filaha:language',
+  THEME: '@filaha:theme',
   FARMS: '@filaha:farms',
   DEVICES: '@filaha:devices',
   ALERTS: '@filaha:alerts',
@@ -47,6 +48,13 @@ export const Storage = {
   },
   async setLanguage(lang) {
     return safeSet(KEYS.LANGUAGE, lang);
+  },
+
+  async getTheme() {
+    return await safeGet(KEYS.THEME, 'dark');
+  },
+  async setTheme(theme) {
+    return safeSet(KEYS.THEME, theme);
   },
 
   async getFarms() {

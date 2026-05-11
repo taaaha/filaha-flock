@@ -165,10 +165,163 @@ export default {
   checkNow: 'check now',
   liveMonitoring: 'Live monitoring',
   systemReady: 'System ready',
+  whatToDo: 'What to do',
+  monitoringActive: 'Filaha Flock is monitoring',
+  monitoringActiveBody: 'Active 24/7 — you will not miss any alert',
+
+  // Appearance
+  appearance: 'Appearance',
+  darkMode: 'Dark',
+  lightMode: 'Light',
+
+  // Breeds
+  broiler: 'Broiler (meat)',
+  layer: 'Layer (eggs)',
+  beldi: 'Beldi (local)',
+  mixed: 'Mixed',
+  chickenType: 'Chicken type',
+  chickenTypeHint: 'Choose the breed type — guidance is tailored to it',
+
+  // Calculators
+  calculators: 'Calculators',
+  brooderCalc: 'Brooder temperature',
+  brooderCalcHint: 'Target heat zone temperature by chick age',
+  densityCalc: 'Density calculator',
+  densityCalcHint: 'How many birds fit your coop area',
+  profitCalc: 'Profit estimator',
+  profitCalcHint: 'Estimated income for this cycle',
+  vaccineCalc: 'Vaccination schedule',
+  vaccineCalcHint: 'Personalized dates based on chick arrival',
+  ageInDays: 'Age (days)',
+  areaInM2: 'Coop area (m²)',
+  birdsPerM2: 'Birds per m²',
+  birdsTotal: 'Total birds',
+  feedCostPerKg: 'Feed cost (DZD/kg)',
+  marketPricePerKg: 'Market price (DZD/kg)',
+  estimatedFeed: 'Feed needed',
+  estimatedRevenue: 'Revenue',
+  estimatedProfit: 'Profit',
+  perBird: 'per bird',
+  sourcedFrom: 'Source: ',
+  basedOn: 'Based on',
+
+  // Strain-specific
+  strain: 'Strain',
+  strainHint: 'Genetic line — affects growth, feed, vaccinations',
+  pickStrain: 'Pick a strain',
+  strainComparison: 'Strain comparison',
+  growthCurve: 'Growth curve',
+  growthCurveHint: 'Day-by-day target weight and feed conversion',
+  benchmark: 'Benchmark',
+  breederStandard: 'Breeder standard',
+  algerianField: 'Algerian field',
+  algerianFieldHint: 'Realistic average from Algerian commercial farms',
+  itelvNorm: 'ITELV regulation',
+
+  // Diseases
+  diseases: 'Diseases',
+  diseaseAlgeria: 'Algerian disease watchlist',
+  diseaseSymptoms: 'Symptoms',
+  diseaseAction: 'What to do',
+  diseaseTriggers: 'Triggers',
+  diseaseSeverity: 'Severity',
+  severityCritical: 'Critical',
+  severityHigh: 'High',
+  severityMedium: 'Medium',
+
+  // Wilaya / region
+  wilaya: 'Region (wilaya)',
+  wilayaHint: 'Climate profile affects ventilation and heat-stress alerts',
+  pickWilaya: 'Pick your region',
+
+  // Heat stress
+  heatStress: 'Heat stress',
+  heatStressSafe: 'Safe',
+  heatStressAlert: 'Alert',
+  heatStressDanger: 'Danger',
+  heatStressEmergency: 'EMERGENCY',
+  thi: 'THI',
+
+  // Markets
+  marketPrices: 'Algerian market reference',
+  marketAsOf: 'As of',
+  priceDocBroiler: 'Day-old broiler chick',
+  priceLivePerKg: 'Live weight, farm-gate',
+  priceRetailPerKg: 'Retail',
+  priceFeedPerKg: 'Complete feed',
+  priceEggPerUnit: 'Egg, retail',
+
+  // Feed phases
+  feedPhases: 'Feed program',
+  feedPhaseStarter: 'Starter',
+  feedPhaseGrower: 'Grower',
+  feedPhaseFinisher: 'Finisher',
+  protein: 'Protein',
+  energy: 'Energy',
+  calcium: 'Calcium',
 
   // SMS
   autoSms: 'Auto-SMS on danger',
   sendSmsPermission: 'Send SMS',
   smsSent: 'SMS sent',
   smsFailed: 'SMS failed',
+
+  // Tutorial
+  tutStep1Title: 'Dashboard',
+  tutStep1Body: 'Track all your coops in one place. Live status, sensors, and batteries.',
+  tutStep2Title: 'Add a coop',
+  tutStep2Body: 'Tap + to add a coop. Enter the name, device ID, and chick age.',
+  tutStep3Title: 'Real alerts',
+  tutStep3Body: 'On danger, the app calls and texts your emergency contact automatically. Set the number in Settings.',
+  tutStep4Title: 'Practical guide',
+  tutStep4Body: 'The Guide tab has daily tasks, the vaccination schedule, and tips for the hot Algerian summer.',
+  tutStep5Title: 'Stay ready',
+  tutStep5Body: 'Enable daily reminders in the Guide so you never forget the morning and evening checks.',
+
+  // Coop age
+  day: 'Day',
+  chickAgeLabel: 'Chick age (days, 0 = today)',
+  chickAgeHint: 'How old are the chicks now? Leave blank if they just arrived.',
+
+  // Search & filter
+  searchCoops: 'Search coops…',
+  noResults: 'No results',
+
+  // Min/max thresholds
+  minLevel: 'Minimum',
+  maxLevel: 'Maximum',
+  warnLow: 'Warn low',
+  dangerLow: 'Danger low',
+
+  // Guide
+  guide: 'Guide',
+  guideTitle: 'Farm guide',
+  guideIntro: 'Practical advice for poultry farming in Algeria',
+  dailyChecklist: "Today's checklist",
+  dailyChecklistHint: 'Daily tasks to keep your flock healthy and productive',
+  ageBased: 'By age',
+  ageBasedHint: 'Advice changes with the age of your birds',
+  topicTemperature: 'Temperature & heat',
+  topicVentilation: 'Ventilation & air quality',
+  topicFeeding: 'Feeding & water',
+  topicHealth: 'Health & prevention',
+  topicVaccination: 'Vaccination schedule',
+  topicLighting: 'Lighting',
+  topicSummer: 'Hot summer tips',
+  topicWinter: 'Winter tips',
+  topicBeldi: 'Local Beldi chicken',
+  optimalTemp: 'Optimal temp',
+  whatToCheck: 'What to check',
+  whyItMatters: 'Why it matters',
+  warningSigns: 'Warning signs',
+  readMore: 'Read more',
+  markDone: 'Done',
+  remindMe: 'Remind me',
+  remindersEnabled: 'Reminders enabled',
+  remindersDisabled: 'Reminders disabled',
+  dailyReminders: 'Daily reminders',
+  morningReminderTitle: 'Morning check',
+  morningReminderBody: 'Inspect water, feed, temperature, ventilation, and any sick birds',
+  eveningReminderTitle: 'Evening check',
+  eveningReminderBody: 'Verify doors, lighting, ventilation, and remove any dead birds',
 };

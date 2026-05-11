@@ -1,10 +1,27 @@
 import React, { memo, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import { colors, STATUS, statusColor, shadows } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
+import { strainLabel } from '../utils/poultryData';
 import SensorMini from './SensorMini';
 import BatteryBar from './BatteryBar';
 import Pulse from './Pulse';
 import { formatRelativeTime } from '../utils/formatters';
+
+function coopAgeDays(device, now) {
+  if (!device.chickArrivalDate) return null;
+  const ms = now - device.chickArrivalDate;
+  if (ms < 0) return 0;
+  return Math.floor(ms / (24 * 60 * 60 * 1000)) + 1;
+}
+
+function phaseColor(age) {
+  if (age == null) return null;
+  if (age <= 7) return '#fb923c';   // brooding
+  if (age <= 21) return '#facc15';  // grower
+  if (age <= 45) return '#22d3ee';  // finisher
+  return '#94a3b8';                  // adult
+}
 
 function statusLabel(status, t) {
   switch (status) {
@@ -18,12 +35,15 @@ function statusLabel(status, t) {
 }
 
 function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
+  const styles = useStyles(makeStyles);
   const sColor = statusColor(status);
   const isDanger = status === STATUS.DANGER || status === STATUS.POWER_CUT;
   const isPower = status === STATUS.POWER_CUT;
   const isOffline = status === STATUS.OFFLINE;
   const r = reading || {};
   const ageText = reading ? formatRelativeTime(reading.timestamp, t, now) : null;
+  const chickAge = coopAgeDays(device, now);
+  const phColor = phaseColor(chickAge);
 
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, friction: 7 }).start();
@@ -53,6 +73,26 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
               <Text style={styles.name} numberOfLines={1}>{device.name}</Text>
               <View style={styles.metaRow}>
                 <Text style={styles.devId}>{device.id}</Text>
+                {device.strain ? (
+                  <>
+                    <Text style={styles.dot}>·</Text>
+                    <View style={styles.strainBadge}>
+                      <Text style={styles.strainBadgeText} numberOfLines={1}>
+                        {strainLabel(device.strain)}
+                      </Text>
+                    </View>
+                  </>
+                ) : null}
+                {chickAge !== null ? (
+                  <>
+                    <Text style={styles.dot}>·</Text>
+                    <View style={[styles.ageChip, { borderColor: phColor + '60', backgroundColor: phColor + '18' }]}>
+                      <Text style={[styles.ageChipText, { color: phColor }]}>
+                        {t('day') || 'Day'} {chickAge}
+                      </Text>
+                    </View>
+                  </>
+                ) : null}
                 {ageText ? (
                   <>
                     <Text style={styles.dot}>·</Text>
@@ -109,7 +149,7 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   wrapper: {
     marginHorizontal: 16,
     marginBottom: 12,
@@ -162,6 +202,31 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     fontSize: 11,
     fontWeight: '600',
+  },
+  ageChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  ageChipText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  strainBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.accent + '60',
+    backgroundColor: colors.accent + '14',
+    maxWidth: 110,
+  },
+  strainBadgeText: {
+    color: colors.accent,
+    fontSize: 10,
+    fontWeight: '800',
   },
   badge: {
     flexDirection: 'row',

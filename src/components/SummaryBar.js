@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { colors, STATUS, statusColor, shadows } from '../utils/colors';
+import { useStyles } from '../utils/useStyles';
 
 function AnimatedCount({ value, color, size = 28 }) {
   const [display, setDisplay] = useState(value);
@@ -34,6 +35,7 @@ function StatPill({ label, count, color, accent = false }) {
 }
 
 export default function SummaryBar({ counts, t }) {
+  const styles = useStyles(makeStyles);
   // Single elegant card with the four key stats
   return (
     <View style={styles.wrap}>
@@ -76,7 +78,7 @@ export default function SummaryBar({ counts, t }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => ({
   wrap: {
     paddingHorizontal: 16,
     paddingBottom: 14,
