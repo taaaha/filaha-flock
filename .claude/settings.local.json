@@ -10,7 +10,8 @@
       "Bash(eas build:view 40371768-433d-41ff-b859-9e554b432850)",
       "Bash(npx expo *)",
       "Bash(grep -n \"^function PermissionRow\\\\|styles\\\\\\\\.\" src/screens/SettingsScreen.js)",
-      "Bash(grep -n \"^function\\\\|styles\\\\\\\\.\" src/screens/SettingsScreen.js)"
+      "Bash(grep -n \"^function\\\\|styles\\\\\\\\.\" src/screens/SettingsScreen.js)",
+      "Bash(node -e ' *)"
     ]
   }
 }

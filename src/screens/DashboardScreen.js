@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   FlatList,
+  ScrollView,
   StatusBar,
   Modal,
   KeyboardAvoidingView,
