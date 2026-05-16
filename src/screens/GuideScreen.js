@@ -12,6 +12,7 @@ import { DAILY_TASKS as BUNDLED_TASKS, AGE_PHASES as BUNDLED_PHASES, TOPICS as B
 import { getRemoteContent, applyRemote } from '../services/RemoteContent';
 import Icon from '../components/Icon';
 import { showToast } from '../components/Toast';
+import HelpButton from '../components/HelpButton';
 import {
   showAlertNotification,
   scheduleDailyReminder,
@@ -145,6 +146,7 @@ export default function GuideScreen() {
           <Text style={styles.title}>{t('guideTitle')}</Text>
           <Text style={styles.subtitle} numberOfLines={2}>{t('guideIntro')}</Text>
         </View>
+        <HelpButton t={t} screen="guide" />
       </View>
 
       {/* ── Tab grid: 2 rows × 3 cards, fixed size, no horizontal scroll ── */}

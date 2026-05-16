@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,12 @@ import SummaryBar from '../components/SummaryBar';
 import PrimaryButton from '../components/PrimaryButton';
 import Field from '../components/Field';
 import { showToast } from '../components/Toast';
+import DailyBriefing from '../components/DailyBriefing';
+import SmartInsights from '../components/SmartInsights';
+import HelpButton from '../components/HelpButton';
+import { generateInsights } from '../services/Insights';
+import { Haptics } from '../services/Haptics';
+import { RefreshControl } from 'react-native';
 import {
   checkSmsPermission,
   checkCallPermission,
@@ -62,7 +68,7 @@ function HeroBackdrop({ heroColor }) {
 export default function DashboardScreen({ navigation }) {
   const {
     t, language,
-    devices, settings, thresholds, powerCut,
+    devices, readings, alerts, settings, thresholds, powerCut,
     lastReadingFor, addDevice, injectMessage, now,
   } = useApp();
 
@@ -76,7 +82,20 @@ export default function DashboardScreen({ navigation }) {
   const [permIssue, setPermIssue] = useState(null);
   const [buildIssue, setBuildIssue] = useState(null);
   const [query, setQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const styles = useStyles(makeStyles);
+
+  // Memoized insights — recomputed when devices, readings, or alerts change.
+  const insights = useMemo(() => generateInsights({
+    devices, readings, alerts, thresholds, now, t, language,
+  }), [devices, readings, alerts, thresholds, now, t, language]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    Haptics.light();
+    // Just a UX flourish — actual state is live. After 600ms we drop the spinner.
+    setTimeout(() => setRefreshing(false), 600);
+  }, []);
 
   // Detect outdated APK
   useEffect(() => {
@@ -374,48 +393,30 @@ export default function DashboardScreen({ navigation }) {
       <HeroBackdrop heroColor={heroColor} />
 
       <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
-        {/* ── Header ── */}
-        <View style={styles.header}>
-          <View style={styles.brandLeft}>
-            <View style={[styles.logoWrap, { borderColor: heroColor + '50' }]}>
-              <Text style={styles.logoEmoji}>🐔</Text>
-              <View style={[styles.logoDot, { backgroundColor: heroColor }]} />
+        {/* ── Minimal top bar (brand + help) ── */}
+        <View style={styles.topBar}>
+          <View style={styles.brandRow}>
+            <View style={[styles.logoMini, { borderColor: heroColor + '60' }]}>
+              <Text style={styles.logoMiniEmoji}>🐔</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.brandTitle}>Filaha Flock</Text>
-              <View style={styles.statusRow}>
-                <Animated.View
-                  style={[
-                    styles.liveDot,
-                    {
-                      backgroundColor: heroColor,
-                      opacity: livePulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),
-                      transform: [{
-                        scale: livePulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] }),
-                      }],
-                    },
-                  ]}
-                />
-                <Text style={[styles.statusText, { color: heroColor }]} numberOfLines={1}>
-                  {heroLabel}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.timeEmoji}>{greeting}</Text>
+            <Text style={styles.brandMini}>Filaha Flock</Text>
           </View>
-
-          {(farmerName || farmName) ? (
-            <View style={styles.farmRow}>
-              {farmerName ? <Text style={styles.farmerLabel}>{farmerName}</Text> : null}
-              {farmerName && farmName ? <Text style={styles.dotSep}>•</Text> : null}
-              {farmName ? (
-                <View style={styles.locationPill}>
-                  <Text style={styles.locationText} numberOfLines={1}>📍 {farmName}</Text>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
+          <HelpButton t={t} screen="dashboard" />
         </View>
+
+        {/* ── DAILY BRIEFING — the hero card ── */}
+        <DailyBriefing
+          t={t} language={language} settings={settings}
+          devices={devices} readings={readings}
+          thresholds={thresholds} powerCut={powerCut} now={now}
+          onPressTasks={() => navigation.getParent()?.navigate('Guide')}
+        />
+
+        {/* ── Smart insights carousel ── */}
+        <SmartInsights
+          insights={insights} t={t}
+          onNavigateCoop={(id) => navigation.navigate('CoopDetail', { deviceId: id })}
+        />
 
         {/* ── Build issue banner (highest priority) ── */}
         {buildIssue ? (
@@ -515,6 +516,14 @@ export default function DashboardScreen({ navigation }) {
 
         {/* ── List ── */}
         <FlatList
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
+            />
+          }
           data={filtered}
           keyExtractor={(item) => item.device.id}
           renderItem={({ item }) => (
@@ -695,7 +704,30 @@ export default function DashboardScreen({ navigation }) {
 const makeStyles = () => ({
   safe: { flex: 1, backgroundColor: colors.bg },
 
-  // Header
+  // Minimal top bar (brand + help)
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logoMini: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  logoMiniEmoji: { fontSize: 20 },
+  brandMini: {
+    color: colors.textPrimary,
+    fontSize: 17, fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+
+  // Old header (kept for any leftover refs, unused now)
   header: {
     paddingHorizontal: 20,
     paddingTop: 16,

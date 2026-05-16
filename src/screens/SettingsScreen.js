@@ -8,6 +8,7 @@ import { colors, useTheme } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import Icon from '../components/Icon';
 import { WilayaPicker } from '../components/GuideExtras';
+import HelpButton from '../components/HelpButton';
 import { LANGS } from '../translations';
 import {
   isIgnoringBatteryOptimizations,
@@ -199,7 +200,10 @@ export default function SettingsScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.screenTitle}>{t('settings')}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <Text style={[styles.screenTitle, { marginBottom: 0 }]}>{t('settings')}</Text>
+          <HelpButton t={t} screen="settings" />
+        </View>
 
         {/* Profile */}
         <Text style={styles.sectionTitle}>{t('profile')}</Text>
