@@ -18,7 +18,8 @@
       "Bash(rm -f ~/AppData/Local/Temp/*.tmp.js)",
       "Bash(rm -f ~/AppData/Local/Temp/*.tmp.node)",
       "Bash(node -e 'require\\(\"@babel/parser\"\\).parse\\(require\\(\"fs\"\\).readFileSync\\(\"src/translations/ar.js\",\"utf8\"\\),{sourceType:\"module\"}\\);console.log\\(\"ar.js parses clean\"\\)')",
-      "PowerShell(New-Item -ItemType Directory -Force -Path \"D:\\\\eas-tmp\" | Out-Null; New-Item -ItemType Directory -Force -Path \"D:\\\\gradle-home\" | Out-Null; Get-PSDrive C,D | Select-Object Name,@{N='FreeGB';E={[math]::Round\\($_.Free/1GB,1\\)}},@{N='UsedGB';E={[math]::Round\\($_.Used/1GB,1\\)}})"
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"D:\\\\eas-tmp\" | Out-Null; New-Item -ItemType Directory -Force -Path \"D:\\\\gradle-home\" | Out-Null; Get-PSDrive C,D | Select-Object Name,@{N='FreeGB';E={[math]::Round\\($_.Free/1GB,1\\)}},@{N='UsedGB';E={[math]::Round\\($_.Used/1GB,1\\)}})",
+      "PowerShell([math]::Round\\(\\(Get-PSDrive C\\).Free/1MB,0\\))"
     ]
   }
 }
