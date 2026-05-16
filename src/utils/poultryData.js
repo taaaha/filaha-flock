@@ -840,6 +840,180 @@ export function targetFCRAt(strainId, ageDays) {
   return curve[curve.length - 1].fcr;
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Vaccine localization — translates route, disease keywords, and notes
+// ─────────────────────────────────────────────────────────────────────
+
+const ROUTE_I18N = {
+  ar: {
+    SC: 'تحت الجلد', Spray: 'رشّ', Water: 'في ماء الشرب', WingWeb: 'وخز الجناح',
+    IM: 'حقن عضلي', EyeDrop: 'قطرة في العين', Hatchery: 'في المفرخ',
+  },
+  fr: {
+    SC: 'Sous-cutané', Spray: 'Pulvérisation', Water: "Eau de boisson", WingWeb: 'Transfixion alaire',
+    IM: 'Intramusculaire', EyeDrop: 'Goutte oculaire', Hatchery: 'Au couvoir',
+  },
+};
+
+// Disease/keyword → localized term. Applied as word replacements on the
+// English vaccine string so "Newcastle (Lasota) booster" becomes natural.
+const DISEASE_I18N = {
+  ar: {
+    'Marek': 'ماريك', 'Newcastle': 'نيوكاسل', 'Gumboro': 'غامبورو',
+    'IBD': 'غامبورو', 'Fowl pox': 'جدري الطيور', 'Mycoplasma': 'ميكوبلازما',
+    'Salmonella': 'سالمونيلا', 'Coryza': 'الزكام المعدي', 'EDS': 'هبوط البيض',
+    'booster': 'جرعة داعمة', 'intermediate': 'متوسط', 'intermediate-plus': 'متوسط مقوّى',
+    'enteritidis': '', 'combo': 'مشترك', 'combined': 'مشترك', 'inactivated': 'معطّل',
+    'Hemorrhagic enteritis': 'التهاب الأمعاء النزفي',
+    'Erysipelas': 'الحمرة', 'Pasteurella multocida': 'الكوليرا (باستوريلا)',
+    'Avian Encephalomyelitis': 'التهاب الدماغ والنخاع',
+  },
+  fr: {
+    'Marek': 'Marek', 'Newcastle': 'Newcastle', 'Gumboro': 'Gumboro',
+    'Fowl pox': 'Variole aviaire', 'Mycoplasma': 'Mycoplasme',
+    'Salmonella': 'Salmonelle', 'Coryza': 'Coryza', 'EDS': 'EDS (chute de ponte)',
+    'booster': 'rappel', 'intermediate': 'intermédiaire',
+    'Hemorrhagic enteritis': 'Entérite hémorragique',
+    'Erysipelas': 'Rouget', 'Pasteurella multocida': 'Choléra (Pasteurella)',
+  },
+};
+
+const NOTE_I18N = {
+  ar: {
+    'Hatchery — sub-cutaneous or in-ovo': 'في المفرخ — تحت الجلد أو داخل البيضة',
+    'Hatchery spray': 'رشّ في المفرخ',
+    'Drinking water — first IBD': 'في ماء الشرب — أول جرعة غامبورو',
+    'Second IBD vs hyper-virulent variant': 'الجرعة الثانية ضد السلالة الشديدة الضراوة',
+    'Critical respiratory protection': 'حماية مهمة للجهاز التنفسي',
+    'Pre-finisher protection': 'حماية قبل مرحلة التسمين',
+    'OPTIONAL — only with vet authorization in outbreak zones':
+      'اختياري — فقط بإذن بيطري في مناطق انتشار المرض',
+    'Outbreak zones': 'مناطق انتشار المرض',
+    'CRITICAL pre-lay shot': 'جرعة مهمّة جداً قبل بدء البيض',
+    'Halal certification': 'لشهادة الحلال',
+    'Hatchery': 'في المفرخ',
+  },
+  fr: {
+    'Hatchery — sub-cutaneous or in-ovo': 'Couvoir — sous-cutané ou in-ovo',
+    'Hatchery spray': 'Pulvérisation au couvoir',
+    'Drinking water — first IBD': "Eau de boisson — première dose IBD",
+    'Second IBD vs hyper-virulent variant': 'Deuxième dose IBD (souche hypervirulente)',
+    'Critical respiratory protection': 'Protection respiratoire essentielle',
+    'Pre-finisher protection': 'Protection avant finition',
+    'OPTIONAL — only with vet authorization in outbreak zones':
+      "Optionnel — seulement avec autorisation vétérinaire",
+    'Outbreak zones': "Zones d'épidémie",
+    'CRITICAL pre-lay shot': 'Injection essentielle avant la ponte',
+    'Halal certification': 'Certification Halal',
+    'Hatchery': 'Couvoir',
+  },
+};
+
+export function localizeVaccine(v, language) {
+  if (language === 'en' || !language) {
+    return { name: v.vaccine, route: v.route || '', notes: v.notes || '' };
+  }
+  let name = v.vaccine || '';
+  const dmap = DISEASE_I18N[language] || {};
+  Object.keys(dmap).forEach((en) => {
+    if (dmap[en]) name = name.split(en).join(dmap[en]);
+  });
+  const route = (ROUTE_I18N[language] && ROUTE_I18N[language][v.route]) || v.route || '';
+  const nmap = NOTE_I18N[language] || {};
+  const notes = nmap[v.notes] || v.notes || '';
+  return { name, route, notes };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Disease localization — season + triggers
+// ─────────────────────────────────────────────────────────────────────
+
+const SEASON_I18N = {
+  ar: {
+    'May–September': 'ماي – سبتمبر',
+    'all year': 'طوال السنة',
+    'all year (wet litter)': 'طوال السنة (الفرشة الرطبة)',
+    'cold months + poor ventilation': 'الأشهر الباردة + تهوية ضعيفة',
+    'cold months + altitude': 'الأشهر الباردة + المرتفعات',
+    'warm months': 'الأشهر الحارة',
+    'endemic': 'متوطّن',
+    'all year — endemic pressure 2021+': 'طوال السنة — انتشار مستمر منذ 2021',
+  },
+  fr: {
+    'May–September': 'Mai – Septembre',
+    'all year': "Toute l'année",
+    'all year (wet litter)': "Toute l'année (litière humide)",
+    'cold months + poor ventilation': 'Mois froids + mauvaise ventilation',
+    'cold months + altitude': 'Mois froids + altitude',
+    'warm months': 'Mois chauds',
+    'endemic': 'Endémique',
+    'all year — endemic pressure 2021+': "Toute l'année — endémique depuis 2021",
+  },
+};
+
+const TRIGGER_I18N = {
+  ar: {
+    'ambient > 28°C from D21+': 'حرارة الجو فوق 28°م من اليوم 21',
+    'high humidity': 'رطوبة مرتفعة',
+    'poor ventilation': 'تهوية ضعيفة',
+    'wet litter': 'فرشة رطبة',
+    'dirt-floor "serre-tunnel" buildings': 'مبانٍ نفقية بأرضية ترابية',
+    'overcrowding': 'اكتظاظ',
+    'unvaccinated flocks': 'قطعان غير ملقّحة',
+    'unvaccinated': 'عدم التلقيح',
+    'wild bird contact': 'مخالطة الطيور البرية',
+    'cross-farm contamination': 'انتقال العدوى بين المزارع',
+    'maternal antibody failure': 'ضعف المناعة الموروثة',
+    'high NH3': 'ارتفاع الأمونيا',
+    'cold drafts': 'تيّارات هواء باردة',
+    'high density': 'كثافة عالية',
+    'serre-tunnel houses': 'العنابر النفقية',
+    'poor water hygiene': 'سوء نظافة الماء',
+    'contaminated litter': 'فرشة ملوّثة',
+    'preceding viral disease': 'مرض فيروسي سابق',
+    'Sétif/Médéa/Aurès altitude': 'مرتفعات سطيف/المدية/الأوراس',
+    'cold houses': 'عنابر باردة',
+    'heavy strains > 2.5 kg': 'سلالات ثقيلة فوق 2.5 كغ',
+    'high-energy feed': 'علف عالي الطاقة',
+  },
+  fr: {
+    'ambient > 28°C from D21+': 'Ambiance > 28°C dès J21',
+    'high humidity': 'Humidité élevée',
+    'poor ventilation': 'Mauvaise ventilation',
+    'wet litter': 'Litière humide',
+    'dirt-floor "serre-tunnel" buildings': 'Bâtiments tunnel sol en terre',
+    'overcrowding': 'Surdensité',
+    'unvaccinated flocks': 'Lots non vaccinés',
+    'unvaccinated': 'Non vacciné',
+    'wild bird contact': 'Contact oiseaux sauvages',
+    'cross-farm contamination': 'Contamination inter-fermes',
+    'maternal antibody failure': 'Échec anticorps maternels',
+    'high NH3': 'NH3 élevé',
+    'cold drafts': "Courants d'air froids",
+    'high density': 'Densité élevée',
+    'serre-tunnel houses': 'Bâtiments tunnel',
+    'poor water hygiene': "Mauvaise hygiène de l'eau",
+    'contaminated litter': 'Litière contaminée',
+    'preceding viral disease': 'Maladie virale préalable',
+    'Sétif/Médéa/Aurès altitude': 'Altitude Sétif/Médéa/Aurès',
+    'cold houses': 'Bâtiments froids',
+    'heavy strains > 2.5 kg': 'Souches lourdes > 2,5 kg',
+    'high-energy feed': 'Aliment haute énergie',
+  },
+};
+
+export function localizeDisease(d, language) {
+  if (language === 'en' || !language) {
+    return { season: d.season, triggers: d.triggers };
+  }
+  const smap = SEASON_I18N[language] || {};
+  const tmap = TRIGGER_I18N[language] || {};
+  return {
+    season: smap[d.season] || d.season,
+    triggers: (d.triggers || []).map((tr) => tmap[tr] || tr),
+  };
+}
+
 export function speciesOfStrain(strainId) {
   return STRAINS[strainId]?.species || null;
 }

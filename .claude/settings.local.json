@@ -11,7 +11,13 @@
       "Bash(npx expo *)",
       "Bash(grep -n \"^function PermissionRow\\\\|styles\\\\\\\\.\" src/screens/SettingsScreen.js)",
       "Bash(grep -n \"^function\\\\|styles\\\\\\\\.\" src/screens/SettingsScreen.js)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(node scripts/findStaleStyles.js)",
+      "Bash(node scripts/findHardcoded.js)",
+      "Bash(df -h /tmp 2>/dev/null | tail -1; rm -f /tmp/*.log 2>/dev/null; grep -c \"قن\" src/translations/ar.js)",
+      "Bash(rm -f ~/AppData/Local/Temp/*.tmp.js)",
+      "Bash(rm -f ~/AppData/Local/Temp/*.tmp.node)",
+      "Bash(node -e 'require\\(\"@babel/parser\"\\).parse\\(require\\(\"fs\"\\).readFileSync\\(\"src/translations/ar.js\",\"utf8\"\\),{sourceType:\"module\"}\\);console.log\\(\"ar.js parses clean\"\\)')"
     ]
   }
 }

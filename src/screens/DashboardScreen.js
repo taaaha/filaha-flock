@@ -26,7 +26,6 @@ import { actionFor } from '../utils/actionSteps';
 import { sensorStatus } from '../utils/thresholds';
 import { BREEDS, STRAINS_BY_BREED, strainLabel, heatStressTHI } from '../utils/poultryData';
 import CoopCard from '../components/CoopCard';
-import SummaryBar from '../components/SummaryBar';
 import PrimaryButton from '../components/PrimaryButton';
 import Field from '../components/Field';
 import { showToast } from '../components/Toast';
@@ -82,6 +81,7 @@ export default function DashboardScreen({ navigation }) {
   const [permIssue, setPermIssue] = useState(null);
   const [buildIssue, setBuildIssue] = useState(null);
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
   const styles = useStyles(makeStyles);
 
@@ -147,12 +147,24 @@ export default function DashboardScreen({ navigation }) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return sorted;
-    return sorted.filter(({ device }) =>
-      device.name.toLowerCase().includes(q) ||
-      device.id.toLowerCase().includes(q)
-    );
-  }, [sorted, query]);
+    let list = sorted;
+    if (statusFilter !== 'all') {
+      list = list.filter(({ status }) => {
+        if (statusFilter === 'danger') return status === STATUS.DANGER || status === STATUS.POWER_CUT;
+        if (statusFilter === 'warn') return status === STATUS.WARN;
+        if (statusFilter === 'ok') return status === STATUS.OK;
+        if (statusFilter === 'offline') return status === STATUS.OFFLINE;
+        return true;
+      });
+    }
+    if (q) {
+      list = list.filter(({ device }) =>
+        device.name.toLowerCase().includes(q) ||
+        device.id.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [sorted, query, statusFilter]);
 
   const counts = useMemo(() => {
     let ok = 0, warn = 0, danger = 0, offline = 0;
@@ -423,7 +435,7 @@ export default function DashboardScreen({ navigation }) {
           <View style={styles.buildBanner}>
             <Text style={styles.buildBannerIcon}>⚠️</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.buildBannerTitle}>APK is out of date</Text>
+              <Text style={styles.buildBannerTitle}>{t('apkOutOfDate')}</Text>
               <Text style={styles.buildBannerHint} numberOfLines={2}>
                 {buildIssue.kind === 'missing'
                   ? `missing: ${buildIssue.detail}`
@@ -483,18 +495,57 @@ export default function DashboardScreen({ navigation }) {
           </View>
         ) : null}
 
-        {/* ── Stats Hero ── */}
-        <SummaryBar counts={counts} t={t} />
-
-        {/* ── Section header + search ── */}
+        {/* ── Filter chips + search ── */}
         {devices.length > 0 ? (
           <>
-            <View style={styles.sectionRow}>
-              <Text style={styles.sectionLabel}>{t('totalCoops').toUpperCase()}</Text>
-              <Text style={styles.sectionCount}>
-                {filtered.length}{filtered.length !== counts.total ? ` / ${counts.total}` : ''}
-              </Text>
-            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterRow}
+            >
+              {[
+                { id: 'all',     label: t('filterAll'),     count: counts.total,   color: colors.accent },
+                { id: 'danger',  label: t('danger'),        count: counts.danger,  color: colors.danger },
+                { id: 'warn',    label: t('warning'),       count: counts.warn,    color: colors.warn },
+                { id: 'ok',      label: t('ok'),            count: counts.ok,      color: colors.ok },
+                { id: 'offline', label: t('offline'),       count: counts.offline, color: colors.offline },
+              ].filter((f) => f.id === 'all' || f.count > 0).map((f) => {
+                const active = statusFilter === f.id;
+                return (
+                  <Pressable
+                    key={f.id}
+                    onPress={() => { setStatusFilter(f.id); Haptics.light(); }}
+                    android_ripple={{ color: f.color + '22' }}
+                    style={[
+                      styles.filterChip,
+                      active && { borderColor: f.color, backgroundColor: f.color + '1c' },
+                    ]}
+                  >
+                    {f.id !== 'all' ? (
+                      <View style={[styles.filterDot, { backgroundColor: f.color }]} />
+                    ) : null}
+                    <Text style={[
+                      styles.filterChipText,
+                      { color: active ? f.color : colors.textSecondary },
+                    ]}>
+                      {f.label}
+                    </Text>
+                    <View style={[
+                      styles.filterCount,
+                      { backgroundColor: active ? f.color : colors.bgElevated },
+                    ]}>
+                      <Text style={[
+                        styles.filterCountText,
+                        { color: active ? '#fff' : colors.textSecondary },
+                      ]}>
+                        {f.count}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
             <View style={styles.searchWrap}>
               <Icon name="search" size={18} color={colors.textTertiary} />
               <TextInput
@@ -539,47 +590,67 @@ export default function DashboardScreen({ navigation }) {
           )}
           contentContainerStyle={{ paddingTop: 4, paddingBottom: 130 }}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <View style={styles.emptyIconBox}>
-                <Text style={styles.emptyIcon}>🐔</Text>
+            devices.length > 0 ? (
+              // Filtered/searched to nothing
+              <View style={styles.empty}>
+                <View style={styles.emptyIconBox}>
+                  <Icon name="search" size={40} color={colors.textTertiary} />
+                </View>
+                <Text style={styles.emptyTitle}>{t('noResults')}</Text>
+                <Text style={styles.emptyHint}>{t('noResultsHint')}</Text>
+                <Pressable
+                  onPress={() => { setQuery(''); setStatusFilter('all'); }}
+                  android_ripple={{ color: colors.accent + '33' }}
+                  style={[styles.emptyBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}
+                >
+                  <Text style={[styles.emptyBtnText, { color: colors.accent }]}>
+                    {t('clearFilters')}
+                  </Text>
+                </Pressable>
               </View>
-              <Text style={styles.emptyTitle}>{t('noCoopsYet')}</Text>
-              <Text style={styles.emptyHint}>{t('noCoopsHint')}</Text>
-              <Pressable
-                onPress={() => setModalVisible(true)}
-                android_ripple={{ color: '#ffffff44' }}
-                style={styles.emptyBtn}
-              >
-                <Text style={styles.emptyBtnText}>+ {t('addNewCoop')}</Text>
-              </Pressable>
-            </View>
+            ) : (
+              <View style={styles.empty}>
+                <View style={styles.emptyIconBox}>
+                  <Text style={styles.emptyIcon}>🐔</Text>
+                </View>
+                <Text style={styles.emptyTitle}>{t('noCoopsYet')}</Text>
+                <Text style={styles.emptyHint}>{t('noCoopsHint')}</Text>
+                <Pressable
+                  onPress={() => setModalVisible(true)}
+                  android_ripple={{ color: '#ffffff44' }}
+                  style={styles.emptyBtn}
+                >
+                  <Text style={styles.emptyBtnText}>+ {t('addNewCoop')}</Text>
+                </Pressable>
+              </View>
+            )
           }
           ListFooterComponent={
             devices.length > 0 ? (
-              <View style={styles.testRow}>
-                <Pressable
-                  onPress={onTestData}
-                  android_ripple={{ color: colors.accent + '33' }}
-                  style={[styles.testBtn, { borderColor: colors.accent + '44' }]}
-                >
-                  <Text style={styles.testBtnIcon}>📡</Text>
-                  <Text style={[styles.testBtnText, { color: colors.accentSoft }]}>
-                    {t('testData')}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={onTestAlert}
-                  android_ripple={{ color: colors.danger + '33' }}
-                  style={[styles.testBtn, {
-                    borderColor: colors.danger + '50',
-                    backgroundColor: colors.danger + '10',
-                  }]}
-                >
-                  <Text style={styles.testBtnIcon}>🚨</Text>
-                  <Text style={[styles.testBtnText, { color: colors.dangerSoft }]}>
-                    {t('testAlert')}
-                  </Text>
-                </Pressable>
+              <View style={styles.demoSection}>
+                <View style={styles.demoDivider}>
+                  <View style={styles.demoLine} />
+                  <Text style={styles.demoLabel}>{t('demoSection')}</Text>
+                  <View style={styles.demoLine} />
+                </View>
+                <View style={styles.testRow}>
+                  <Pressable
+                    onPress={onTestData}
+                    android_ripple={{ color: colors.accent + '33' }}
+                    style={styles.testBtn}
+                  >
+                    <Icon name="activity" size={15} color={colors.textSecondary} />
+                    <Text style={styles.testBtnText}>{t('testData')}</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={onTestAlert}
+                    android_ripple={{ color: colors.danger + '33' }}
+                    style={styles.testBtn}
+                  >
+                    <Icon name="alertTriangle" size={15} color={colors.textSecondary} />
+                    <Text style={styles.testBtnText}>{t('testAlert')}</Text>
+                  </Pressable>
+                </View>
               </View>
             ) : null
           }
@@ -953,6 +1024,36 @@ const makeStyles = () => ({
     fontWeight: '700',
   },
 
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    gap: 8,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingLeft: 12,
+    paddingRight: 8,
+    paddingVertical: 8,
+    backgroundColor: colors.card,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  filterDot: { width: 7, height: 7, borderRadius: 4 },
+  filterChipText: { fontSize: 12, fontWeight: '800' },
+  filterCount: {
+    minWidth: 22,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterCountText: { fontSize: 11, fontWeight: '900' },
+
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1010,26 +1111,50 @@ const makeStyles = () => ({
   },
   emptyBtnText: { color: '#fff', fontWeight: '900', fontSize: 15 },
 
+  demoSection: {
+    marginTop: 18,
+    marginBottom: 6,
+  },
+  demoDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 24,
+    marginBottom: 10,
+  },
+  demoLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  demoLabel: {
+    color: colors.textTertiary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
   testRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     gap: 10,
-    marginTop: 6,
-    marginBottom: 8,
   },
   testBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    backgroundColor: colors.card,
-    borderRadius: 12,
+    gap: 7,
+    paddingVertical: 10,
+    backgroundColor: 'transparent',
+    borderRadius: 10,
     borderWidth: 1,
+    borderColor: colors.border,
   },
-  testBtnIcon: { fontSize: 14 },
-  testBtnText: { fontWeight: '800', fontSize: 13 },
+  testBtnText: {
+    fontWeight: '700',
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
 
   // FAB
   fabWrap: {

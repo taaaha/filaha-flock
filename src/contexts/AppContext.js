@@ -545,7 +545,7 @@ export function AppProvider({ children }) {
     let resolvedFarmId = farmId;
     if (!resolvedFarmId) {
       if (s.farms.length === 0) {
-        const farm = { id: uid('f_'), name: s.settings.farmName || 'My farm' };
+        const farm = { id: uid('f_'), name: s.settings.farmName || (tRef.current('myFarm') || 'My farm') };
         farms = [farm];
         await Storage.setFarms(farms);
         resolvedFarmId = farm.id;

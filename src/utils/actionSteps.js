@@ -5,7 +5,7 @@
 
 export const ACTION_STEPS = {
   co2: {
-    ar: 'افتح كل النوافذ فوراً، شغّل المراوح، تحقق من مجاري التهوية',
+    ar: 'افتح كل النوافذ فوراً، شغّل المراوح، وتأكّد من مجاري التهوية',
     en: 'Open all vents NOW. Turn on fans. Check ventilation ducts.',
     fr: 'Ouvrir tous les évents IMMÉDIATEMENT. Démarrer ventilateurs.',
   },
@@ -20,17 +20,17 @@ export const ACTION_STEPS = {
     fr: "Temp élevée: asperger le toit, ventilateurs, électrolytes dans l'eau.",
   },
   temp_low: {
-    ar: 'الحرارة منخفضة: شغّل التدفئة، أغلق الأبواب، تحقق من سلامة الصيصان الصغيرة',
+    ar: 'الحرارة منخفضة: شغّل التدفئة، أغلق الأبواب، وتفقّد الصيصان جيداً',
     en: 'Temp LOW: turn on heating, close doors, check young chicks for hypothermia.',
     fr: 'Temp basse: chauffage, fermer portes, vérifier les jeunes poussins.',
   },
   hum: {
-    ar: 'الرطوبة عالية: زِد التهوية، تحقق من تسرب المياه، جفّف الفرشة',
+    ar: 'الرطوبة عالية: زِد التهوية، تأكّد من عدم تسرّب الماء، وجفّف الفرشة',
     en: 'Humidity HIGH: increase ventilation, check for water leaks, dry the litter.',
     fr: "Humidité élevée: ventilation, vérifier fuites d'eau, sécher la litière.",
   },
   power_cut: {
-    ar: '⚡ انقطع التيار! شغّل المولد فوراً، راقب درجة الحرارة، الدجاج في خطر',
+    ar: '⚡ انقطعت الكهرباء! شغّل المولّد فوراً وراقب الحرارة — الدجاج في خطر',
     en: '⚡ POWER CUT! Start generator NOW. Watch temperature. Flock at risk.',
     fr: '⚡ COUPURE! Démarrer le générateur. Surveiller la température.',
   },
@@ -40,7 +40,7 @@ export const ACTION_STEPS = {
     fr: 'Batterie capteur faible — remplacer bientôt.',
   },
   generic: {
-    ar: 'افحص القنّ فوراً وتأكد من سلامة الدجاج',
+    ar: 'افحص الحظيرة فوراً وتأكّد من سلامة الدجاج',
     en: 'Check the coop immediately and verify your birds.',
     fr: 'Vérifier le poulailler immédiatement.',
   },

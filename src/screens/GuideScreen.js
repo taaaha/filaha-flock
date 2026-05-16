@@ -204,7 +204,7 @@ export default function GuideScreen() {
           <PhasesTab t={t} language={language} styles={styles} phases={AGE_PHASES} setActivePhase={setActivePhase} />
         )}
         {activeTab === 'tools' && (
-          <ToolsTab t={t} styles={styles} />
+          <ToolsTab t={t} language={language} styles={styles} />
         )}
         {activeTab === 'health' && (
           <HealthTab t={t} language={language} styles={styles} />
@@ -309,14 +309,14 @@ function PhasesTab({ t, language, styles, phases, setActivePhase }) {
   );
 }
 
-function ToolsTab({ t, styles }) {
+function ToolsTab({ t, language, styles }) {
   return (
     <View style={styles.tabContent}>
-      <CalculatorCard title={t('brooderCalc')} hint={t('brooderCalcHint')} icon="thermometer" iconColor={colors.temp} t={t} Component={BrooderCalc} styles={styles} />
-      <CalculatorCard title={t('densityCalc')} hint={t('densityCalcHint')} icon="home" iconColor={colors.accent} t={t} Component={DensityCalc} styles={styles} />
-      <CalculatorCard title={t('profitCalc')} hint={t('profitCalcHint')} icon="target" iconColor={colors.ok} t={t} Component={ProfitCalc} styles={styles} />
-      <CalculatorCard title={t('vaccineCalc')} hint={t('vaccineCalcHint')} icon="shield" iconColor={colors.warn} t={t} Component={VaccineSchedule} styles={styles} />
-      <CalculatorCard title={t('growthCurve')} hint={t('growthCurveHint')} icon="activity" iconColor={colors.accentSoft} t={t} Component={GrowthCurveViewer} styles={styles} />
+      <CalculatorCard title={t('brooderCalc')} hint={t('brooderCalcHint')} icon="thermometer" iconColor={colors.temp} t={t} language={language} Component={BrooderCalc} styles={styles} />
+      <CalculatorCard title={t('densityCalc')} hint={t('densityCalcHint')} icon="home" iconColor={colors.accent} t={t} language={language} Component={DensityCalc} styles={styles} />
+      <CalculatorCard title={t('profitCalc')} hint={t('profitCalcHint')} icon="target" iconColor={colors.ok} t={t} language={language} Component={ProfitCalc} styles={styles} />
+      <CalculatorCard title={t('vaccineCalc')} hint={t('vaccineCalcHint')} icon="shield" iconColor={colors.warn} t={t} language={language} Component={VaccineSchedule} styles={styles} />
+      <CalculatorCard title={t('growthCurve')} hint={t('growthCurveHint')} icon="activity" iconColor={colors.accentSoft} t={t} language={language} Component={GrowthCurveViewer} styles={styles} />
     </View>
   );
 }
@@ -338,7 +338,7 @@ function MarketTab({ t, styles }) {
       <MarketPrices t={t} />
       <View style={{ height: 14 }} />
       <Text style={styles.sectionTitle}>{t('feedPhases')}</Text>
-      <Text style={styles.sectionHint}>ITELV standard, 3-phase broiler program</Text>
+      <Text style={styles.sectionHint}>{t('feedProgramHint')}</Text>
       <FeedPhaseTable t={t} breed="broiler" />
     </View>
   );
@@ -370,7 +370,7 @@ function TopicsTab({ t, language, styles, topics, setActiveTopic }) {
   );
 }
 
-function CalculatorCard({ title, hint, icon, iconColor, Component, t, styles }) {
+function CalculatorCard({ title, hint, icon, iconColor, Component, t, language, styles }) {
   const [open, setOpen] = useState(false);
   return (
     <View style={styles.calcCard}>
@@ -388,7 +388,7 @@ function CalculatorCard({ title, hint, icon, iconColor, Component, t, styles }) 
         </View>
         <Icon name={open ? 'chevronUp' : 'chevronDown'} size={18} color={colors.textTertiary} />
       </Pressable>
-      {open ? <View style={styles.calcBody}><Component t={t} /></View> : null}
+      {open ? <View style={styles.calcBody}><Component t={t} language={language} /></View> : null}
     </View>
   );
 }

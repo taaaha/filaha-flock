@@ -6,7 +6,7 @@ import { colors, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import Icon from './Icon';
 import {
-  targetTempAt, DENSITY, FEED_PROFILE, MARKET_REF, VACCINATION,
+  targetTempAt, DENSITY, FEED_PROFILE, MARKET_REF, VACCINATION, localizeVaccine,
 } from '../utils/poultryData';
 
 const BREEDS = [
@@ -178,7 +178,7 @@ export function ProfitCalc({ t, defaultBreed = 'broiler' }) {
 }
 
 // ── Vaccination schedule ──
-export function VaccineSchedule({ t, defaultBreed = 'broiler', chickArrivalDate = Date.now() }) {
+export function VaccineSchedule({ t, language = 'en', defaultBreed = 'broiler', chickArrivalDate = Date.now() }) {
   const styles = useStyles(makeStyles);
   const [breed, setBreed] = useState(defaultBreed);
   const schedule = VACCINATION[breed] || VACCINATION.broiler;
@@ -188,30 +188,38 @@ export function VaccineSchedule({ t, defaultBreed = 'broiler', chickArrivalDate 
   return (
     <View style={styles.calc}>
       <BreedTabs current={breed} onChange={setBreed} t={t} />
-      <ScrollView style={{ maxHeight: 320 }}>
+      <Text style={styles.vaccineCountHint}>
+        {schedule.length} {t('vaccineDoses') || 'doses'}
+      </Text>
+      {/* No nested ScrollView/maxHeight — the Guide's outer ScrollView
+          scrolls. This makes the WHOLE schedule visible (was cut at ~4). */}
+      <View>
         {schedule.map((v, i) => {
           const date = new Date(chickArrivalDate + (v.day - 1) * dayMs);
           const dateStr = date.toLocaleDateString();
           const past = date.getTime() < now;
+          const loc = localizeVaccine(v, language);
           return (
-            <View key={i} style={[styles.vaccineRow, past && { opacity: 0.5 }]}>
+            <View key={i} style={[styles.vaccineRow, past && { opacity: 0.55 }]}>
               <View style={[styles.vaccineDay, past && { backgroundColor: colors.ok + '22', borderColor: colors.ok }]}>
                 <Text style={[styles.vaccineDayNum, past && { color: colors.ok }]}>{v.day}</Text>
                 <Text style={styles.vaccineDayLabel}>{t('day')}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.vaccineName}>{v.vaccine}</Text>
+                <Text style={styles.vaccineName}>
+                  {loc.name}{v.optional ? ` (${t('optional') || 'optional'})` : ''}
+                </Text>
                 <Text style={styles.vaccineMeta}>
-                  {dateStr} • {v.route} • {v.notes}
+                  {dateStr} • {loc.route}{loc.notes ? ` • ${loc.notes}` : ''}
                 </Text>
               </View>
               {past ? <Icon name="check" size={18} color={colors.ok} /> : null}
             </View>
           );
         })}
-      </ScrollView>
+      </View>
       <Text style={styles.source}>
-        {t('sourcedFrom')}Standard Algerian poultry vaccination protocol
+        {t('sourcedFrom')}{t('vaccineProtocolSource') || 'Standard Algerian poultry vaccination protocol'}
       </Text>
     </View>
   );
@@ -396,5 +404,12 @@ const makeStyles = () => ({
     fontSize: 11,
     marginTop: 3,
     lineHeight: 15,
+  },
+  vaccineCountHint: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    marginBottom: 2,
   },
 });

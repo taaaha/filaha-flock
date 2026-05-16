@@ -1,6 +1,18 @@
 import { sensorStatus } from '../utils/thresholds';
 import { STATUS } from '../utils/colors';
-import { targetTempAt, envTargetsAt, heatStressTHI } from '../utils/poultryData';
+import { targetTempAt, envTargetsAt, heatStressTHI, VACCINATION } from '../utils/poultryData';
+
+// Phase boundaries (broiler-style). Day at which a new phase begins.
+const PHASE_STARTS = [
+  { day: 1,  key: 'phaseBrooding' },
+  { day: 8,  key: 'phaseGrower' },
+  { day: 22, key: 'phaseFinisher' },
+];
+
+function ageOf(device, now) {
+  if (!device.chickArrivalDate) return null;
+  return Math.max(1, Math.floor((now - device.chickArrivalDate) / 86400000) + 1);
+}
 
 /**
  * Analyses recent readings and surfaces actionable, educational insights.
@@ -39,6 +51,47 @@ export function generateInsights({ devices, readings, thresholds, alerts, now, t
         severity: 'success',
         title: t('insightCalmTitle') || `${days} ${t('day') || 'days'} ${t('insightCalmStreak') || 'with no alerts'}`,
         body: t('insightCalmBody') || 'Your flock has been stable. Keep up the daily checks.',
+      });
+    }
+  }
+
+  // 1.5) PROACTIVE COACHING — works even for brand-new coops (no readings yet).
+  // This is what makes the app actively guide the farmer.
+  for (const device of devices) {
+    const age = ageOf(device, now);
+    if (age == null) continue;
+    const breed = device.breed || 'broiler';
+
+    // (a) Phase transition — bird crossed into a new rearing phase today
+    const phaseNow = [...PHASE_STARTS].reverse().find((p) => age >= p.day);
+    const startedToday = PHASE_STARTS.some((p) => p.day === age);
+    if (startedToday && phaseNow) {
+      const target = targetTempAt(breed, age);
+      out.push({
+        id: `phase_${device.id}_${age}`,
+        icon: 'target',
+        severity: 'info',
+        title: `${device.name} — ${t(phaseNow.key) || phaseNow.key}`,
+        body: (t('insightPhaseBody') ||
+          'New phase from today (day {age}). Adjust the heat zone to about {temp}°C and switch to the matching feed.')
+          .replace('{age}', age)
+          .replace('{temp}', target != null ? target.toFixed(0) : '—'),
+        deviceId: device.id,
+      });
+    }
+
+    // (b) Vaccination due today or tomorrow
+    const schedule = VACCINATION[breed] || VACCINATION.broiler;
+    const dueSoon = (schedule || []).find((v) => v.day === age || v.day === age + 1);
+    if (dueSoon && !dueSoon.optional) {
+      const whenKey = dueSoon.day === age ? 'insightVaccineToday' : 'insightVaccineTomorrow';
+      out.push({
+        id: `vacc_${device.id}_${dueSoon.day}`,
+        icon: 'shield',
+        severity: dueSoon.day === age ? 'warn' : 'info',
+        title: `${device.name} — ${t('insightVaccineTitle') || 'Vaccination due'}`,
+        body: `${t(whenKey) || (dueSoon.day === age ? 'Due today' : 'Due tomorrow')}: ${dueSoon.vaccine}. ${dueSoon.notes || ''}`.trim(),
+        deviceId: device.id,
       });
     }
   }

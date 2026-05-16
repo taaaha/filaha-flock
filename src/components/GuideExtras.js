@@ -7,6 +7,7 @@ import Icon from './Icon';
 import {
   STRAINS, STRAINS_BY_BREED, targetWeightAt, targetFCRAt,
   DISEASES, MARKET_REF, WILAYAS, heatStressTHI, FEED_PROFILE, strainLabel,
+  localizeDisease,
 } from '../utils/poultryData';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -148,6 +149,7 @@ export function DiseaseWatchlist({ t, language }) {
         const isOpen = open === d.id;
         const name = d.name[language] || d.name.en;
         const action = d.action[language] || d.action.en;
+        const loc = localizeDisease(d, language);
         return (
           <View key={d.id} style={styles.diseaseCard}>
             <Pressable
@@ -159,7 +161,7 @@ export function DiseaseWatchlist({ t, language }) {
               <View style={{ flex: 1 }}>
                 <Text style={styles.diseaseName} numberOfLines={1}>{name}</Text>
                 <Text style={styles.diseaseMeta}>
-                  {sevLabel(d.severity)} • {d.season}
+                  {sevLabel(d.severity)} • {loc.season}
                 </Text>
               </View>
               <Icon name={isOpen ? 'chevronUp' : 'chevronDown'} size={16} color={colors.textTertiary} />
@@ -167,7 +169,7 @@ export function DiseaseWatchlist({ t, language }) {
             {isOpen && (
               <View style={styles.diseaseBody}>
                 <Text style={styles.diseaseSection}>{t('diseaseTriggers')}</Text>
-                {d.triggers.map((tr, i) => (
+                {loc.triggers.map((tr, i) => (
                   <Text key={i} style={styles.diseaseItem}>• {tr}</Text>
                 ))}
                 <Text style={[styles.diseaseSection, { marginTop: 8 }]}>{t('diseaseAction')}</Text>
