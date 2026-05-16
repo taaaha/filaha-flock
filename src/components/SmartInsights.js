@@ -1,143 +1,263 @@
-import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
-import { colors } from '../utils/colors';
+import React, { useState, useMemo } from 'react';
+import { View, Text, Pressable } from 'react-native';
+import { colors, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import Icon from './Icon';
 
-const SEVERITY_COLORS = {
-  info:    'accent',
-  success: 'ok',
-  warn:    'warn',
-  danger:  'danger',
+// severity → palette key, sort weight, tag-label key.
+// Higher weight floats to the top so the most urgent guidance is seen first.
+const SEVERITY = {
+  danger:  { colorKey: 'danger', weight: 4, tagKey: 'insightSevDanger' },
+  warn:    { colorKey: 'warn',   weight: 3, tagKey: 'insightSevWarn' },
+  info:    { colorKey: 'accent', weight: 2, tagKey: 'insightSevInfo' },
+  success: { colorKey: 'ok',     weight: 1, tagKey: 'insightSevSuccess' },
 };
+
+const DEFAULT_VISIBLE = 2;
+
+function InsightCard({ ins, t, onPress, styles }) {
+  const sev = SEVERITY[ins.severity] || SEVERITY.info;
+  const tint = colors[sev.colorKey] || colors.accent;
+  const actionable = !!ins.deviceId && !!onPress;
+
+  const Body = (
+    <>
+      <View style={styles.cardHead}>
+        <View style={[styles.iconChip, { backgroundColor: tint + '1f' }]}>
+          <Icon name={ins.icon || 'target'} size={20} color={tint} strokeWidth={2.4} />
+        </View>
+        <View style={styles.headText}>
+          <View style={[styles.tag, { backgroundColor: tint + '1f' }]}>
+            <Text style={[styles.tagText, { color: tint }]} numberOfLines={1}>
+              {t(sev.tagKey) || ins.severity}
+            </Text>
+          </View>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {ins.title}
+          </Text>
+        </View>
+      </View>
+
+      <Text style={styles.cardBody}>{ins.body}</Text>
+
+      {actionable ? (
+        <View style={[styles.cta, { backgroundColor: tint + '14', borderColor: tint + '40' }]}>
+          <Text style={[styles.ctaText, { color: tint }]} numberOfLines={1}>
+            {t('openCoop') || 'Open coop'}
+          </Text>
+          <Icon name="chevronRight" size={16} color={tint} strokeWidth={2.6} />
+        </View>
+      ) : null}
+    </>
+  );
+
+  const cardStyle = [
+    styles.card,
+    { borderStartColor: tint },
+    ins.severity === 'danger' ? shadows.glow(tint) : shadows.sm,
+  ];
+
+  if (!actionable) {
+    return <View style={cardStyle}>{Body}</View>;
+  }
+
+  return (
+    <Pressable
+      onPress={() => onPress(ins.deviceId)}
+      android_ripple={{ color: tint + '22' }}
+      accessibilityRole="button"
+      accessibilityLabel={`${ins.title}. ${ins.body}`}
+      style={({ pressed }) => [cardStyle, pressed && styles.cardPressed]}
+    >
+      {Body}
+    </Pressable>
+  );
+}
 
 export default function SmartInsights({ insights, t, onNavigateCoop }) {
   const styles = useStyles(makeStyles);
-  const [expandedId, setExpandedId] = useState(insights?.[0]?.id);
-  if (!insights || insights.length === 0) return null;
+  const [expanded, setExpanded] = useState(false);
+
+  // Sort by severity weight (stable for equal weights — preserves the
+  // engine's own ordering inside a tier).
+  const sorted = useMemo(() => {
+    if (!insights || insights.length === 0) return [];
+    return insights
+      .map((ins, i) => ({ ins, i }))
+      .sort((a, b) => {
+        const wa = (SEVERITY[a.ins.severity] || SEVERITY.info).weight;
+        const wb = (SEVERITY[b.ins.severity] || SEVERITY.info).weight;
+        return wb - wa || a.i - b.i;
+      })
+      .map((x) => x.ins);
+  }, [insights]);
+
+  if (sorted.length === 0) return null;
+
+  const visible = expanded ? sorted : sorted.slice(0, DEFAULT_VISIBLE);
+  const hidden = sorted.length - DEFAULT_VISIBLE;
 
   return (
     <View style={styles.wrap}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Icon name="target" size={16} color={colors.accent} />
+          <Icon name="target" size={17} color={colors.accent} strokeWidth={2.5} />
           <Text style={styles.headerTitle}>{t('smartInsights') || 'Smart insights'}</Text>
         </View>
-        <Text style={styles.headerCount}>{insights.length}</Text>
+        <View style={styles.headerCountPill}>
+          <Text style={styles.headerCount}>{sorted.length}</Text>
+        </View>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
-      >
-        {insights.map((ins) => {
-          const sevColor = colors[SEVERITY_COLORS[ins.severity]] || colors.accent;
-          const expanded = expandedId === ins.id;
-          return (
-            <Pressable
-              key={ins.id}
-              onPress={() => {
-                if (ins.deviceId && onNavigateCoop) onNavigateCoop(ins.deviceId);
-                else setExpandedId(expanded ? null : ins.id);
-              }}
-              android_ripple={{ color: sevColor + '22' }}
-              style={[
-                styles.card,
-                { borderColor: sevColor + '60', backgroundColor: sevColor + '0a' },
-              ]}
-            >
-              <View style={styles.cardHead}>
-                <View style={[styles.iconBox, { backgroundColor: sevColor + '20', borderColor: sevColor + '40' }]}>
-                  <Icon name={ins.icon} size={16} color={sevColor} />
-                </View>
-                <Text style={[styles.cardTitle, { color: sevColor }]} numberOfLines={2}>
-                  {ins.title}
-                </Text>
-              </View>
-              <Text style={styles.cardBody} numberOfLines={4}>
-                {ins.body}
-              </Text>
-              {ins.deviceId ? (
-                <View style={styles.cardCta}>
-                  <Text style={[styles.cardCtaText, { color: sevColor }]}>
-                    {t('openCoop') || 'Open coop'}
-                  </Text>
-                  <Icon name="chevronRight" size={14} color={sevColor} />
-                </View>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.stack}>
+        {visible.map((ins) => (
+          <InsightCard
+            key={ins.id}
+            ins={ins}
+            t={t}
+            onPress={onNavigateCoop}
+            styles={styles}
+          />
+        ))}
+      </View>
+
+      {hidden > 0 ? (
+        <Pressable
+          onPress={() => setExpanded((v) => !v)}
+          android_ripple={{ color: colors.accent + '22' }}
+          accessibilityRole="button"
+          style={styles.showMore}
+        >
+          <Text style={styles.showMoreText}>
+            {expanded
+              ? (t('insightsShowLess') || 'Show less')
+              : `${t('insightsShowAll') || 'Show all'} (${hidden})`}
+          </Text>
+          <Icon
+            name={expanded ? 'chevronUp' : 'chevronDown'}
+            size={16}
+            color={colors.accent}
+            strokeWidth={2.6}
+          />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
 const makeStyles = () => ({
-  wrap: { marginBottom: 14 },
+  wrap: { marginBottom: 16 },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 8,
+    marginHorizontal: 16,
+    marginBottom: 10,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: {
-    color: colors.textTertiary,
-    fontSize: 11,
+    color: colors.textSecondary,
+    fontSize: 14,
     fontWeight: '900',
-    letterSpacing: 1.0,
+  },
+  headerCountPill: {
+    minWidth: 24,
+    height: 22,
+    paddingHorizontal: 8,
+    borderRadius: 11,
+    backgroundColor: colors.accent + '1f',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerCount: {
     color: colors.accent,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
-    backgroundColor: colors.accent + '14',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-    overflow: 'hidden',
   },
+
+  stack: {
+    marginHorizontal: 16,
+    gap: 10,
+  },
+
   card: {
-    width: 280,
     backgroundColor: colors.card,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    padding: 12,
+    borderRadius: 16,
+    padding: 16,
+    borderStartWidth: 4,
+    borderStartColor: colors.accent,
   },
+  cardPressed: { opacity: 0.88, transform: [{ scale: 0.992 }] },
+
   cardHead: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  iconChip: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
+    justifyContent: 'center',
   },
-  iconBox: {
-    width: 32, height: 32, borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center',
+  headText: { flex: 1, gap: 5 },
+  tag: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  cardTitle: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
-  cardBody: {
-    color: colors.textPrimary,
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  cardCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-  },
-  cardCtaText: {
+  tagText: {
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 0.3,
+  },
+  cardTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+
+  cardBody: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 12,
+  },
+
+  cta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 14,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  ctaText: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+
+  showMore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginHorizontal: 16,
+    marginTop: 10,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  showMoreText: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: '900',
   },
 });

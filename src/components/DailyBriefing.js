@@ -69,76 +69,93 @@ export default function DailyBriefing({
     })();
   }, [now]);
 
+  const hasDevices = !!devices && devices.length > 0;
   const tasksRemaining = DAILY_TASKS.length - doneCount;
+  const allDone = tasksRemaining <= 0;
+
+  const hint = score == null
+    ? (t('healthNoDataBody') || 'Add a coop to start monitoring.')
+    : score >= 90 ? (t('healthExcellentBody') || 'Everything is running well.')
+    : score >= 70 ? (t('healthGoodBody') || 'Watch a few coops; keep up the daily checks.')
+    : score >= 50 ? (t('healthFairBody') || 'Several coops need attention.')
+    :               (t('healthPoorBody') || 'Critical. Check the dashboard now.');
 
   return (
     <View style={[styles.card, shadows.md]}>
-      {/* Header row: greeting + date + help */}
+      {/* Header: greeting + date */}
       <View style={styles.headerRow}>
         <View style={styles.greetCol}>
           <View style={styles.greetLine}>
-            <Icon name={greet.icon} size={16} color={tier.color} strokeWidth={2.2} />
+            <Icon name={greet.icon} size={18} color={tier.color} strokeWidth={2.4} />
             <Text style={styles.greeting} numberOfLines={1}>
-              {t(greet.key) || 'Hello'}{farmerName ? `, ${farmerName}` : ''}
+              {t(greet.key) || 'Hello'}{farmerName ? `، ${farmerName}` : ''}
             </Text>
           </View>
-          <Text style={styles.dateText}>{dateLabel}{farmName ? ` • ${farmName}` : ''}</Text>
+          <Text style={styles.dateText} numberOfLines={1}>
+            {dateLabel}{farmName ? `  •  ${farmName}` : ''}
+          </Text>
         </View>
         {onPressHelp ? (
           <Pressable
             onPress={onPressHelp}
-            hitSlop={10}
-            android_ripple={{ color: colors.accent + '33', borderless: true, radius: 20 }}
+            hitSlop={12}
+            android_ripple={{ color: colors.accent + '33', borderless: true, radius: 22 }}
             style={styles.helpBtn}
+            accessibilityRole="button"
           >
             <Icon name="info" size={18} color={colors.textSecondary} />
           </Pressable>
         ) : null}
       </View>
 
-      {/* Body: health score + status */}
+      {/* Body: health ring + status */}
       <View style={styles.body}>
-        <HealthScore score={score} t={t} size={88} strokeWidth={9} />
+        <HealthScore score={score} t={t} size={92} strokeWidth={9} />
         <View style={styles.bodyRight}>
           <Text style={styles.scoreLabel}>{t('farmHealth') || 'Farm health'}</Text>
-          <Text style={[styles.scoreTier, { color: tier.color }]}>
-            {t(`tier_${tier.label}`) || tier.label.toUpperCase()}
+          <Text style={[styles.scoreTier, { color: tier.color }]} numberOfLines={1}>
+            {t(`tier_${tier.label}`) || tier.label}
           </Text>
-          {score != null ? (
-            <Text style={styles.scoreHint} numberOfLines={2}>
-              {score >= 90 ? (t('healthExcellentBody') || 'Everything is running well.') :
-               score >= 70 ? (t('healthGoodBody') || 'Watch a few coops; keep up the daily checks.') :
-               score >= 50 ? (t('healthFairBody') || 'Several coops need attention. Open the danger list.') :
-                             (t('healthPoorBody') || 'Critical. Check the dashboard NOW.')}
-            </Text>
-          ) : (
-            <Text style={styles.scoreHint} numberOfLines={2}>
-              {t('healthNoDataBody') || 'Add a coop to start monitoring.'}
-            </Text>
-          )}
+          <Text style={styles.scoreHint} numberOfLines={3}>{hint}</Text>
         </View>
       </View>
 
-      {/* Tasks chip */}
-      {devices && devices.length > 0 ? (
+      {/* Tasks row */}
+      {hasDevices ? (
         <Pressable
           onPress={onPressTasks}
-          android_ripple={{ color: colors.accent + '22' }}
-          style={[styles.tasksChip, tasksRemaining === 0 && {
-            backgroundColor: colors.ok + '14', borderColor: colors.ok + '50',
-          }]}
+          android_ripple={{ color: (allDone ? colors.ok : colors.accent) + '22' }}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.tasksRow,
+            allDone && styles.tasksRowDone,
+            pressed && { opacity: 0.85 },
+          ]}
         >
-          <Icon
-            name={tasksRemaining === 0 ? 'checkCircle' : 'clock'}
-            size={16}
-            color={tasksRemaining === 0 ? colors.ok : colors.accent}
-          />
-          <Text style={styles.tasksText}>
-            {tasksRemaining === 0
-              ? (t('allTasksDone') || 'All today\'s tasks done — great job')
-              : `${doneCount}/${DAILY_TASKS.length} ${t('tasksDoneToday') || 'daily tasks done'}`}
-          </Text>
-          <Icon name="chevronRight" size={14} color={colors.textTertiary} />
+          <View style={[
+            styles.tasksIcon,
+            { backgroundColor: (allDone ? colors.ok : colors.accent) + '1f' },
+          ]}>
+            <Icon
+              name={allDone ? 'checkCircle' : 'clock'}
+              size={18}
+              color={allDone ? colors.ok : colors.accent}
+              strokeWidth={2.4}
+            />
+          </View>
+          <View style={styles.tasksTextCol}>
+            <Text style={styles.tasksTitle} numberOfLines={1}>
+              {allDone
+                ? (t('allTasksDone') || "All today's tasks done — great job")
+                : (t('tasksDoneToday') || 'Daily tasks')}
+            </Text>
+            {!allDone ? (
+              <Text style={styles.tasksProgress} numberOfLines={1}>
+                {doneCount}/{DAILY_TASKS.length}
+              </Text>
+            ) : null}
+          </View>
+          <Icon name="chevronRight" size={18} color={colors.textTertiary} strokeWidth={2.4} />
         </Pressable>
       ) : null}
     </View>
@@ -148,81 +165,96 @@ export default function DailyBriefing({
 const makeStyles = () => ({
   card: {
     marginHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 14,
     backgroundColor: colors.card,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 16,
+    padding: 18,
   },
+
   headerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 14,
-    gap: 10,
+    gap: 12,
+    marginBottom: 18,
   },
   greetCol: { flex: 1 },
-  greetLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  greetLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   greeting: {
     color: colors.textPrimary,
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '900',
-    letterSpacing: 0.1,
     flex: 1,
   },
   dateText: {
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    marginTop: 3,
+    marginTop: 5,
   },
   helpBtn: {
-    width: 32, height: 32, borderRadius: 16,
+    width: 34, height: 34, borderRadius: 17,
     backgroundColor: colors.bgElevated,
     borderWidth: 1, borderColor: colors.border,
     alignItems: 'center', justifyContent: 'center',
   },
+
   body: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    marginBottom: 14,
+    gap: 18,
+    marginBottom: 16,
   },
   bodyRight: { flex: 1 },
   scoreLabel: {
     color: colors.textTertiary,
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+    fontSize: 12,
+    fontWeight: '800',
   },
   scoreTier: {
-    fontSize: 19,
+    fontSize: 22,
     fontWeight: '900',
-    marginTop: 3,
-    letterSpacing: 0.4,
+    marginTop: 4,
   },
   scoreHint: {
     color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: 4,
-    lineHeight: 17,
+    fontSize: 13,
+    marginTop: 6,
+    lineHeight: 19,
   },
-  tasksChip: {
+
+  tasksRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
+    gap: 12,
+    minHeight: 56,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: colors.bgElevated,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  tasksText: {
-    flex: 1,
+  tasksRowDone: {
+    backgroundColor: colors.ok + '12',
+    borderColor: colors.ok + '50',
+  },
+  tasksIcon: {
+    width: 38, height: 38, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tasksTextCol: { flex: 1 },
+  tasksTitle: {
     color: colors.textPrimary,
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  tasksProgress: {
+    color: colors.textSecondary,
+    fontSize: 12,
     fontWeight: '700',
+    marginTop: 2,
   },
 });

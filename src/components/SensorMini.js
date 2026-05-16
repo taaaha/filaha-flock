@@ -62,9 +62,8 @@ const makeStyles = () => ({
   col: { flex: 1 },
   label: {
     color: colors.textTertiary,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.6,
   },
   valueRow: {
     flexDirection: 'row',
@@ -75,7 +74,6 @@ const makeStyles = () => ({
   value: {
     fontSize: 21,
     fontWeight: '800',
-    letterSpacing: -0.3,
     lineHeight: 24,
   },
   unit: {

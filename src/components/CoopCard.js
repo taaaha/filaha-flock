@@ -1,5 +1,5 @@
 import React, { memo, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
+import { View, Text, Pressable, Animated } from 'react-native';
 import { colors, STATUS, statusColor, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { strainLabel } from '../utils/poultryData';
@@ -44,6 +44,7 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
   const ageText = reading ? formatRelativeTime(reading.timestamp, t, now) : null;
   const chickAge = coopAgeDays(device, now);
   const phColor = phaseColor(chickAge);
+  const showSensors = !isOffline || isPower;
 
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, friction: 7 }).start();
@@ -57,14 +58,15 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
           onPressIn={onPressIn}
           onPressOut={onPressOut}
           android_ripple={{ color: sColor + '20', foreground: true }}
+          accessibilityRole="button"
+          accessibilityLabel={`${device.name}. ${statusLabel(status, t)}`}
           style={[
             styles.card,
-            { borderColor: isDanger ? sColor + '50' : colors.border },
-            isDanger && shadows.glow(sColor),
-            !isDanger && shadows.sm,
+            { borderColor: isDanger ? sColor + '55' : colors.border },
+            isDanger ? shadows.glow(sColor) : shadows.sm,
           ]}
         >
-          {/* Status bar on the left */}
+          {/* Status stripe — logical start edge (RTL-correct) */}
           <View style={[styles.stripe, { backgroundColor: sColor }]} />
 
           {/* Header */}
@@ -72,41 +74,32 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
             <View style={styles.headerLeft}>
               <Text style={styles.name} numberOfLines={1}>{device.name}</Text>
               <View style={styles.metaRow}>
-                <Text style={styles.devId}>{device.id}</Text>
+                <Text style={styles.devId} numberOfLines={1}>{device.id}</Text>
                 {device.strain && strainLabel(device.strain) ? (
-                  <>
-                    <Text style={styles.dot}>·</Text>
-                    <View style={styles.strainBadge}>
-                      <Text style={styles.strainBadgeText} numberOfLines={1}>
-                        {strainLabel(device.strain)}
-                      </Text>
-                    </View>
-                  </>
+                  <View style={styles.strainBadge}>
+                    <Text style={styles.strainBadgeText} numberOfLines={1}>
+                      {strainLabel(device.strain)}
+                    </Text>
+                  </View>
                 ) : null}
                 {chickAge !== null ? (
-                  <>
-                    <Text style={styles.dot}>·</Text>
-                    <View style={[styles.ageChip, { borderColor: phColor + '60', backgroundColor: phColor + '18' }]}>
-                      <Text style={[styles.ageChipText, { color: phColor }]}>
-                        {t('day') || 'Day'} {chickAge}
-                      </Text>
-                    </View>
-                  </>
+                  <View style={[styles.ageChip, { borderColor: phColor + '60', backgroundColor: phColor + '1f' }]}>
+                    <Text style={[styles.ageChipText, { color: phColor }]}>
+                      {t('day') || 'Day'} {chickAge}
+                    </Text>
+                  </View>
                 ) : null}
                 {ageText ? (
-                  <>
-                    <Text style={styles.dot}>·</Text>
-                    <Text style={styles.age}>{ageText}</Text>
-                  </>
+                  <Text style={styles.age} numberOfLines={1}>{ageText}</Text>
                 ) : null}
               </View>
             </View>
             <View style={[styles.badge, {
-              backgroundColor: sColor + '1d',
+              backgroundColor: sColor + '1f',
               borderColor: sColor + '60',
             }]}>
               <View style={[styles.badgeDot, { backgroundColor: sColor }]} />
-              <Text style={[styles.badgeText, { color: sColor }]}>
+              <Text style={[styles.badgeText, { color: sColor }]} numberOfLines={1}>
                 {statusLabel(status, t)}
               </Text>
             </View>
@@ -128,7 +121,7 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
           ) : null}
 
           {/* Sensors grid */}
-          {!isOffline || isPower ? (
+          {showSensors ? (
             <View style={styles.sensorGrid}>
               <SensorMini sensorKey="co2"  value={r.co2}  label={t('co2Short')}  thresholds={thresholds} />
               <SensorMini sensorKey="nh3"  value={r.nh3}  label={t('nh3Short')}  thresholds={thresholds} />
@@ -138,7 +131,7 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
           ) : null}
 
           {/* Battery footer */}
-          {!isOffline || isPower ? (
+          {showSensors ? (
             <View style={styles.footer}>
               <BatteryBar value={r.bat} compact label={t('battery')} />
             </View>
@@ -161,20 +154,20 @@ const makeStyles = () => ({
     borderWidth: 1,
     paddingTop: 16,
     paddingBottom: 14,
-    paddingRight: 16,
-    paddingLeft: 22,
+    paddingEnd: 16,
+    paddingStart: 22,
     overflow: 'hidden',
   },
   stripe: {
     position: 'absolute',
-    left: 0,
+    start: 0,
     top: 0,
     bottom: 0,
     width: 5,
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 16,
     gap: 10,
@@ -182,80 +175,78 @@ const makeStyles = () => ({
   headerLeft: { flex: 1 },
   name: {
     color: colors.textPrimary,
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '800',
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
-    marginTop: 4,
+    marginTop: 6,
   },
   devId: {
     color: colors.textTertiary,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 0.4,
   },
-  dot: { color: colors.textDim, fontSize: 11 },
   age: {
     color: colors.textTertiary,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
   },
   ageChip: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 7,
     borderWidth: 1,
   },
   ageChipText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 0.3,
   },
   strainBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 7,
     borderWidth: 1,
     borderColor: colors.accent + '60',
-    backgroundColor: colors.accent + '14',
-    maxWidth: 110,
+    backgroundColor: colors.accent + '18',
+    maxWidth: 120,
   },
   strainBadgeText: {
     color: colors.accent,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
   },
-  badgeDot: { width: 6, height: 6, borderRadius: 3 },
-  badgeText: { fontSize: 11, fontWeight: '900' },
+  badgeDot: { width: 7, height: 7, borderRadius: 4 },
+  badgeText: { fontSize: 12, fontWeight: '900' },
 
   powerBanner: {
     backgroundColor: colors.power + '22',
     borderColor: colors.power + '70',
     borderWidth: 1,
     borderRadius: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     marginBottom: 12,
   },
   powerBannerText: {
     color: colors.power,
     fontWeight: '800',
-    fontSize: 13,
+    fontSize: 14,
   },
   offlineBanner: {
-    backgroundColor: colors.offline + '12',
+    backgroundColor: colors.offline + '14',
     borderColor: colors.offline + '40',
     borderWidth: 1,
     borderRadius: 12,
@@ -266,7 +257,7 @@ const makeStyles = () => ({
   offlineBannerText: {
     color: colors.offline,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 14,
   },
 
   sensorGrid: {
