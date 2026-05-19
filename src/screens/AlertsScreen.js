@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, Pressable, StatusBar, Alert,
+  View, Text, StyleSheet, FlatList, Pressable, StatusBar, Alert, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
@@ -47,9 +47,21 @@ export default function AlertsScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+      <StatusBar
+        barStyle={colors.bg === '#070b14' ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.bg}
+      />
       <View style={styles.header}>
-        <Text style={styles.title}>{t('alerts')}</Text>
+        <View style={styles.brandRow}>
+          <View style={styles.logoSm}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.logoSmImg}
+              resizeMode="cover"
+            />
+          </View>
+          <Text style={styles.title}>{t('alerts')}</Text>
+        </View>
         <Pressable
           onPress={onClearAll}
           style={[
@@ -116,6 +128,14 @@ const makeStyles = () => ({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logoSm: {
+    width: 34, height: 34, borderRadius: 11,
+    backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  logoSmImg: { width: 34, height: 34 },
   title: {
     color: colors.textPrimary,
     fontSize: 20,

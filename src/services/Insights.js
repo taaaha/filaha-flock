@@ -220,9 +220,16 @@ export function generateInsights({ devices, readings, thresholds, alerts, now, t
   // but the farmer always has a relevant "what to do today" anchor.
   out.push(dailyFocus({ devices, readings, thresholds, now, t }));
 
-  // A "flock is stable" reassurance must NOT sit next to active warnings —
-  // that's contradictory. Drop it whenever something needs attention.
-  if (out.some((o) => o.severity === 'danger' || o.severity === 'warn')) {
+  // "Your flock is fine / no problems" must NEVER sit next to something
+  // that says "danger is near, act now" — that's the contradiction the
+  // user saw. Drop the calm card whenever there is ANY real concern:
+  // a danger/warn insight, OR a preventive "approaching danger" focus.
+  const hasConcern = out.some((o) =>
+    o.severity === 'danger' ||
+    o.severity === 'warn' ||
+    (o.id && o.id.indexOf('focus_prevent') === 0)
+  );
+  if (hasConcern) {
     return out.filter((o) => o.id !== 'calm_streak');
   }
 

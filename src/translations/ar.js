@@ -389,7 +389,7 @@ export default {
   insightGuidance: 'ماذا تفعل',
   insightTool: 'أداة مساعدة',
   focusWatch: 'راقب هذا اليوم',
-  focusApproaching: '{sensor} بدأ يقترب من الخطر. تصرّف الآن قبل فوات الأوان.',
+  focusApproaching: 'اقترب الخطر في {sensor} — تصرّف الآن قبل فوات الأوان.',
   healthCheckTitle: 'فحص حظائرك اليومي',
   healthCheckBody: 'حالة المزرعة {score}٪ — تحتاج بعض الحظائر إلى انتباهك. افتح التطبيق لمعرفة التفاصيل.',
   thiAlert: 'إنذار',

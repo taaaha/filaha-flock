@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Alert, Pressable, StatusBar,
+  View, Text, StyleSheet, ScrollView, Alert, Pressable, StatusBar, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
@@ -221,7 +221,16 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <Text style={[styles.screenTitle, { marginBottom: 0 }]}>{t('settings')}</Text>
+          <View style={styles.brandRow}>
+            <View style={styles.logoSm}>
+              <Image
+                source={require('../../assets/icon.png')}
+                style={styles.logoSmImg}
+                resizeMode="cover"
+              />
+            </View>
+            <Text style={[styles.screenTitle, { marginBottom: 0 }]}>{t('settings')}</Text>
+          </View>
           <HelpButton t={t} screen="settings" />
         </View>
 
@@ -599,6 +608,14 @@ const makeStyles = () => ({
     fontWeight: '900',
     marginBottom: 18,
   },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  logoSm: {
+    width: 36, height: 36, borderRadius: 11,
+    backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  logoSmImg: { width: 36, height: 36 },
   sectionTitle: {
     color: colors.accent,
     fontSize: 14,

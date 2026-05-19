@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StatusBar, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, StatusBar, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../components/Icon';
 import SmartInsights from '../components/SmartInsights';
@@ -44,7 +44,11 @@ export default function InsightsScreen({ navigation }) {
         <View style={styles.header}>
           <View style={styles.titleRow}>
             <View style={styles.iconBadge}>
-              <Icon name="target" size={22} color={colors.accent} strokeWidth={2.5} />
+              <Image
+                source={require('../../assets/icon.png')}
+                style={styles.brandLogo}
+                resizeMode="cover"
+              />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.title} numberOfLines={1}>
@@ -131,7 +135,9 @@ const makeStyles = () => ({
     width: 46, height: 46, borderRadius: 14,
     backgroundColor: colors.accent + '1f',
     alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
   },
+  brandLogo: { width: 46, height: 46 },
   title: {
     color: colors.textPrimary,
     fontSize: 22,

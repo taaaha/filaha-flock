@@ -12,6 +12,7 @@ import {
   Platform,
   Animated,
   NativeModules,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
@@ -585,7 +586,11 @@ export default function DashboardScreen({ navigation }) {
         <View style={styles.topBar}>
           <View style={styles.brandRow}>
             <View style={[styles.logoMini, { borderColor: heroColor + '60' }]}>
-              <Text style={styles.logoMiniEmoji}>🐔</Text>
+              <Image
+                source={require('../../assets/icon.png')}
+                style={styles.logoImg}
+                resizeMode="cover"
+              />
             </View>
             <Text style={styles.brandMini}>Filaha Flock</Text>
           </View>
@@ -819,8 +824,9 @@ const makeStyles = () => ({
     backgroundColor: colors.card,
     borderWidth: 1.5,
     alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
   },
-  logoMiniEmoji: { fontSize: 20 },
+  logoImg: { width: 38, height: 38 },
   brandMini: {
     color: colors.textPrimary,
     fontSize: 17, fontWeight: '900',

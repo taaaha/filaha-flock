@@ -14,10 +14,10 @@ const DARK = {
   borderLight: '#2a3a58',
   borderStrong: '#36476b',
 
-  // Brand
-  accent: '#3b82f6',
-  accentSoft: '#60a5fa',
-  accentGlow: '#3b82f680',
+  // Brand — agricultural green (distinct from the emerald "ok" status)
+  accent: '#22c55e',
+  accentSoft: '#4ade80',
+  accentGlow: '#22c55e80',
 
   // Status
   ok: '#10b981',
@@ -54,9 +54,9 @@ const LIGHT = {
   borderLight: '#cbd5e1',
   borderStrong: '#94a3b8',
 
-  accent: '#2563eb',
-  accentSoft: '#3b82f6',
-  accentGlow: '#2563eb40',
+  accent: '#16a34a',
+  accentSoft: '#22c55e',
+  accentGlow: '#16a34a40',
 
   ok: '#059669',
   okSoft: '#10b981',

@@ -87,7 +87,7 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
                 ) : null}
               </View>
             </View>
-            <View style={styles.status}>
+            <View style={[styles.statusPill, { backgroundColor: sColor + '1a' }]}>
               <View style={[styles.statusDot, { backgroundColor: sColor }]} />
               <Text style={[styles.statusText, { color: sColor }]} numberOfLines={1}>
                 {statusLabel(status, t)}
@@ -110,13 +110,17 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
             </View>
           ) : null}
 
-          {/* Sensors grid */}
+          {/* Sensors — 2×2 tiles */}
           {showSensors ? (
             <View style={styles.sensorGrid}>
-              <SensorMini sensorKey="co2"  value={r.co2}  label={t('co2Short')}  thresholds={thresholds} />
-              <SensorMini sensorKey="nh3"  value={r.nh3}  label={t('nh3Short')}  thresholds={thresholds} />
-              <SensorMini sensorKey="temp" value={r.temp} label={t('tempShort')} thresholds={thresholds} />
-              <SensorMini sensorKey="hum"  value={r.hum}  label={t('humShort')}  thresholds={thresholds} />
+              <View style={styles.sensorRow}>
+                <SensorMini sensorKey="co2" value={r.co2} label={t('co2Short')} thresholds={thresholds} />
+                <SensorMini sensorKey="nh3" value={r.nh3} label={t('nh3Short')} thresholds={thresholds} />
+              </View>
+              <View style={styles.sensorRow}>
+                <SensorMini sensorKey="temp" value={r.temp} label={t('tempShort')} thresholds={thresholds} />
+                <SensorMini sensorKey="hum" value={r.hum} label={t('humShort')} thresholds={thresholds} />
+              </View>
             </View>
           ) : null}
 
@@ -166,8 +170,8 @@ const makeStyles = () => ({
   headerLeft: { flex: 1 },
   name: {
     color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 19,
+    fontWeight: '800',
   },
   metaRow: {
     flexDirection: 'row',
@@ -193,13 +197,16 @@ const makeStyles = () => ({
     fontSize: 13,
     fontWeight: '500',
   },
-  status: {
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
   },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { fontSize: 13, fontWeight: '600' },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: { fontSize: 12, fontWeight: '800' },
 
   powerBanner: {
     backgroundColor: colors.power + '22',
@@ -231,9 +238,12 @@ const makeStyles = () => ({
   },
 
   sensorGrid: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  sensorRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 14,
+    gap: 10,
   },
 
   footer: {
