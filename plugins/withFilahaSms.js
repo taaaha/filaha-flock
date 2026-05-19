@@ -19,6 +19,7 @@ const REQUIRED_PERMISSIONS = [
   'android.permission.FOREGROUND_SERVICE',
   'android.permission.FOREGROUND_SERVICE_DATA_SYNC',
   'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+  'android.permission.RECEIVE_BOOT_COMPLETED',
 ];
 
 function ensurePermissions(manifest) {
@@ -87,6 +88,27 @@ function ensureSmsReceiver(application) {
         'android:name': '.ReminderReceiver',
         'android:exported': 'false',
       },
+    });
+  }
+  // Boot receiver — restarts the watchdog service after a reboot/update
+  const bootExists = application.receiver.some(
+    (r) => r && r.$ && r.$['android:name'] === '.BootReceiver'
+  );
+  if (!bootExists) {
+    application.receiver.push({
+      $: {
+        'android:name': '.BootReceiver',
+        'android:exported': 'true',
+      },
+      'intent-filter': [
+        {
+          action: [
+            { $: { 'android:name': 'android.intent.action.BOOT_COMPLETED' } },
+            { $: { 'android:name': 'android.intent.action.QUICKBOOT_POWERON' } },
+            { $: { 'android:name': 'android.intent.action.MY_PACKAGE_REPLACED' } },
+          ],
+        },
+      ],
     });
   }
 }
@@ -262,6 +284,7 @@ function withFilahaJavaFiles(config) {
         'SmsPackage.java',
         'ReminderReceiver.java',
         'FilahaMonitorService.java',
+        'BootReceiver.java',
       ];
 
       files.forEach((file) => {

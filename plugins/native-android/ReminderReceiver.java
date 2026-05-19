@@ -55,16 +55,21 @@ public class ReminderReceiver extends BroadcastReceiver {
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .setAutoCancel(true);
 
-            // Open app on tap
-            Intent openIntent = context.getPackageManager()
-                    .getLaunchIntentForPackage(context.getPackageName());
-            if (openIntent != null) {
-                int piFlags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-                        ? PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
-                        : PendingIntent.FLAG_UPDATE_CURRENT;
-                PendingIntent openPending = PendingIntent.getActivity(context, 1, openIntent, piFlags);
-                builder.setContentIntent(openPending);
-            }
+            // Open the app on tap AND tell it which screen to show. An
+            // explicit MainActivity intent with SINGLE_TOP|CLEAR_TOP means a
+            // running app receives this via onNewIntent (not a new instance);
+            // a cold start receives it as the launch intent.
+            Intent openIntent = new Intent(context, MainActivity.class);
+            openIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            openIntent.putExtra("filaha_route", "insights");
+            int piFlags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                    ? PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
+                    : PendingIntent.FLAG_UPDATE_CURRENT;
+            PendingIntent openPending = PendingIntent.getActivity(
+                    context, 1, openIntent, piFlags);
+            builder.setContentIntent(openPending);
 
             NotificationManagerCompat nmc = NotificationManagerCompat.from(context);
             if (nmc.areNotificationsEnabled()) {

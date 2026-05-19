@@ -18,7 +18,7 @@ const DEFAULT_VISIBLE = 2;
 function InsightCard({ ins, t, onPress, styles }) {
   const sev = SEVERITY[ins.severity] || SEVERITY.info;
   const tint = colors[sev.colorKey] || colors.accent;
-  const actionable = !!ins.deviceId && !!onPress;
+  const actionable = !!onPress && (!!ins.deviceId || !!ins.topicId || !!ins.tool);
 
   const Body = (
     <>
@@ -43,7 +43,7 @@ function InsightCard({ ins, t, onPress, styles }) {
       {actionable ? (
         <View style={[styles.cta, { backgroundColor: tint + '14', borderColor: tint + '40' }]}>
           <Text style={[styles.ctaText, { color: tint }]} numberOfLines={1}>
-            {t('openCoop') || 'Open coop'}
+            {t('insightSeeDetail') || 'See details & guidance'}
           </Text>
           <Icon name="chevronRight" size={16} color={tint} strokeWidth={2.6} />
         </View>
@@ -63,7 +63,7 @@ function InsightCard({ ins, t, onPress, styles }) {
 
   return (
     <Pressable
-      onPress={() => onPress(ins.deviceId)}
+      onPress={() => onPress(ins)}
       android_ripple={{ color: tint + '22' }}
       accessibilityRole="button"
       accessibilityLabel={`${ins.title}. ${ins.body}`}
@@ -74,7 +74,11 @@ function InsightCard({ ins, t, onPress, styles }) {
   );
 }
 
-export default function SmartInsights({ insights, t, onNavigateCoop }) {
+export default function SmartInsights({
+  insights, t, onNavigateCoop,
+  showHeader = true,
+  maxVisible = DEFAULT_VISIBLE,
+}) {
   const styles = useStyles(makeStyles);
   const [expanded, setExpanded] = useState(false);
 
@@ -94,20 +98,23 @@ export default function SmartInsights({ insights, t, onNavigateCoop }) {
 
   if (sorted.length === 0) return null;
 
-  const visible = expanded ? sorted : sorted.slice(0, DEFAULT_VISIBLE);
-  const hidden = sorted.length - DEFAULT_VISIBLE;
+  const cap = maxVisible === Infinity ? sorted.length : maxVisible;
+  const visible = expanded ? sorted : sorted.slice(0, cap);
+  const hidden = sorted.length - cap;
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Icon name="target" size={17} color={colors.accent} strokeWidth={2.5} />
-          <Text style={styles.headerTitle}>{t('smartInsights') || 'Smart insights'}</Text>
+      {showHeader ? (
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Icon name="target" size={17} color={colors.accent} strokeWidth={2.5} />
+            <Text style={styles.headerTitle}>{t('smartInsights') || 'Smart insights'}</Text>
+          </View>
+          <View style={styles.headerCountPill}>
+            <Text style={styles.headerCount}>{sorted.length}</Text>
+          </View>
         </View>
-        <View style={styles.headerCountPill}>
-          <Text style={styles.headerCount}>{sorted.length}</Text>
-        </View>
-      </View>
+      ) : null}
 
       <View style={styles.stack}>
         {visible.map((ins) => (

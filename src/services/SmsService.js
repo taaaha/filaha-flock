@@ -3,11 +3,18 @@ import { DeviceEventEmitter, NativeModules, PermissionsAndroid, Platform } from 
 const { FilahaSms } = NativeModules || {};
 
 // JS expects this version. Bump in lockstep with NATIVE_VERSION in SmsPackage.java.
-export const EXPECTED_NATIVE_VERSION = 'v7-2026-05-07c';
+export const EXPECTED_NATIVE_VERSION = 'v8-2026-05-17a';
 
 export async function getNativeVersion() {
   if (!FilahaSms || !FilahaSms.getNativeVersion) return null;
   try { return await FilahaSms.getNativeVersion(); } catch (e) { return null; }
+}
+
+// Route a tapped notification asked the app to open ('insights' | null).
+// Consumed once — native clears it after returning.
+export async function getPendingRoute() {
+  if (!FilahaSms || !FilahaSms.getPendingRoute) return null;
+  try { return await FilahaSms.getPendingRoute(); } catch (e) { return null; }
 }
 
 export function listMissingNativeMethods() {
@@ -15,7 +22,7 @@ export function listMissingNativeMethods() {
     'showAlertNotification', 'sendSms', 'makeDirectCall',
     'setAlertConfig', 'saveEmergencyContact', 'drainQueue',
     'getNativeVersion', 'scheduleDailyReminder', 'cancelDailyReminder',
-    'startMonitoring', 'stopMonitoring',
+    'startMonitoring', 'stopMonitoring', 'getPendingRoute',
   ];
   if (!FilahaSms) return required;
   return required.filter((k) => typeof FilahaSms[k] !== 'function');

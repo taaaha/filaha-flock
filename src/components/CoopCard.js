@@ -62,8 +62,8 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
           accessibilityLabel={`${device.name}. ${statusLabel(status, t)}`}
           style={[
             styles.card,
-            { borderColor: isDanger ? sColor + '55' : colors.border },
-            isDanger ? shadows.glow(sColor) : shadows.sm,
+            isDanger && { borderColor: sColor + '55' },
+            shadows.sm,
           ]}
         >
           {/* Status stripe — logical start edge (RTL-correct) */}
@@ -73,33 +73,23 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
           <View style={styles.headerRow}>
             <View style={styles.headerLeft}>
               <Text style={styles.name} numberOfLines={1}>{device.name}</Text>
+              {/* Each token is its own Text so the bidi algorithm can't
+                  jumble the LTR device id with the Arabic age label. */}
               <View style={styles.metaRow}>
-                <Text style={styles.devId} numberOfLines={1}>{device.id}</Text>
-                {device.strain && strainLabel(device.strain) ? (
-                  <View style={styles.strainBadge}>
-                    <Text style={styles.strainBadgeText} numberOfLines={1}>
-                      {strainLabel(device.strain)}
-                    </Text>
-                  </View>
-                ) : null}
+                <Text style={styles.metaId} numberOfLines={1}>{device.id}</Text>
                 {chickAge !== null ? (
-                  <View style={[styles.ageChip, { borderColor: phColor + '60', backgroundColor: phColor + '1f' }]}>
-                    <Text style={[styles.ageChipText, { color: phColor }]}>
+                  <>
+                    <Text style={styles.metaSep}>·</Text>
+                    <Text style={styles.metaAge} numberOfLines={1}>
                       {t('day') || 'Day'} {chickAge}
                     </Text>
-                  </View>
-                ) : null}
-                {ageText ? (
-                  <Text style={styles.age} numberOfLines={1}>{ageText}</Text>
+                  </>
                 ) : null}
               </View>
             </View>
-            <View style={[styles.badge, {
-              backgroundColor: sColor + '1f',
-              borderColor: sColor + '60',
-            }]}>
-              <View style={[styles.badgeDot, { backgroundColor: sColor }]} />
-              <Text style={[styles.badgeText, { color: sColor }]} numberOfLines={1}>
+            <View style={styles.status}>
+              <View style={[styles.statusDot, { backgroundColor: sColor }]} />
+              <Text style={[styles.statusText, { color: sColor }]} numberOfLines={1}>
                 {statusLabel(status, t)}
               </Text>
             </View>
@@ -150,11 +140,12 @@ const makeStyles = () => ({
   },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    paddingTop: 16,
-    paddingBottom: 14,
-    paddingEnd: 16,
+    borderColor: colors.border,
+    paddingTop: 18,
+    paddingBottom: 16,
+    paddingEnd: 18,
     paddingStart: 22,
     overflow: 'hidden',
   },
@@ -163,73 +154,52 @@ const makeStyles = () => ({
     start: 0,
     top: 0,
     bottom: 0,
-    width: 5,
+    width: 3,
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 10,
+    marginBottom: 18,
+    gap: 12,
   },
   headerLeft: { flex: 1 },
   name: {
     color: colors.textPrimary,
-    fontSize: 19,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 6,
+    marginTop: 5,
   },
-  devId: {
+  metaId: {
     color: colors.textTertiary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  age: {
-    color: colors.textTertiary,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
+    // The device id is always Latin/numeric — isolate it LTR so it
+    // renders correctly inside the RTL (Arabic) layout.
+    writingDirection: 'ltr',
   },
-  ageChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 7,
-    borderWidth: 1,
+  metaSep: {
+    color: colors.textDim,
+    fontSize: 13,
   },
-  ageChipText: {
-    fontSize: 11,
-    fontWeight: '900',
+  metaAge: {
+    color: colors.textTertiary,
+    fontSize: 13,
+    fontWeight: '500',
   },
-  strainBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 7,
-    borderWidth: 1,
-    borderColor: colors.accent + '60',
-    backgroundColor: colors.accent + '18',
-    maxWidth: 120,
-  },
-  strainBadgeText: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  badge: {
+  status: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
+    gap: 7,
   },
-  badgeDot: { width: 7, height: 7, borderRadius: 4 },
-  badgeText: { fontSize: 12, fontWeight: '900' },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: 13, fontWeight: '600' },
 
   powerBanner: {
     backgroundColor: colors.power + '22',

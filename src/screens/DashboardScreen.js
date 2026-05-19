@@ -30,7 +30,7 @@ import PrimaryButton from '../components/PrimaryButton';
 import Field from '../components/Field';
 import { showToast } from '../components/Toast';
 import DailyBriefing from '../components/DailyBriefing';
-import SmartInsights from '../components/SmartInsights';
+import SmsMuteGuide from '../components/SmsMuteGuide';
 import HelpButton from '../components/HelpButton';
 import { generateInsights } from '../services/Insights';
 import { Haptics } from '../services/Haptics';
@@ -68,10 +68,11 @@ export default function DashboardScreen({ navigation }) {
   const {
     t, language,
     devices, readings, alerts, settings, thresholds, powerCut,
-    lastReadingFor, addDevice, injectMessage, now,
+    lastReadingFor, addDevice, injectMessage, updateSettings, now,
   } = useApp();
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [smsGuideOpen, setSmsGuideOpen] = useState(false);
   const [coopName, setCoopName] = useState('');
   const [deviceId, setDeviceId] = useState('');
   const [chickAge, setChickAge] = useState('');
@@ -399,10 +400,185 @@ export default function DashboardScreen({ navigation }) {
     showToast(ok ? t('permissionGranted') : t('permissionDenied'), ok ? 'success' : 'error');
   };
 
+  // Everything above the coop list lives in the FlatList header so the
+  // WHOLE page scrolls as one — fixes content overflowing off-screen.
+  const listHeader = (
+    <View>
+      {/* ── DAILY BRIEFING — hero card with embedded smart guidance ── */}
+      <DailyBriefing
+        t={t} language={language} settings={settings}
+        devices={devices} readings={readings}
+        thresholds={thresholds} powerCut={powerCut} now={now}
+        insights={insights}
+        onOpenInsight={(ins) =>
+          navigation.getParent()?.navigate('Insights', {
+            screen: 'InsightDetail',
+            params: { insight: ins },
+          })
+        }
+        onSeeAllInsights={() => navigation.getParent()?.navigate('Insights')}
+      />
+
+      {/* ── Build issue banner (highest priority) ── */}
+      {buildIssue ? (
+        <View style={styles.buildBanner}>
+          <Text style={styles.buildBannerIcon}>⚠️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.buildBannerTitle}>{t('apkOutOfDate')}</Text>
+            <Text style={styles.buildBannerHint} numberOfLines={2}>
+              {buildIssue.kind === 'missing'
+                ? `missing: ${buildIssue.detail}`
+                : buildIssue.detail}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* ── Permission banner ── */}
+      {!buildIssue && permIssue ? (
+        <Pressable
+          onPress={onFixPermission}
+          android_ripple={{ color: colors.warn + '33' }}
+          style={styles.permBanner}
+        >
+          <View style={styles.permBannerIconBox}>
+            <Text style={styles.permBannerIcon}>🔒</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.permBannerTitle}>{permIssue.label}</Text>
+            <Text style={styles.permBannerHint}>{t('enable')} →</Text>
+          </View>
+        </Pressable>
+      ) : null}
+
+      {/* ── One-time: guide the user to mute the device SMS thread ── */}
+      {!buildIssue && !permIssue && !settings?.smsGuideAck && devices.length > 0 ? (
+        <Pressable
+          onPress={() => setSmsGuideOpen(true)}
+          android_ripple={{ color: colors.accent + '22' }}
+          style={styles.smsGuideCard}
+          accessibilityRole="button"
+        >
+          <View style={styles.smsGuideIcon}>
+            <Icon name="bell" size={18} color={colors.accent} strokeWidth={2.4} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.smsGuideCardTitle} numberOfLines={1}>
+              {t('smsGuideCardTitle')}
+            </Text>
+            <Text style={styles.smsGuideCardHint} numberOfLines={2}>
+              {t('smsGuideCardHint')}
+            </Text>
+          </View>
+          <Icon name="chevronRight" size={18} color={colors.textTertiary} strokeWidth={2.4} />
+        </Pressable>
+      ) : null}
+
+      <SmsMuteGuide
+        visible={smsGuideOpen}
+        t={t}
+        onClose={() => setSmsGuideOpen(false)}
+        onAck={async () => {
+          try { await updateSettings({ smsGuideAck: true }); } catch (e) {}
+          setSmsGuideOpen(false);
+        }}
+      />
+
+      {/* ── Actionable danger list ── */}
+      {dangerDetails.length > 0 ? (
+        <View style={styles.dangerList}>
+          {dangerDetails.slice(0, 4).map((d, i) => (
+            <Pressable
+              key={d.device.id + d.sensorKey}
+              onPress={() => navigation.navigate('CoopDetail', { deviceId: d.device.id })}
+              android_ripple={{ color: colors.danger + '22' }}
+              style={[styles.dangerItem, i === 0 && styles.dangerItemFirst]}
+            >
+              <View style={styles.dangerItemHead}>
+                <View style={styles.dangerItemHeadLeft}>
+                  <Icon name="alertTriangle" size={18} color={colors.danger} strokeWidth={2.4} />
+                  <Text style={styles.dangerItemTitle} numberOfLines={1}>
+                    {d.device.name} — {d.sensorLabel}
+                    {d.valueText ? `  ${d.valueText}` : ''}
+                  </Text>
+                </View>
+                <Icon name="chevronRight" size={18} color={colors.danger} />
+              </View>
+              <Text style={styles.dangerItemAction} numberOfLines={2}>
+                ▶ {d.action}
+              </Text>
+            </Pressable>
+          ))}
+          {dangerDetails.length > 4 ? (
+            <Text style={styles.dangerMore}>
+              +{dangerDetails.length - 4} {t('danger').toLowerCase()}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* ── Filter chips + search ── */}
+      {devices.length > 0 ? (
+        <>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}
+            keyboardShouldPersistTaps="handled"
+          >
+            {[
+              { id: 'all',     label: t('filterAll'),     count: counts.total,   color: colors.accent },
+              { id: 'danger',  label: t('danger'),        count: counts.danger,  color: colors.danger },
+              { id: 'warn',    label: t('warning'),       count: counts.warn,    color: colors.warn },
+              { id: 'ok',      label: t('ok'),            count: counts.ok,      color: colors.ok },
+              { id: 'offline', label: t('offline'),       count: counts.offline, color: colors.offline },
+            ].filter((f) => f.id === 'all' || f.count > 0).map((f) => {
+              const active = statusFilter === f.id;
+              return (
+                <Pressable
+                  key={f.id}
+                  onPress={() => { setStatusFilter(f.id); Haptics.light(); }}
+                  android_ripple={{ color: colors.accent + '22' }}
+                  style={[styles.filterChip, active && styles.filterChipActive]}
+                >
+                  <Text style={[
+                    styles.filterChipText,
+                    { color: active ? '#fff' : colors.textSecondary },
+                  ]}>
+                    {f.label}  {f.count}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <View style={styles.searchWrap}>
+            <Icon name="search" size={18} color={colors.textTertiary} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t('searchCoops')}
+              placeholderTextColor={colors.textTertiary}
+              style={styles.searchInput}
+              underlineColorAndroid="transparent"
+            />
+            {query.length > 0 ? (
+              <Pressable onPress={() => setQuery('')} hitSlop={10}>
+                <Icon name="x" size={16} color={colors.textSecondary} />
+              </Pressable>
+            ) : null}
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+
   return (
     <View style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-      <HeroBackdrop heroColor={heroColor} />
+      <StatusBar
+        barStyle={colors.bg === '#070b14' ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.bg}
+      />
 
       <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
         {/* ── Minimal top bar (brand + help) ── */}
@@ -416,157 +592,10 @@ export default function DashboardScreen({ navigation }) {
           <HelpButton t={t} screen="dashboard" />
         </View>
 
-        {/* ── DAILY BRIEFING — the hero card ── */}
-        <DailyBriefing
-          t={t} language={language} settings={settings}
-          devices={devices} readings={readings}
-          thresholds={thresholds} powerCut={powerCut} now={now}
-          onPressTasks={() => navigation.getParent()?.navigate('Guide')}
-        />
-
-        {/* ── Smart insights carousel ── */}
-        <SmartInsights
-          insights={insights} t={t}
-          onNavigateCoop={(id) => navigation.navigate('CoopDetail', { deviceId: id })}
-        />
-
-        {/* ── Build issue banner (highest priority) ── */}
-        {buildIssue ? (
-          <View style={styles.buildBanner}>
-            <Text style={styles.buildBannerIcon}>⚠️</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.buildBannerTitle}>{t('apkOutOfDate')}</Text>
-              <Text style={styles.buildBannerHint} numberOfLines={2}>
-                {buildIssue.kind === 'missing'
-                  ? `missing: ${buildIssue.detail}`
-                  : buildIssue.detail}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-        {/* ── Permission banner ── */}
-        {!buildIssue && permIssue ? (
-          <Pressable
-            onPress={onFixPermission}
-            android_ripple={{ color: colors.warn + '33' }}
-            style={styles.permBanner}
-          >
-            <View style={styles.permBannerIconBox}>
-              <Text style={styles.permBannerIcon}>🔒</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.permBannerTitle}>{permIssue.label}</Text>
-              <Text style={styles.permBannerHint}>{t('enable')} →</Text>
-            </View>
-          </Pressable>
-        ) : null}
-
-        {/* ── Actionable danger list ── */}
-        {dangerDetails.length > 0 ? (
-          <View style={styles.dangerList}>
-            {dangerDetails.slice(0, 4).map((d, i) => (
-              <Pressable
-                key={d.device.id + d.sensorKey}
-                onPress={() => navigation.navigate('CoopDetail', { deviceId: d.device.id })}
-                android_ripple={{ color: colors.danger + '22' }}
-                style={[styles.dangerItem, i === 0 && styles.dangerItemFirst]}
-              >
-                <View style={styles.dangerItemHead}>
-                  <View style={styles.dangerItemHeadLeft}>
-                    <Icon name="alertTriangle" size={18} color={colors.danger} strokeWidth={2.4} />
-                    <Text style={styles.dangerItemTitle} numberOfLines={1}>
-                      {d.device.name} — {d.sensorLabel}
-                      {d.valueText ? `  ${d.valueText}` : ''}
-                    </Text>
-                  </View>
-                  <Icon name="chevronRight" size={18} color={colors.danger} />
-                </View>
-                <Text style={styles.dangerItemAction} numberOfLines={2}>
-                  ▶ {d.action}
-                </Text>
-              </Pressable>
-            ))}
-            {dangerDetails.length > 4 ? (
-              <Text style={styles.dangerMore}>
-                +{dangerDetails.length - 4} {t('danger').toLowerCase()}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-
-        {/* ── Filter chips + search ── */}
-        {devices.length > 0 ? (
-          <>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterRow}
-            >
-              {[
-                { id: 'all',     label: t('filterAll'),     count: counts.total,   color: colors.accent },
-                { id: 'danger',  label: t('danger'),        count: counts.danger,  color: colors.danger },
-                { id: 'warn',    label: t('warning'),       count: counts.warn,    color: colors.warn },
-                { id: 'ok',      label: t('ok'),            count: counts.ok,      color: colors.ok },
-                { id: 'offline', label: t('offline'),       count: counts.offline, color: colors.offline },
-              ].filter((f) => f.id === 'all' || f.count > 0).map((f) => {
-                const active = statusFilter === f.id;
-                return (
-                  <Pressable
-                    key={f.id}
-                    onPress={() => { setStatusFilter(f.id); Haptics.light(); }}
-                    android_ripple={{ color: f.color + '22' }}
-                    style={[
-                      styles.filterChip,
-                      active && { borderColor: f.color, backgroundColor: f.color + '1c' },
-                    ]}
-                  >
-                    {f.id !== 'all' ? (
-                      <View style={[styles.filterDot, { backgroundColor: f.color }]} />
-                    ) : null}
-                    <Text style={[
-                      styles.filterChipText,
-                      { color: active ? f.color : colors.textSecondary },
-                    ]}>
-                      {f.label}
-                    </Text>
-                    <View style={[
-                      styles.filterCount,
-                      { backgroundColor: active ? f.color : colors.bgElevated },
-                    ]}>
-                      <Text style={[
-                        styles.filterCountText,
-                        { color: active ? '#fff' : colors.textSecondary },
-                      ]}>
-                        {f.count}
-                      </Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            <View style={styles.searchWrap}>
-              <Icon name="search" size={18} color={colors.textTertiary} />
-              <TextInput
-                value={query}
-                onChangeText={setQuery}
-                placeholder={t('searchCoops')}
-                placeholderTextColor={colors.textTertiary}
-                style={styles.searchInput}
-                underlineColorAndroid="transparent"
-              />
-              {query.length > 0 ? (
-                <Pressable onPress={() => setQuery('')} hitSlop={10}>
-                  <Icon name="x" size={16} color={colors.textSecondary} />
-                </Pressable>
-              ) : null}
-            </View>
-          </>
-        ) : null}
-
-        {/* ── List ── */}
+        {/* ── List (header holds briefing, insights, banners, filters) ── */}
         <FlatList
+          ListHeaderComponent={listHeader}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -912,6 +941,26 @@ const makeStyles = () => ({
   permBannerTitle: { color: colors.warn, fontSize: 13, fontWeight: '800' },
   permBannerHint: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
 
+  smsGuideCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 14,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+  },
+  smsGuideIcon: {
+    width: 38, height: 38, borderRadius: 11,
+    backgroundColor: colors.accent + '1f',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  smsGuideCardTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
+  smsGuideCardHint: { color: colors.textSecondary, fontSize: 12, marginTop: 3 },
+
   // Danger highlight (premium card style)
   dangerHighlight: {
     flexDirection: 'row',
@@ -1031,28 +1080,15 @@ const makeStyles = () => ({
     gap: 8,
   },
   filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingLeft: 12,
-    paddingRight: 8,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardElevated,
     borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: colors.border,
   },
-  filterDot: { width: 7, height: 7, borderRadius: 4 },
-  filterChipText: { fontSize: 12, fontWeight: '800' },
-  filterCount: {
-    minWidth: 22,
-    height: 20,
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
+  filterChipActive: {
+    backgroundColor: colors.accent,
   },
-  filterCountText: { fontSize: 11, fontWeight: '900' },
+  filterChipText: { fontSize: 13, fontWeight: '600' },
 
   searchWrap: {
     flexDirection: 'row',

@@ -19,7 +19,19 @@
       "Bash(rm -f ~/AppData/Local/Temp/*.tmp.node)",
       "Bash(node -e 'require\\(\"@babel/parser\"\\).parse\\(require\\(\"fs\"\\).readFileSync\\(\"src/translations/ar.js\",\"utf8\"\\),{sourceType:\"module\"}\\);console.log\\(\"ar.js parses clean\"\\)')",
       "PowerShell(New-Item -ItemType Directory -Force -Path \"D:\\\\eas-tmp\" | Out-Null; New-Item -ItemType Directory -Force -Path \"D:\\\\gradle-home\" | Out-Null; Get-PSDrive C,D | Select-Object Name,@{N='FreeGB';E={[math]::Round\\($_.Free/1GB,1\\)}},@{N='UsedGB';E={[math]::Round\\($_.Used/1GB,1\\)}})",
-      "PowerShell([math]::Round\\(\\(Get-PSDrive C\\).Free/1MB,0\\))"
+      "PowerShell([math]::Round\\(\\(Get-PSDrive C\\).Free/1MB,0\\))",
+      "Bash(echo \"=== insight/tip keys present in ar.js ===\"; grep -oE \"^  \\(insight[A-Za-z0-9]+|tip[A-Za-z0-9]+|phase[A-Za-z]+\\):\" src/translations/ar.js | sed 's/[: ]//g' | sort > /tmp/ar_keys.txt; cat /tmp/ar_keys.txt *)",
+      "Bash(sed -n '185,230p' src/utils/guideContent.js)",
+      "Bash(grep -n \"id: \\\\`\\\\|id: '\" src/services/Insights.js)",
+      "Bash(sed -n '34,56p' src/screens/GuideScreen.js)",
+      "Bash(sed -n '267,304p' src/utils/guideContent.js)",
+      "Bash(grep -n \"onPress={onPressTasks}\\\\|onPressTasks\\\\|</View>\\\\s*$\\\\|^  \\);\\\\|^}\" src/components/DailyBriefing.js)",
+      "Bash(grep -n \"return \\(\\\\|<View style={\\\\[styles.card, shadows.md\\\\]}>\" src/components/DailyBriefing.js)",
+      "Bash(sed -n '1,30p')",
+      "Bash(sed -n \"/export const VACCINATION/,/^};/p\" src/utils/poultryData.js)",
+      "Bash(sed -n '8,22p' plugins/withFilahaSms.js)",
+      "Bash(sed -n '258,268p' plugins/withFilahaSms.js)",
+      "Bash(grep -n \"} = useApp\\(\\);\\\\|const {$\\\\|import SmartInsights\\\\|import DailyBriefing\\\\|const \\\\[smsGuideOpen\\\\|updateSettings\" src/screens/DashboardScreen.js)"
     ]
   }
 }

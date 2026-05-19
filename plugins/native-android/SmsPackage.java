@@ -26,6 +26,7 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
 import com.facebook.react.ReactPackage;
+import com.facebook.react.bridge.ActivityEventListener;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -58,12 +59,53 @@ public class SmsPackage implements ReactPackage {
         return Collections.emptyList();
     }
 
-    public static class SmsModule extends ReactContextBaseJavaModule {
+    public static class SmsModule extends ReactContextBaseJavaModule
+            implements ActivityEventListener {
         private static final String CHANNEL_ID = "filaha_alerts";
         private static final String CHANNEL_NAME = "Filaha Flock Alerts";
 
+        // Route requested by a tapped notification. Captured on cold start
+        // (launch intent) or warm start (onNewIntent), consumed once by JS.
+        private static volatile String pendingRoute = null;
+
         public SmsModule(ReactApplicationContext reactContext) {
             super(reactContext);
+            reactContext.addActivityEventListener(this);
+        }
+
+        // ── ActivityEventListener ──────────────────────────────────────
+        @Override
+        public void onNewIntent(Intent intent) {
+            if (intent != null) {
+                String r = intent.getStringExtra("filaha_route");
+                if (r != null) pendingRoute = r;
+            }
+        }
+
+        @Override
+        public void onActivityResult(Activity activity, int requestCode,
+                                     int resultCode, Intent data) {
+            // Unused — required by the ActivityEventListener interface.
+        }
+
+        // Returns (and clears) the route a notification asked us to open.
+        // Falls back to the launch intent's extra for the cold-start case.
+        @ReactMethod
+        public void getPendingRoute(Promise promise) {
+            try {
+                String r = pendingRoute;
+                pendingRoute = null;
+                if (r == null) {
+                    Activity a = getCurrentActivity();
+                    if (a != null && a.getIntent() != null) {
+                        r = a.getIntent().getStringExtra("filaha_route");
+                        if (r != null) a.getIntent().removeExtra("filaha_route");
+                    }
+                }
+                promise.resolve(r);
+            } catch (Exception e) {
+                promise.resolve(null);
+            }
         }
 
         @NonNull
@@ -74,7 +116,7 @@ public class SmsPackage implements ReactPackage {
 
         // Bump this string whenever native code changes so JS can detect
         // when the installed APK is older than the JS code expects.
-        private static final String NATIVE_VERSION = "v7-2026-05-07c";
+        private static final String NATIVE_VERSION = "v8-2026-05-17a";
 
         @ReactMethod
         public void getNativeVersion(Promise promise) {

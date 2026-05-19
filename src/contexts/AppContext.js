@@ -18,7 +18,11 @@ import {
   showAlertNotification,
   sendSms,
   startMonitoring,
+  scheduleDailyReminder,
+  cancelDailyReminder,
 } from '../services/SmsService';
+import { computeFarmHealth } from '../utils/farmHealth';
+import { generateInsights } from '../services/Insights';
 import { actionFor } from '../utils/actionSteps';
 import { startRemoteContentRefresh } from '../services/RemoteContent';
 import { makePhoneCall, makeDirectCall } from '../services/CallService';
@@ -39,6 +43,8 @@ const DEFAULT_SETTINGS = {
   autoCallOnDanger: false,
   autoCallOnPowerCut: false,
   autoSmsOnDanger: false,
+  // One-time acknowledgement of the "mute the device SMS thread" guide.
+  smsGuideAck: false,
 };
 
 const SENSOR_KEYS = ['co2', 'nh3', 'temp', 'hum'];
@@ -478,6 +484,7 @@ export function AppProvider({ children }) {
       alertLabel: t('danger'),
       checkNowLabel: t('checkNow'),
       whatToDoLabel: t('whatToDo'),
+      clearedLabel: t('alertCleared'),
     }).catch(() => {});
   }, [
     state.ready,
@@ -517,15 +524,104 @@ export function AppProvider({ children }) {
     return () => clearTimeout(id);
   }, [state.ready, t]);
 
+  // ---------- Smart daily health notification ----------
+  // If the farm isn't 100%, schedule a morning notification that NAMES the
+  // single most important issue (not generic text). Tapping it opens the
+  // app where that same guidance is embedded in the dashboard card + the
+  // Insights tab. Rescheduled only when the summary actually changes, so
+  // we never spam AlarmManager on every incoming reading.
+  const reminderSigRef = useRef('');
+  const lastImmediateRef = useRef({ sig: '', at: 0 });
+  useEffect(() => {
+    if (!state.ready) return;
+    const s = stateRef.current;
+    const now = Date.now();
+
+    let score = null;
+    try {
+      score = computeFarmHealth(s.devices, s.readings, s.thresholds, s.powerCut, now);
+    } catch (e) { return; }
+
+    // No coops yet, or perfect health → don't nag.
+    if (score == null || (s.devices || []).length === 0) {
+      if (reminderSigRef.current !== 'none') {
+        reminderSigRef.current = 'none';
+        cancelDailyReminder(1).catch(() => {});
+      }
+      return;
+    }
+    if (score >= 100) {
+      if (reminderSigRef.current !== 'ok') {
+        reminderSigRef.current = 'ok';
+        cancelDailyReminder(1).catch(() => {});
+      }
+      return;
+    }
+
+    // Name the single most important issue in the notification body.
+    let topTitle = '';
+    try {
+      const ins = generateInsights({
+        devices: s.devices, readings: s.readings, thresholds: s.thresholds,
+        alerts: s.alerts, now, t, language: s.language,
+      });
+      const weight = { danger: 4, warn: 3, info: 2, success: 1 };
+      const top = [...ins].sort(
+        (a, b) => (weight[b.severity] || 0) - (weight[a.severity] || 0)
+      )[0];
+      topTitle = top ? top.title : '';
+    } catch (e) { /* fall back to score-only copy */ }
+
+    const rounded = Math.round(score);
+    const sig = `${rounded}|${topTitle}`;
+    if (reminderSigRef.current === sig) return;
+    reminderSigRef.current = sig;
+
+    const title = t('healthCheckTitle') || 'Daily flock check';
+    const body = topTitle
+      || (t('healthCheckBody') || 'Some coops need attention ({score}%).')
+        .replace('{score}', String(rounded));
+
+    // Always keep the 8 AM digest armed…
+    scheduleDailyReminder({ hour: 8, minute: 0, title, body, reqCode: 1 }).catch(() => {});
+
+    // …but when health is genuinely poor, also fire an IMMEDIATE heads-up
+    // instead of waiting for tomorrow morning. Dedup by signature + a 3h
+    // floor so a flapping sensor can't spam the farmer.
+    if (rounded < 60) {
+      const sinceLast = now - (lastImmediateRef.current.at || 0);
+      if (lastImmediateRef.current.sig !== sig && sinceLast > 3 * 60 * 60 * 1000) {
+        lastImmediateRef.current = { sig, at: now };
+        showAlertNotification(title, body, false).catch(() => {});
+      }
+    }
+  }, [
+    state.ready, state.devices, state.readings,
+    state.thresholds, state.powerCut, state.language, t,
+  ]);
+
   // ---------- Public actions ----------
   const setLanguage = useCallback(async (lang) => {
     await Storage.setLanguage(lang);
     const rtl = isRTL(lang);
+    // Capture BEFORE forcing — a direction flip (Arabic ⇄ EN/FR) only
+    // applies to native layout (the bottom tab bar, paddings, etc.) after
+    // a full reload, so we restart automatically instead of leaving the
+    // UI half-mirrored until the user kills the app.
+    const directionChanged = I18nManager.isRTL !== rtl;
     try {
       I18nManager.allowRTL(rtl);
       I18nManager.forceRTL(rtl);
     } catch (e) {}
     dispatch({ type: 'SET_LANGUAGE', payload: lang });
+    if (directionChanged) {
+      try {
+        const Updates = require('expo-updates');
+        if (Updates && typeof Updates.reloadAsync === 'function') {
+          setTimeout(() => { Updates.reloadAsync().catch(() => {}); }, 400);
+        }
+      } catch (e) { /* standalone reload unavailable — user restarts manually */ }
+    }
   }, []);
 
   const setTheme = useCallback(async (theme) => {
@@ -576,6 +672,29 @@ export function AppProvider({ children }) {
     dispatch({ type: 'SET_DEVICES', payload: devices });
     if (farms !== s.farms) dispatch({ type: 'SET_FARMS', payload: farms });
     return { ok: true, device };
+  }, []);
+
+  const updateDevice = useCallback(async (deviceId, patch) => {
+    const s = stateRef.current;
+    const idx = s.devices.findIndex((d) => d.id === deviceId);
+    if (idx === -1) return { ok: false, reason: 'notfound' };
+
+    const prev = s.devices[idx];
+    const next = { ...prev };
+
+    if (patch.name != null) next.name = String(patch.name).trim() || prev.name;
+    if (patch.breed != null) next.breed = patch.breed;
+    if (patch.strain !== undefined) next.strain = patch.strain;
+    // Re-derive the arrival date if the farmer corrected the flock age.
+    if (patch.chickAgeDays != null && Number.isFinite(patch.chickAgeDays)) {
+      const ageDays = Math.max(0, Math.floor(patch.chickAgeDays));
+      next.chickArrivalDate = Date.now() - ageDays * 24 * 60 * 60 * 1000;
+    }
+
+    const devices = s.devices.map((d, i) => (i === idx ? next : d));
+    await Storage.setDevices(devices);
+    dispatch({ type: 'SET_DEVICES', payload: devices });
+    return { ok: true, device: next };
   }, []);
 
   const removeDevice = useCallback(async (deviceId) => {
@@ -674,6 +793,7 @@ export function AppProvider({ children }) {
     setTheme,
     completeOnboarding,
     addDevice,
+    updateDevice,
     removeDevice,
     acknowledgeAlert,
     clearAllAlerts,
@@ -686,7 +806,7 @@ export function AppProvider({ children }) {
   }), [
     state, t,
     setLanguage, setTheme, completeOnboarding,
-    addDevice, removeDevice,
+    addDevice, updateDevice, removeDevice,
     acknowledgeAlert, clearAllAlerts,
     updateSettings, updateThresholds, resetThresholds,
     callEmergency, injectMessage, lastReadingFor,

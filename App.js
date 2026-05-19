@@ -6,12 +6,14 @@ import {
   Alert,
   Text,
   StyleSheet,
+  AppState,
 } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   NavigationContainer,
   DarkTheme,
+  createNavigationContainerRef,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -22,13 +24,28 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import CoopDetailScreen from './src/screens/CoopDetailScreen';
 import AlertsScreen from './src/screens/AlertsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
-import GuideScreen from './src/screens/GuideScreen';
+import InsightsScreen from './src/screens/InsightsScreen';
+import InsightDetailScreen from './src/screens/InsightDetailScreen';
 import ToastHost from './src/components/Toast';
 import Icon from './src/components/Icon';
 import Tutorial, { shouldShowTutorial } from './src/components/Tutorial';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { useTheme } from './src/utils/colors';
 import { colors } from './src/utils/colors';
+import { getPendingRoute } from './src/services/SmsService';
+
+// Imperative navigation ref so a tapped notification can route the app
+// even when it was launched cold from the background.
+export const navigationRef = createNavigationContainerRef();
+
+function consumePendingRoute() {
+  getPendingRoute().then((route) => {
+    if (!route || !navigationRef.isReady()) return;
+    if (route === 'insights') {
+      try { navigationRef.navigate('Insights'); } catch (e) {}
+    }
+  }).catch(() => {});
+}
 import {
   requestSmsPermissions,
   requestCallPermission,
@@ -64,6 +81,22 @@ function DashboardStack() {
       }}
     >
       <Stack.Screen name="DashboardHome" component={DashboardScreen} />
+      <Stack.Screen name="CoopDetail" component={CoopDetailScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function InsightsStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+        contentStyle: { backgroundColor: colors.bg },
+      }}
+    >
+      <Stack.Screen name="InsightsHome" component={InsightsScreen} />
+      <Stack.Screen name="InsightDetail" component={InsightDetailScreen} />
       <Stack.Screen name="CoopDetail" component={CoopDetailScreen} />
     </Stack.Navigator>
   );
@@ -129,14 +162,14 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="Guide"
-        component={GuideScreen}
+        name="Insights"
+        component={InsightsStack}
         options={{
           tabBarLabel: ({ focused }) => (
-            <TabBarLabel focused={focused} label={t('guide')} />
+            <TabBarLabel focused={focused} label={t('insightsTab')} />
           ),
           tabBarIcon: ({ focused }) => (
-            <TabBarIcon name="book" focused={focused} />
+            <TabBarIcon name="target" focused={focused} />
           ),
         }}
       />
@@ -224,6 +257,15 @@ function RootNav() {
     }
   }, [onboardingDone]);
 
+  // A tapped notification can arrive while the app is backgrounded — catch
+  // it on every foreground, not just cold start.
+  React.useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') consumePendingRoute();
+    });
+    return () => sub.remove();
+  }, []);
+
   if (!ready) {
     return (
       <View style={[styles.splash, { backgroundColor: colors.bg }]}>
@@ -234,7 +276,10 @@ function RootNav() {
   // Theme is applied via the Proxy `colors` + useStyles hook. The screens
   // re-render when `themeMode` changes because they subscribe via useTheme.
   return (
-    <NavigationContainer theme={{
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={consumePendingRoute}
+      theme={{
       ...navTheme,
       colors: {
         ...navTheme.colors,

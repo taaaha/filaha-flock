@@ -20,6 +20,7 @@ import BatteryBar from '../components/BatteryBar';
 import PrimaryButton from '../components/PrimaryButton';
 import TrendChart from '../components/TrendChart';
 import StatusDot from '../components/StatusDot';
+import CoopEditModal from '../components/CoopEditModal';
 import { showToast } from '../components/Toast';
 import { checkCallPermission, requestCallPermission } from '../services/SmsService';
 import { strainLabel, envTargetsAt, heatStressTHI } from '../utils/poultryData';
@@ -49,11 +50,12 @@ export default function CoopDetailScreen({ route, navigation }) {
   const { deviceId } = route.params || {};
   const {
     t, devices, readings, thresholds, powerCut, settings,
-    callEmergency, removeDevice, injectMessage, now,
+    callEmergency, removeDevice, updateDevice, injectMessage, now,
   } = useApp();
 
   // ── Hooks always called in the same order ──
   const [selectedSensor, setSelectedSensor] = useState('co2');
+  const [editVisible, setEditVisible] = useState(false);
 
   const device = devices.find((d) => d.id === deviceId);
   const list = device ? (readings[deviceId] || []) : [];
@@ -166,6 +168,12 @@ export default function CoopDetailScreen({ route, navigation }) {
       ],
       { cancelable: true }
     );
+  };
+
+  const onSaveEdit = async (patch) => {
+    const res = await updateDevice(device.id, patch);
+    setEditVisible(false);
+    showToast(res?.ok ? t('saved') : (t('error') || 'Error'), res?.ok ? 'success' : 'error');
   };
 
   return (
@@ -352,13 +360,28 @@ export default function CoopDetailScreen({ route, navigation }) {
         </View>
 
         <PrimaryButton
+          title={t('editCoop') || 'Edit coop'}
+          icon="✎"
+          variant="subtle"
+          onPress={() => setEditVisible(true)}
+          style={{ marginTop: 16 }}
+        />
+        <PrimaryButton
           title={t('deleteDevice')}
           icon="🗑"
           variant="ghost"
           onPress={onDelete}
-          style={{ marginTop: 12 }}
+          style={{ marginTop: 10 }}
         />
       </ScrollView>
+
+      <CoopEditModal
+        visible={editVisible}
+        device={device}
+        t={t}
+        onClose={() => setEditVisible(false)}
+        onSave={onSaveEdit}
+      />
     </SafeAreaView>
   );
 }

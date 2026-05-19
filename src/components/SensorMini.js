@@ -1,84 +1,58 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import { colors, statusColor } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { sensorStatus } from '../utils/thresholds';
 import { formatNumber } from '../utils/formatters';
 
-const SENSOR_META = {
-  co2:  { icon: '🌫️', unit: 'ppm', decimals: 0 },
-  nh3:  { icon: '☢️',  unit: 'ppm', decimals: 1 },
-  temp: { icon: '🌡️', unit: '°C',  decimals: 1 },
-  hum:  { icon: '💧', unit: '%',   decimals: 0 },
-};
+const DECIMALS = { co2: 0, nh3: 1, temp: 1, hum: 0 };
+const UNIT = { co2: 'ppm', nh3: 'ppm', temp: '°C', hum: '%' };
 
+// Clean & minimal, RTL-safe: muted label on top, big value below. Status
+// is the value's COLOUR — no floating dot to get shoved across the cell
+// by the bidi/flex layout in Arabic.
 export default function SensorMini({ sensorKey, value, label, thresholds }) {
   const styles = useStyles(makeStyles);
-  const meta = SENSOR_META[sensorKey] || {};
   const status = sensorStatus(sensorKey, value, thresholds || {});
-  const sColor = statusColor(status);
   const noData = value === null || value === undefined || isNaN(value);
+  const valueColor = noData ? colors.textTertiary : statusColor(status);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.iconCol}>
-        <View style={[styles.iconBox, { backgroundColor: sColor + '1d', borderColor: sColor + '40' }]}>
-          <Text style={styles.icon}>{meta.icon || '•'}</Text>
-        </View>
-      </View>
-      <View style={styles.col}>
-        <Text style={styles.label} numberOfLines={1}>{label}</Text>
-        <View style={styles.valueRow}>
-          <Text style={[styles.value, { color: noData ? colors.textTertiary : colors.textPrimary }]}>
-            {noData ? '—' : formatNumber(value, meta.decimals || 0)}
-          </Text>
-          {!noData ? <Text style={styles.unit}>{meta.unit}</Text> : null}
-        </View>
-      </View>
+    <View style={styles.cell}>
+      <Text style={styles.label} numberOfLines={2}>{label}</Text>
+      {/* Number + unit in ONE Text, LTR, so it never reorders to "°C 28". */}
+      <Text style={[styles.value, { color: valueColor }]} numberOfLines={1}>
+        {noData ? '—' : formatNumber(value, DECIMALS[sensorKey] || 0)}
+        {!noData ? <Text style={styles.unit}> {UNIT[sensorKey]}</Text> : null}
+      </Text>
     </View>
   );
 }
 
 const makeStyles = () => ({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flexBasis: '50%',
-    minWidth: '48%',
-    paddingRight: 8,
-    marginBottom: 12,
+  cell: {
+    width: '50%',
+    paddingEnd: 12,
+    marginBottom: 16,
   },
-  iconCol: {},
-  iconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  icon: { fontSize: 18 },
-  col: { flex: 1 },
   label: {
-    color: colors.textTertiary,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  valueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 3,
-    marginTop: 2,
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 17,
+    // Fixed two-line slot so all four cells align even when one label
+    // wraps (e.g. "ثاني أكسيد الكربون") and others are single words.
+    minHeight: 34,
+    marginBottom: 4,
   },
   value: {
-    fontSize: 21,
-    fontWeight: '800',
-    lineHeight: 24,
+    fontSize: 24,
+    fontWeight: '700',
+    lineHeight: 28,
   },
   unit: {
     color: colors.textTertiary,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
   },
 });

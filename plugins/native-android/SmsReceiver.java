@@ -226,8 +226,9 @@ public class SmsReceiver extends BroadcastReceiver {
         }
 
         if (isClear) {
-            showAlertNotification(context, "✅ " + deviceId,
-                    "Sensor readings returned to normal", "", false);
+            String clearedMsg = prefs.getString("i18n_clearedLabel",
+                    "Sensor readings returned to normal");
+            showAlertNotification(context, "✅ " + deviceId, clearedMsg, "", false);
         }
     }
 

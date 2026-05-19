@@ -77,6 +77,9 @@ export function generateInsights({ devices, readings, thresholds, alerts, now, t
           .replace('{age}', age)
           .replace('{temp}', target != null ? target.toFixed(0) : '—'),
         deviceId: device.id,
+        topicId: 'temperature',
+        sensorKey: 'temp',
+        tool: 'brooder',
       });
     }
 
@@ -85,13 +88,25 @@ export function generateInsights({ devices, readings, thresholds, alerts, now, t
     const dueSoon = (schedule || []).find((v) => v.day === age || v.day === age + 1);
     if (dueSoon && !dueSoon.optional) {
       const whenKey = dueSoon.day === age ? 'insightVaccineToday' : 'insightVaccineTomorrow';
+      // The vaccine name is universal vet terminology (Gumboro, Newcastle…)
+      // and stays as-is; the administration route is localized so no raw
+      // English prose leaks into the Arabic UI.
+      const ROUTE_KEY = {
+        Water: 'vacRouteWater', Spray: 'vacRouteSpray', SC: 'vacRouteSC',
+        IM: 'vacRouteIM', 'Eye-drop': 'vacRouteEyeDrop', WingWeb: 'vacRouteWingWeb',
+        Hatchery: 'vacRouteHatchery', 'In-ovo': 'vacRouteHatchery',
+      };
+      const routeLabel = dueSoon.route ? t(ROUTE_KEY[dueSoon.route] || '') : '';
+      const whenLabel = t(whenKey) || (dueSoon.day === age ? 'Due today' : 'Due tomorrow');
       out.push({
         id: `vacc_${device.id}_${dueSoon.day}`,
         icon: 'shield',
         severity: dueSoon.day === age ? 'warn' : 'info',
         title: `${device.name} — ${t('insightVaccineTitle') || 'Vaccination due'}`,
-        body: `${t(whenKey) || (dueSoon.day === age ? 'Due today' : 'Due tomorrow')}: ${dueSoon.vaccine}. ${dueSoon.notes || ''}`.trim(),
+        body: `${whenLabel}: ${dueSoon.vaccine}${routeLabel ? ` (${routeLabel})` : ''}`,
         deviceId: device.id,
+        topicId: 'vaccination',
+        tool: 'vaccine',
       });
     }
   }
@@ -114,6 +129,8 @@ export function generateInsights({ devices, readings, thresholds, alerts, now, t
         body: t('insightCo2RisingBody') ||
           `CO₂ has risen by about ${Math.round(co2Trend.slope * TREND_WINDOW)} ppm across recent readings. Open vents now to keep the air fresh.`,
         deviceId: device.id,
+        topicId: 'ventilation',
+        sensorKey: 'co2',
       });
     }
 
@@ -128,6 +145,8 @@ export function generateInsights({ devices, readings, thresholds, alerts, now, t
         body: t('insightNh3RisingBody') ||
           'Ammonia smell may already be sharp at bird level. Replace wet litter and increase ventilation before it harms the lungs.',
         deviceId: device.id,
+        topicId: 'ventilation',
+        sensorKey: 'nh3',
       });
     }
 
@@ -153,6 +172,9 @@ export function generateInsights({ devices, readings, thresholds, alerts, now, t
                 ? (t('insightTempTooHigh') || 'Reduce heating, open vents, spray roof if outdoor temp is high.')
                 : (t('insightTempTooLow')  || 'Increase heating, close drafts, check the heater is working.')),
             deviceId: device.id,
+            topicId: 'temperature',
+            sensorKey: 'temp',
+            tool: 'brooder',
           });
         }
       }
@@ -171,8 +193,10 @@ export function generateInsights({ devices, readings, thresholds, alerts, now, t
           body: (t('insightHeatStressBody') ||
             'THI is {thi} ({tier}). Spray the roof, run fans, and add electrolytes + vitamin C to drinking water.')
             .replace('{thi}', hs.thi)
-            .replace('{tier}', hs.tier),
+            .replace('{tier}', t('thi' + hs.tier.charAt(0).toUpperCase() + hs.tier.slice(1)) || hs.tier),
           deviceId: device.id,
+          topicId: 'summer',
+          sensorKey: 'temp',
         });
       }
     }
@@ -191,9 +215,15 @@ export function generateInsights({ devices, readings, thresholds, alerts, now, t
     }
   }
 
-  // 3) Education: rotate a daily tip if no critical insights yet
-  if (out.length === 0 || out.every((o) => o.severity === 'success' || o.severity === 'info')) {
-    out.push(dailyTip(now, t, language));
+  // 3) Focus of the day — ALWAYS present and contextual (never a random
+  // rotating tip). It's 'info' severity so danger/warn float above it,
+  // but the farmer always has a relevant "what to do today" anchor.
+  out.push(dailyFocus({ devices, readings, thresholds, now, t }));
+
+  // A "flock is stable" reassurance must NOT sit next to active warnings —
+  // that's contradictory. Drop it whenever something needs attention.
+  if (out.some((o) => o.severity === 'danger' || o.severity === 'warn')) {
+    return out.filter((o) => o.id !== 'calm_streak');
   }
 
   return out;
@@ -223,62 +253,113 @@ function countCalmDays(alerts, now) {
   return Math.floor((now - lastAlert) / (24 * 60 * 60 * 1000));
 }
 
-// Rotating tip by day-of-year + language
-const TIPS = [
-  {
-    icon: 'droplet',
-    titleKey: 'tipWaterTitle',
-    bodyKey: 'tipWaterBody',
-    fallback: { title: 'Clean water saves lives', body: 'Wash drinkers daily. Birds drink twice as much water as feed — dirty water is the #1 disease vector.' },
-  },
-  {
-    icon: 'thermometer',
-    titleKey: 'tipTempTitle',
-    bodyKey: 'tipTempBody',
-    fallback: { title: 'Watch the chicks, not the thermometer', body: 'Chicks huddled together = too cold. Spread out at the edges = too hot. Evenly distributed = perfect.' },
-  },
-  {
-    icon: 'wind',
-    titleKey: 'tipVentilationTitle',
-    bodyKey: 'tipVentilationBody',
-    fallback: { title: 'Test the air at bird level', body: 'Crouch to where the birds breathe. If your eyes burn, the ammonia is already harming their lungs.' },
-  },
-  {
-    icon: 'shield',
-    titleKey: 'tipBiosecurityTitle',
-    bodyKey: 'tipBiosecurityBody',
-    fallback: { title: 'Biosecurity beats medicine', body: 'No visitors in the coop. Disinfect your boots. Keep wild birds and rodents out. Most outbreaks start with a careless visitor.' },
-  },
-  {
-    icon: 'sun',
-    titleKey: 'tipSummerTitle',
-    bodyKey: 'tipSummerBody',
-    fallback: { title: 'Algerian summers kill birds', body: 'Spray the roof with water in afternoon heat. Feed at dawn and dusk, not noon. Add electrolytes when temps exceed 30°C.' },
-  },
-  {
-    icon: 'feather',
-    titleKey: 'tipFeedTitle',
-    bodyKey: 'tipFeedBody',
-    fallback: { title: 'Fresh feed only', body: 'Wet or moldy feed causes silent mortality through mycotoxins. Distribute small amounts 4–6× daily for chicks.' },
-  },
-  {
-    icon: 'heart',
-    titleKey: 'tipObservationTitle',
-    bodyKey: 'tipObservationBody',
-    fallback: { title: 'Walk the flock every morning', body: 'A lethargic, fluffed-up bird is your earliest warning of an outbreak. Removing it from the flock can save the rest.' },
-  },
-];
+function latestReading(readings, id) {
+  const l = (readings && readings[id]) || [];
+  return l.length ? l[l.length - 1] : null;
+}
 
-function dailyTip(now, t, language) {
-  const dayOfYear = Math.floor((now - new Date(new Date(now).getFullYear(), 0, 0)) / 86400000);
-  const tip = TIPS[dayOfYear % TIPS.length];
-  const title = t(tip.titleKey);
-  const body = t(tip.bodyKey);
+// The "focus of the day" — derived from the real state of the farm, never
+// a random rotation. Priority: (1) a sensor creeping toward its limit,
+// (2) seasonal risk for the Algerian climate, (3) the youngest flock's
+// phase need. Every variant carries a topicId/deviceId so tapping it
+// forwards to the matching issue + guidance.
+function dailyFocus({ devices, readings, thresholds, now, t }) {
+  const list = devices || [];
+
+  // 1) Preventive: a sensor already 70–99% of its warn threshold.
+  let best = null;
+  for (const d of list) {
+    const r = latestReading(readings, d.id);
+    if (!r) continue;
+    for (const key of ['nh3', 'co2', 'temp', 'hum']) {
+      const v = r[key];
+      const warn = thresholds && thresholds[key] && thresholds[key].warn;
+      if (v == null || isNaN(v) || !warn) continue;
+      const frac = v / warn;
+      if (frac >= 0.7 && frac < 1 && (!best || frac > best.frac)) {
+        best = { id: d.id, name: d.name, key, frac };
+      }
+    }
+  }
+  if (best) {
+    return {
+      id: `focus_prevent_${best.id}_${best.key}`,
+      icon: best.key === 'temp' ? 'thermometer' : best.key === 'hum' ? 'droplet' : 'wind',
+      severity: 'info',
+      title: `${best.name} — ${t('focusWatch') || 'Worth watching today'}`,
+      body: (t('focusApproaching') ||
+        '{sensor} is approaching its safe limit. Act early — open the guidance before it becomes a danger.')
+        .replace('{sensor}', t(`${best.key}Short`) || best.key),
+      deviceId: best.id,
+      topicId: best.key === 'temp' ? 'temperature' : 'ventilation',
+      sensorKey: best.key,
+    };
+  }
+
+  // 2) Seasonal — Algerian hot months (May–September).
+  const month = new Date(now).getMonth();
+  if (month >= 4 && month <= 8) {
+    return {
+      id: 'focus_season_summer',
+      icon: 'sun',
+      severity: 'info',
+      title: t('tipSummerTitle') || 'Manage the summer heat',
+      body: t('tipSummerBody') ||
+        'Spray the roof in the afternoon, feed at dawn and dusk, and add electrolytes when it is hot.',
+      topicId: 'summer',
+    };
+  }
+
+  // 3) The youngest flock's current phase need.
+  const aged = list
+    .map((d) => ({ d, age: ageOf(d, now) }))
+    .filter((x) => x.age != null)
+    .sort((a, b) => a.age - b.age);
+  if (aged.length) {
+    const { d, age } = aged[0];
+    if (age <= 7) {
+      return {
+        id: `focus_phase_${d.id}`,
+        icon: 'droplet',
+        severity: 'info',
+        title: `${d.name} — ${t('tipWaterTitle') || 'Clean water saves lives'}`,
+        body: t('tipWaterBody') ||
+          'Chicks are fragile now — keep water clean and cool, and wash the drinkers every morning.',
+        deviceId: d.id,
+        topicId: 'health',
+      };
+    }
+    if (age <= 21) {
+      return {
+        id: `focus_phase_${d.id}`,
+        icon: 'wind',
+        severity: 'info',
+        title: `${d.name} — ${t('tipVentilationTitle') || 'Test the air at bird level'}`,
+        body: t('tipVentilationBody') ||
+          'Crouch to bird level. If your eyes sting, ammonia is already hurting their lungs — ventilate.',
+        deviceId: d.id,
+        topicId: 'ventilation',
+      };
+    }
+    return {
+      id: `focus_phase_${d.id}`,
+      icon: 'heart',
+      severity: 'info',
+      title: `${d.name} — ${t('tipObservationTitle') || 'Walk the flock every morning'}`,
+      body: t('tipObservationBody') ||
+        'A lethargic, fluffed-up bird is the earliest outbreak warning. Remove it to protect the rest.',
+      deviceId: d.id,
+      topicId: 'health',
+    };
+  }
+
+  // 4) Universal default — water hygiene.
   return {
-    id: 'daily_tip',
-    icon: tip.icon,
+    id: 'focus_default',
+    icon: 'droplet',
     severity: 'info',
-    title: (title && title !== tip.titleKey) ? title : tip.fallback.title,
-    body:  (body  && body  !== tip.bodyKey)  ? body  : tip.fallback.body,
+    title: t('tipWaterTitle') || 'Clean water saves lives',
+    body: t('tipWaterBody') || 'Wash drinkers daily. Dirty water is the number-one disease vector.',
+    topicId: 'health',
   };
 }

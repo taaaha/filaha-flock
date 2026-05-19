@@ -29,6 +29,7 @@ import Field from '../components/Field';
 import ToggleRow from '../components/ToggleRow';
 import ThresholdSlider from '../components/ThresholdSlider';
 import PrimaryButton from '../components/PrimaryButton';
+import SmsMuteGuide from '../components/SmsMuteGuide';
 import { showToast } from '../components/Toast';
 
 export default function SettingsScreen() {
@@ -46,6 +47,9 @@ export default function SettingsScreen() {
   const [sendSmsGranted, setSendSmsGranted] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [batteryOk, setBatteryOk] = useState(true);
+  const [editProfile, setEditProfile] = useState(false);
+  const [editContact, setEditContact] = useState(false);
+  const [smsGuideOpen, setSmsGuideOpen] = useState(false);
 
   useEffect(() => { setFarmerName(settings.farmerName || ''); }, [settings.farmerName]);
   useEffect(() => { setFarmName(settings.farmName || ''); }, [settings.farmName]);
@@ -73,14 +77,30 @@ export default function SettingsScreen() {
       farmerName: farmerName.trim(),
       farmName: farmName.trim(),
     });
+    setEditProfile(false);
     showToast(t('profileSaved'), 'success');
+  };
+
+  const cancelProfile = () => {
+    setFarmerName(settings.farmerName || '');
+    setFarmName(settings.farmName || '');
+    setEditProfile(false);
   };
 
   const onSaveContact = async () => {
     const trimmed = emergencyContact.trim();
     await updateSettings({ emergencyContact: trimmed });
+    setEditContact(false);
     showToast(trimmed ? t('contactSaved') : t('saved'), 'success');
   };
+
+  const cancelContact = () => {
+    setEmergencyContact(settings.emergencyContact || '');
+    setEditContact(false);
+  };
+
+  const profileFilled = !!(settings.farmerName || settings.farmName);
+  const contactFilled = !!settings.emergencyContact;
 
   const onLanguage = (lang) => {
     if (lang === language) return;
@@ -206,24 +226,66 @@ export default function SettingsScreen() {
         </View>
 
         {/* Profile */}
-        <Text style={styles.sectionTitle}>{t('profile')}</Text>
-        <Field
-          label={t('farmerName')}
-          value={farmerName}
-          onChangeText={setFarmerName}
-        />
-        <Field
-          label={t('farmName')}
-          value={farmName}
-          onChangeText={setFarmName}
-        />
-        <PrimaryButton
-          title={t('save')}
-          icon="✓"
-          variant="primary"
-          onPress={onSaveProfile}
-          style={{ marginBottom: 16 }}
-        />
+        <View style={styles.sectionHead}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0, marginTop: 0 }]}>{t('profile')}</Text>
+          {profileFilled && !editProfile ? (
+            <Pressable
+              onPress={() => setEditProfile(true)}
+              android_ripple={{ color: colors.accent + '22' }}
+              style={styles.editBtn}
+              accessibilityRole="button"
+            >
+              <Text style={styles.editBtnText}>{t('edit')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {profileFilled && !editProfile ? (
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>{t('farmerName')}</Text>
+              <Text style={styles.infoValue} numberOfLines={1}>
+                {settings.farmerName || t('notSet')}
+              </Text>
+            </View>
+            <View style={[styles.infoRow, styles.infoRowLast]}>
+              <Text style={styles.infoLabel}>{t('farmName')}</Text>
+              <Text style={styles.infoValue} numberOfLines={1}>
+                {settings.farmName || t('notSet')}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <>
+            <Field
+              label={t('farmerName')}
+              value={farmerName}
+              onChangeText={setFarmerName}
+            />
+            <Field
+              label={t('farmName')}
+              value={farmName}
+              onChangeText={setFarmName}
+            />
+            <View style={styles.editActions}>
+              {profileFilled ? (
+                <PrimaryButton
+                  title={t('cancel')}
+                  variant="subtle"
+                  onPress={cancelProfile}
+                  style={{ flex: 1 }}
+                />
+              ) : null}
+              <PrimaryButton
+                title={t('save')}
+                icon="✓"
+                variant="primary"
+                onPress={onSaveProfile}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </>
+        )}
 
         {/* Language */}
         <Text style={styles.sectionTitle}>{t('language')}</Text>
@@ -344,20 +406,56 @@ export default function SettingsScreen() {
         />
 
         {/* Emergency */}
-        <Text style={styles.sectionTitle}>{t('emergencyContact')}</Text>
-        <Field
-          value={emergencyContact}
-          onChangeText={setEmergencyContact}
-          placeholder={t('emergencyContactPlaceholder')}
-          keyboardType="phone-pad"
-        />
-        <PrimaryButton
-          title={t('save')}
-          icon="✓"
-          variant="primary"
-          onPress={onSaveContact}
-          style={{ marginBottom: 10 }}
-        />
+        <View style={styles.sectionHead}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0, marginTop: 0 }]}>{t('emergencyContact')}</Text>
+          {contactFilled && !editContact ? (
+            <Pressable
+              onPress={() => setEditContact(true)}
+              android_ripple={{ color: colors.accent + '22' }}
+              style={styles.editBtn}
+              accessibilityRole="button"
+            >
+              <Text style={styles.editBtnText}>{t('edit')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {contactFilled && !editContact ? (
+          <View style={styles.infoCard}>
+            <View style={[styles.infoRow, styles.infoRowLast]}>
+              <Text style={styles.infoLabel}>{t('emergencyContact')}</Text>
+              <Text style={[styles.infoValue, styles.infoValueLtr]} numberOfLines={1}>
+                {settings.emergencyContact}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <>
+            <Field
+              value={emergencyContact}
+              onChangeText={setEmergencyContact}
+              placeholder={t('emergencyContactPlaceholder')}
+              keyboardType="phone-pad"
+            />
+            <View style={styles.editActions}>
+              {contactFilled ? (
+                <PrimaryButton
+                  title={t('cancel')}
+                  variant="subtle"
+                  onPress={cancelContact}
+                  style={{ flex: 1 }}
+                />
+              ) : null}
+              <PrimaryButton
+                title={t('save')}
+                icon="✓"
+                variant="primary"
+                onPress={onSaveContact}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </>
+        )}
 
         <View style={styles.testRow}>
           <PrimaryButton
@@ -394,6 +492,28 @@ export default function SettingsScreen() {
           label={t('autoCallPowerCut')}
           value={!!settings.autoCallOnPowerCut}
           onValueChange={(v) => updateSettings({ autoCallOnPowerCut: v })}
+        />
+
+        <Pressable
+          onPress={() => setSmsGuideOpen(true)}
+          android_ripple={{ color: colors.accent + '22' }}
+          style={styles.guideRow}
+          accessibilityRole="button"
+        >
+          <Text style={styles.guideRowText} numberOfLines={2}>
+            {t('smsGuideRow')}
+          </Text>
+          <Text style={styles.guideRowChevron}>›</Text>
+        </Pressable>
+
+        <SmsMuteGuide
+          visible={smsGuideOpen}
+          t={t}
+          onClose={() => setSmsGuideOpen(false)}
+          onAck={async () => {
+            try { await updateSettings({ smsGuideAck: true }); } catch (e) {}
+            setSmsGuideOpen(false);
+          }}
         />
 
         {/* Permissions */}
@@ -488,6 +608,86 @@ const makeStyles = () => ({
     borderStartWidth: 3,
     borderStartColor: colors.accent,
     paddingStart: 10,
+  },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  editBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.accent + '14',
+  },
+  editBtnText: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  infoCard: {
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  infoRowLast: {
+    borderBottomWidth: 0,
+  },
+  infoLabel: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  infoValue: {
+    flexShrink: 1,
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  infoValueLtr: {
+    writingDirection: 'ltr',
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  guideRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  guideRowText: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  guideRowChevron: {
+    color: colors.textTertiary,
+    fontSize: 20,
+    fontWeight: '700',
   },
   sectionRow: {
     flexDirection: 'row',

@@ -3,6 +3,11 @@
     "name": "Filaha Flock",
     "slug": "filaha-monitor",
     "version": "1.0.0",
+    "runtimeVersion": { "policy": "appVersion" },
+    "updates": {
+      "url": "https://u.expo.dev/19541610-9acc-4823-b1b6-69108e461fca",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "scheme": "filaha",
