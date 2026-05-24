@@ -31,7 +31,10 @@
       "Bash(sed -n \"/export const VACCINATION/,/^};/p\" src/utils/poultryData.js)",
       "Bash(sed -n '8,22p' plugins/withFilahaSms.js)",
       "Bash(sed -n '258,268p' plugins/withFilahaSms.js)",
-      "Bash(grep -n \"} = useApp\\(\\);\\\\|const {$\\\\|import SmartInsights\\\\|import DailyBriefing\\\\|const \\\\[smsGuideOpen\\\\|updateSettings\" src/screens/DashboardScreen.js)"
+      "Bash(grep -n \"} = useApp\\(\\);\\\\|const {$\\\\|import SmartInsights\\\\|import DailyBriefing\\\\|const \\\\[smsGuideOpen\\\\|updateSettings\" src/screens/DashboardScreen.js)",
+      "Bash(grep -nE \"mkdir|writeFile|externals|\\\\.expo[\\\\\\\\\\\\\\\\/]metro\" node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js)",
+      "Bash(grep -rln \"metro.externals\\\\|expo[\\\\\\\\\\\\\\\\/]metro[\\\\\\\\\\\\\\\\/]externals\\\\|metro['\\\\\"], ['\\\\\"]externals\" node_modules/@expo/cli/build/)",
+      "Bash(node -c node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/externals.js)"
     ]
   }
 }
