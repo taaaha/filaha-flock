@@ -7,7 +7,7 @@ import React, {
   useReducer,
   useRef,
 } from 'react';
-import { I18nManager } from 'react-native';
+import { I18nManager, AppState } from 'react-native';
 import { Storage } from '../services/StorageService';
 import { setActiveTheme, useTheme } from '../utils/colors';
 import {
@@ -193,6 +193,16 @@ export function AppProvider({ children }) {
   useEffect(() => {
     const id = setInterval(() => dispatch({ type: 'TICK' }), 60 * 1000);
     return () => clearInterval(id);
+  }, []);
+
+  // ---------- Force an immediate tick when the app returns to foreground ----------
+  // Without this, after the app was backgrounded across a day rollover the
+  // flock age could appear stale for up to 60 s until the next interval fires.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') dispatch({ type: 'TICK' });
+    });
+    return () => sub.remove();
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────

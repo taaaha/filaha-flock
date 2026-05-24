@@ -5,9 +5,10 @@ import { colors, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import Icon from './Icon';
 import HealthScore from './HealthScore';
-import { computeFarmHealth, healthTier } from '../utils/farmHealth';
 import { DAILY_TASKS } from '../utils/guideContent';
 import TaskChecklistModal from './TaskChecklistModal';
+import { deviceStatus } from '../utils/thresholds';
+import { STATUS } from '../utils/colors';
 
 const DAILY_KEY = '@filaha:dailyTasksDone';
 const SEV_COLOR = { danger: 'danger', warn: 'warn', info: 'accent', success: 'ok' };
@@ -45,10 +46,27 @@ export default function DailyBriefing({
   const greet = timeOfDay(new Date(now).getHours());
   const farmerName = (settings?.farmerName || '').trim();
 
-  const score = useMemo(() =>
-    computeFarmHealth(devices, readings, thresholds, powerCut, now),
-  [devices, readings, thresholds, powerCut, now]);
-  const tier = healthTier(score, colors);
+  // Farmer-language breakdown: how many coops are fine vs need attention vs
+  // are in actual danger. Powers the ring AND the status sentence.
+  const counts = useMemo(() => {
+    let ok = 0, attention = 0, danger = 0;
+    (devices || []).forEach((d) => {
+      const list = (readings && readings[d.id]) || [];
+      const reading = list.length ? list[list.length - 1] : null;
+      const isPowerCut = !!(powerCut && powerCut[d.id]);
+      const s = deviceStatus(d, reading, thresholds, now, isPowerCut);
+      if (s === STATUS.OK) ok++;
+      else if (s === STATUS.DANGER || s === STATUS.POWER_CUT) danger++;
+      else attention++;                              // WARN + OFFLINE
+    });
+    return { total: (devices || []).length, ok, attention, danger };
+  }, [devices, readings, thresholds, powerCut, now]);
+
+  const worstColor =
+      counts.total === 0 ? colors.textTertiary
+    : counts.danger > 0  ? colors.danger
+    : counts.attention > 0 ? colors.warn
+    : colors.ok;
 
   useEffect(() => {
     (async () => {
@@ -86,21 +104,35 @@ export default function DailyBriefing({
   const moreCount = Math.max(0, sortedInsights.length - 1);
 
   const greeting = `${t(greet.key) || 'Hello'}${farmerName ? `، ${farmerName}` : ''}`;
-  const statusLine = score == null
-    ? (t('healthNoDataBody') || 'Add a coop to start monitoring.')
-    : `${t(`tier_${tier.label}`) || tier.label}${
-        score >= 90 ? '' : (topInsight ? ` · ${topInsight.title}` : '')}`;
+
+  // Plain-language status the farmer instantly understands.
+  function farmSentence() {
+    if (counts.total === 0) return t('healthNoDataBody') || 'Add a coop to start.';
+    if (counts.danger === 1) return t('farmDanger1') || 'Danger in 1 coop';
+    if (counts.danger > 1)
+      return (t('farmDangerN') || 'Danger in {n} coops').replace('{n}', counts.danger);
+    if (counts.attention === 1) return t('farmAttention1') || '1 coop needs attention';
+    if (counts.attention > 1)
+      return (t('farmAttentionN') || '{n} coops need attention').replace('{n}', counts.attention);
+    return t('farmAllOk') || 'All your coops are fine';
+  }
+  const sentence = farmSentence();
+  // Append the single most urgent insight title when there *is* a problem,
+  // so the farmer sees not just "1 coop needs attention" but which/why.
+  const statusLine = (counts.danger > 0 || counts.attention > 0) && topInsight
+    ? `${sentence} · ${topInsight.title}`
+    : sentence;
 
   return (
     <>
     <View style={[styles.card, shadows.sm]}>
       {/* Top strip: ring · greeting+status · tasks */}
       <View style={styles.strip}>
-        <HealthScore score={score} t={t} size={54} strokeWidth={6} />
+        <HealthScore counts={counts} size={54} strokeWidth={6} />
 
         <View style={styles.mid}>
           <View style={styles.greetLine}>
-            <Icon name={greet.icon} size={14} color={tier.color} strokeWidth={2.4} />
+            <Icon name={greet.icon} size={14} color={worstColor} strokeWidth={2.4} />
             <Text style={styles.greeting} numberOfLines={1}>{greeting}</Text>
             {onPressHelp ? (
               <Pressable
@@ -113,7 +145,7 @@ export default function DailyBriefing({
               </Pressable>
             ) : null}
           </View>
-          <Text style={[styles.status, { color: tier.color }]} numberOfLines={1}>
+          <Text style={[styles.status, { color: worstColor }]} numberOfLines={1}>
             {statusLine}
           </Text>
         </View>

@@ -15,6 +15,7 @@ import { useStyles } from '../utils/useStyles';
 import { deviceStatus } from '../utils/thresholds';
 import { isToday, formatRelativeTime, formatTime } from '../utils/formatters';
 import { buildFakeDataSms } from '../utils/smsParser';
+import Icon from '../components/Icon';
 import SensorTile from '../components/SensorTile';
 import BatteryBar from '../components/BatteryBar';
 import PrimaryButton from '../components/PrimaryButton';
@@ -98,7 +99,7 @@ export default function CoopDetailScreen({ route, navigation }) {
         <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
         <View style={styles.header}>
           <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backText}>‹</Text>
+            <Icon name="chevronLeft" size={26} color={colors.textPrimary} />
           </Pressable>
           <View style={styles.titleWrap}>
             <Text style={styles.title}>{t('coopDetails')}</Text>
@@ -185,7 +186,7 @@ export default function CoopDetailScreen({ route, navigation }) {
           style={styles.backBtn}
           android_ripple={{ color: '#1a2235', borderless: true }}
         >
-          <Text style={styles.backText}>‹</Text>
+          <Icon name="chevronLeft" size={26} color={colors.textPrimary} />
         </Pressable>
         <View style={styles.titleWrap}>
           <Text style={styles.title} numberOfLines={1}>{device.name}</Text>

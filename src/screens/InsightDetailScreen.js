@@ -58,7 +58,7 @@ export default function InsightDetailScreen({ route, navigation }) {
             style={styles.backBtn}
             accessibilityRole="button"
           >
-            <Icon name="chevronRight" size={22} color={colors.textPrimary} style={styles.backIcon} />
+            <Icon name="chevronLeft" size={24} color={colors.textPrimary} />
           </Pressable>
           <Text style={styles.topTitle} numberOfLines={1}>
             {t('insightDetailTitle') || 'Details'}

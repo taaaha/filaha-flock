@@ -1,5 +1,10 @@
 import React from 'react';
+import { I18nManager } from 'react-native';
 import Svg, { Path, Circle, Line, Polyline, Polygon, Rect, G } from 'react-native-svg';
+
+// Horizontal directional icons must mirror in RTL (a "back" / "more" arrow
+// points the other way in Arabic). Vertical chevrons (up/down) never flip.
+const RTL_FLIP = new Set(['chevronRight', 'chevronLeft', 'arrowLeft', 'arrowRight']);
 
 // Lucide-style icons (MIT). Each is a pure function returning SVG primitives.
 // Stroke-based for sharp scaling and color theming.
@@ -108,6 +113,7 @@ const I = {
     </>
   ),
   chevronRight: <Polyline points="9 18 15 12 9 6" />,
+  chevronLeft: <Polyline points="15 18 9 12 15 6" />,
   chevronDown: <Polyline points="6 9 12 15 18 9" />,
   chevronUp: <Polyline points="18 15 12 9 6 15" />,
   arrowLeft: (
@@ -221,9 +227,11 @@ export default function Icon({
   color = '#fff',
   strokeWidth = 2,
   fill = 'none',
+  style,
 }) {
   const content = I[name];
   if (!content) return null;
+  const flip = I18nManager.isRTL && RTL_FLIP.has(name);
   return (
     <Svg
       width={size}
@@ -234,6 +242,7 @@ export default function Icon({
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
+      style={[flip && { transform: [{ scaleX: -1 }] }, style]}
     >
       {content}
     </Svg>

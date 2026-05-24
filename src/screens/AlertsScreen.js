@@ -8,6 +8,7 @@ import { colors } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { isToday } from '../utils/formatters';
 import AlertItem from '../components/AlertItem';
+import Icon from '../components/Icon';
 
 const FILTERS = ['all', 'alerts', 'cleared', 'today'];
 
@@ -54,11 +55,7 @@ export default function AlertsScreen() {
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <View style={styles.logoSm}>
-            <Image
-              source={require('../../assets/icon.png')}
-              style={styles.logoSmImg}
-              resizeMode="cover"
-            />
+            <Icon name="feather" size={19} color={colors.accent} strokeWidth={2.3} />
           </View>
           <Text style={styles.title}>{t('alerts')}</Text>
         </View>

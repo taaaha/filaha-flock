@@ -319,6 +319,8 @@ export default {
   maxLevel: 'Maximum',
   warnLow: 'Warn low',
   dangerLow: 'Danger low',
+  whenAbove: 'If above',
+  whenBelow: 'If below',
 
   // Guide
   guide: 'Guide',
@@ -349,6 +351,11 @@ export default {
   healthFairBody: 'Several coops need attention — act before it worsens.',
   healthPoorBody: 'Critical — several coops need urgent action now.',
   healthNoDataBody: 'Add a coop to start monitoring.',
+  farmAllOk: 'All your coops are fine',
+  farmAttention1: '1 coop needs your attention',
+  farmAttentionN: '{n} coops need your attention',
+  farmDanger1: 'Danger in 1 coop',
+  farmDangerN: 'Danger in {n} coops',
   tasksDoneToday: "daily tasks done",
   allTasksDone: "All today's tasks done — great job",
 

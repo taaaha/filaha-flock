@@ -69,8 +69,8 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
           {/* Status stripe — logical start edge (RTL-correct) */}
           <View style={[styles.stripe, { backgroundColor: sColor }]} />
 
-          {/* Header */}
-          <View style={styles.headerRow}>
+          {/* Header — status-tinted zone */}
+          <View style={[styles.headerRow, { backgroundColor: sColor + '14' }]}>
             <View style={styles.headerLeft}>
               <Text style={styles.name} numberOfLines={1}>{device.name}</Text>
               {/* Each token is its own Text so the bidi algorithm can't
@@ -164,8 +164,11 @@ const makeStyles = () => ({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
     gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 16,
   },
   headerLeft: { flex: 1 },
   name: {

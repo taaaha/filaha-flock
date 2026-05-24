@@ -9,16 +9,30 @@ function clamp(value, min, max) {
   return value;
 }
 
+/**
+ * A threshold control card.
+ *
+ * Single-direction sensor (CO2 / NH3): pass only warn + danger. The card
+ * renders one block — "↑ if above" — with two rows.
+ *
+ * Bi-directional sensor (temp / hum): pass warn + danger AND warnLow +
+ * dangerLow. The card renders two blocks — "↓ if below" then "↑ if above".
+ *
+ * Both shapes share the same visual rhythm, so every sensor card looks
+ * finished and the trigger direction is obvious at a glance.
+ */
 export default function ThresholdSlider({
   label,
   warnLabel,
   dangerLabel,
   warnLowLabel,
   dangerLowLabel,
+  whenAboveLabel,
+  whenBelowLabel,
   warn,
   danger,
-  warnLow,    // optional: low warning threshold
-  dangerLow,  // optional: low danger threshold
+  warnLow,    // optional
+  dangerLow,  // optional
   min,
   max,
   step = 1,
@@ -26,53 +40,63 @@ export default function ThresholdSlider({
   onChange,
 }) {
   const styles = useStyles(makeStyles);
-
   const hasLow = warnLow != null && dangerLow != null;
 
-  const setWarn = (v) => onChange({ warn: clamp(v, (warnLow != null ? warnLow + step : min), danger - step), danger, warnLow, dangerLow });
-  const setDanger = (v) => onChange({ warn, danger: clamp(v, warn + step, max), warnLow, dangerLow });
-  const setWarnLow = (v) => onChange({ warn, danger, warnLow: clamp(v, dangerLow + step, warn - step), dangerLow });
-  const setDangerLow = (v) => onChange({ warn, danger, warnLow, dangerLow: clamp(v, min, warnLow - step) });
+  // Always include only the fields that actually exist for this sensor — no
+  // undefined keys leaking into AppContext / Storage / state.
+  const fireChange = (patch) => {
+    const base = hasLow
+      ? { warn, danger, warnLow, dangerLow }
+      : { warn, danger };
+    onChange({ ...base, ...patch });
+  };
+
+  const setWarn      = (v) => fireChange({ warn:      clamp(v, hasLow ? warnLow + step : min, danger - step) });
+  const setDanger    = (v) => fireChange({ danger:    clamp(v, warn + step, max) });
+  const setWarnLow   = (v) => fireChange({ warnLow:   clamp(v, dangerLow + step, warn - step) });
+  const setDangerLow = (v) => fireChange({ dangerLow: clamp(v, min, warnLow - step) });
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.title}>{label}</Text>
 
       {hasLow ? (
-        <>
-          <Text style={styles.sectionLabel}>↓ {warnLowLabel || 'Below'}</Text>
-          <Row
-            color={colors.danger} label={dangerLowLabel || 'Danger low'}
-            value={dangerLow} unit={unit} step={step}
-            onMinus={() => setDangerLow(dangerLow - step)}
-            onPlus={() => setDangerLow(dangerLow + step)}
-            styles={styles}
-          />
+        <View style={styles.block}>
+          <Text style={styles.sectionLabel}>↓ {whenBelowLabel || 'If below'}</Text>
           <Row
             color={colors.warn} label={warnLowLabel || 'Warn low'}
-            value={warnLow} unit={unit} step={step}
+            value={warnLow} unit={unit}
             onMinus={() => setWarnLow(warnLow - step)}
             onPlus={() => setWarnLow(warnLow + step)}
             styles={styles}
           />
-          <Text style={styles.sectionLabel}>↑ {warnLabel}</Text>
-        </>
+          <Row
+            color={colors.danger} label={dangerLowLabel || 'Danger low'}
+            value={dangerLow} unit={unit}
+            onMinus={() => setDangerLow(dangerLow - step)}
+            onPlus={() => setDangerLow(dangerLow + step)}
+            styles={styles}
+          />
+        </View>
       ) : null}
 
-      <Row
-        color={colors.warn} label={warnLabel}
-        value={warn} unit={unit} step={step}
-        onMinus={() => setWarn(warn - step)}
-        onPlus={() => setWarn(warn + step)}
-        styles={styles}
-      />
-      <Row
-        color={colors.danger} label={dangerLabel}
-        value={danger} unit={unit} step={step}
-        onMinus={() => setDanger(danger - step)}
-        onPlus={() => setDanger(danger + step)}
-        styles={styles}
-      />
+      <View style={[styles.block, hasLow && styles.blockGap]}>
+        <Text style={styles.sectionLabel}>↑ {whenAboveLabel || 'If above'}</Text>
+        <Row
+          color={colors.warn} label={warnLabel}
+          value={warn} unit={unit}
+          onMinus={() => setWarn(warn - step)}
+          onPlus={() => setWarn(warn + step)}
+          styles={styles}
+        />
+        <Row
+          color={colors.danger} label={dangerLabel}
+          value={danger} unit={unit}
+          onMinus={() => setDanger(danger - step)}
+          onPlus={() => setDanger(danger + step)}
+          styles={styles}
+        />
+      </View>
     </View>
   );
 }
@@ -81,18 +105,22 @@ function Row({ color, label, value, unit, onMinus, onPlus, styles }) {
   return (
     <View style={styles.row}>
       <View style={[styles.dot, { backgroundColor: color }]} />
-      <Text style={styles.subLabel}>{label}</Text>
+      <Text style={styles.subLabel} numberOfLines={1}>{label}</Text>
       <View style={styles.controls}>
         <Pressable
           onPress={onMinus}
           android_ripple={{ color: '#ffffff22', borderless: true }}
           style={styles.btn}
+          accessibilityRole="button"
+          accessibilityLabel={`${label} −`}
         ><Text style={styles.btnText}>−</Text></Pressable>
         <Text style={styles.value}>{value}{unit ? ` ${unit}` : ''}</Text>
         <Pressable
           onPress={onPlus}
           android_ripple={{ color: '#ffffff22', borderless: true }}
           style={styles.btn}
+          accessibilityRole="button"
+          accessibilityLabel={`${label} +`}
         ><Text style={styles.btnText}>+</Text></Pressable>
       </View>
     </View>
@@ -114,11 +142,17 @@ const makeStyles = () => ({
     fontWeight: '800',
     marginBottom: 10,
   },
+  block: {
+    backgroundColor: colors.bgElevated,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  blockGap: { marginTop: 10 },
   sectionLabel: {
     color: colors.textTertiary,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontWeight: '700',
     marginTop: 6,
     marginBottom: 2,
   },
@@ -131,7 +165,7 @@ const makeStyles = () => ({
     width: 10,
     height: 10,
     borderRadius: 5,
-    marginRight: 10,
+    marginEnd: 10,
   },
   subLabel: {
     color: colors.textSecondary,
@@ -148,7 +182,7 @@ const makeStyles = () => ({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: colors.cardElevated,
+    backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',

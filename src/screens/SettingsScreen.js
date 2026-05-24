@@ -223,11 +223,7 @@ export default function SettingsScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <View style={styles.brandRow}>
             <View style={styles.logoSm}>
-              <Image
-                source={require('../../assets/icon.png')}
-                style={styles.logoSmImg}
-                resizeMode="cover"
-              />
+              <Icon name="feather" size={20} color={colors.accent} strokeWidth={2.3} />
             </View>
             <Text style={[styles.screenTitle, { marginBottom: 0 }]}>{t('settings')}</Text>
           </View>
@@ -371,12 +367,14 @@ export default function SettingsScreen() {
 
           <ThresholdSlider
             label={t('co2')} warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
+            whenAboveLabel={t('whenAbove')} whenBelowLabel={t('whenBelow')}
             warn={thresholds.co2.warn} danger={thresholds.co2.danger}
             min={500} max={5000} step={100} unit="ppm"
             onChange={(v) => onThresholdChange('co2', v)}
           />
           <ThresholdSlider
             label={t('nh3')} warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
+            whenAboveLabel={t('whenAbove')} whenBelowLabel={t('whenBelow')}
             warn={thresholds.nh3.warn} danger={thresholds.nh3.danger}
             min={5} max={80} step={1} unit="ppm"
             onChange={(v) => onThresholdChange('nh3', v)}
@@ -385,6 +383,7 @@ export default function SettingsScreen() {
             label={t('temperature')}
             warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
             warnLowLabel={t('warnLow')} dangerLowLabel={t('dangerLow')}
+            whenAboveLabel={t('whenAbove')} whenBelowLabel={t('whenBelow')}
             warn={thresholds.temp.warn} danger={thresholds.temp.danger}
             warnLow={thresholds.temp.warnLow} dangerLow={thresholds.temp.dangerLow}
             min={0} max={50} step={1} unit="°C"
@@ -394,6 +393,7 @@ export default function SettingsScreen() {
             label={t('humidity')}
             warnLabel={t('warnLevel')} dangerLabel={t('dangerLevel')}
             warnLowLabel={t('warnLow')} dangerLowLabel={t('dangerLow')}
+            whenAboveLabel={t('whenAbove')} whenBelowLabel={t('whenBelow')}
             warn={thresholds.hum.warn} danger={thresholds.hum.danger}
             warnLow={thresholds.hum.warnLow} dangerLow={thresholds.hum.dangerLow}
             min={0} max={100} step={1} unit="%"

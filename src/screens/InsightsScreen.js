@@ -44,11 +44,7 @@ export default function InsightsScreen({ navigation }) {
         <View style={styles.header}>
           <View style={styles.titleRow}>
             <View style={styles.iconBadge}>
-              <Image
-                source={require('../../assets/icon.png')}
-                style={styles.brandLogo}
-                resizeMode="cover"
-              />
+              <Icon name="feather" size={24} color={colors.accent} strokeWidth={2.3} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.title} numberOfLines={1}>

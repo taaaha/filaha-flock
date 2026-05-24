@@ -306,6 +306,8 @@ export default {
   maxLevel: 'الحد الأقصى',
   warnLow: 'تحذير منخفض',
   dangerLow: 'خطر منخفض',
+  whenAbove: 'إذا تجاوز',
+  whenBelow: 'إذا انخفض دون',
 
   // Guide
   guide: 'الدليل',
@@ -336,6 +338,11 @@ export default {
   healthFairBody: 'عدة حظائر تحتاج اهتماماً — تصرّف قبل أن تتفاقم المشكلة.',
   healthPoorBody: 'الوضع حرج — عدة حظائر تحتاج تدخلاً عاجلاً الآن.',
   healthNoDataBody: 'أضف حظيرة لبدء المتابعة.',
+  farmAllOk: 'كل حظائرك بخير',
+  farmAttention1: 'حظيرة واحدة تحتاج انتباهك',
+  farmAttentionN: '{n} حظائر تحتاج انتباهك',
+  farmDanger1: 'خطر في حظيرة واحدة',
+  farmDangerN: 'خطر في {n} حظائر',
   tasksDoneToday: 'مهمّة يومية مُنجزة',
   allTasksDone: 'انتهيت من كل مهام اليوم — أحسنت',
 

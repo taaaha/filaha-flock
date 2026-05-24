@@ -263,9 +263,6 @@ export default function DashboardScreen({ navigation }) {
     return () => loop.stop();
   }, [livePulse]);
 
-  const fabScale = useRef(new Animated.Value(1)).current;
-  const onFabPressIn = () => Animated.spring(fabScale, { toValue: 0.92, useNativeDriver: true, friction: 6 }).start();
-  const onFabPressOut = () => Animated.spring(fabScale, { toValue: 1, useNativeDriver: true, friction: 4 }).start();
 
   // Status mapping
   let heroLabel, heroColor, heroEmoji;
@@ -582,19 +579,60 @@ export default function DashboardScreen({ navigation }) {
       />
 
       <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
-        {/* ── Minimal top bar (brand + help) ── */}
+        {/* ── Brand header band ── */}
         <View style={styles.topBar}>
+          <Svg
+            style={StyleSheet.absoluteFill}
+            width="100%"
+            height="100%"
+            pointerEvents="none"
+          >
+            <Defs>
+              <SvgLinearGradient id="hdr" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={colors.accent} stopOpacity="0.20" />
+                <Stop offset="1" stopColor={colors.accent} stopOpacity="0" />
+              </SvgLinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="100%" fill="url(#hdr)" />
+          </Svg>
+
           <View style={styles.brandRow}>
-            <View style={[styles.logoMini, { borderColor: heroColor + '60' }]}>
-              <Image
-                source={require('../../assets/icon.png')}
-                style={styles.logoImg}
-                resizeMode="cover"
-              />
+            <View style={styles.logoBadge}>
+              <Icon name="feather" size={20} color={colors.accent} strokeWidth={2.3} />
             </View>
-            <Text style={styles.brandMini}>Filaha Flock</Text>
+            <View>
+              <Text style={styles.brandMini}>Filaha Flock</Text>
+              <View style={styles.liveRow}>
+                <View style={styles.liveDotWrap}>
+                  <Animated.View
+                    style={[
+                      styles.liveHalo,
+                      {
+                        backgroundColor: heroColor,
+                        opacity: livePulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }),
+                        transform: [{ scale: livePulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2.8] }) }],
+                      },
+                    ]}
+                  />
+                  <View style={[styles.liveDot, { backgroundColor: heroColor }]} />
+                </View>
+                <Text style={styles.liveText} numberOfLines={1}>{heroLabel}</Text>
+              </View>
+            </View>
           </View>
-          <HelpButton t={t} screen="dashboard" />
+          <View style={styles.topActions}>
+            <Pressable
+              onPress={() => setModalVisible(true)}
+              android_ripple={{ color: '#ffffff44' }}
+              accessibilityRole="button"
+              accessibilityLabel={t('addCoop')}
+              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.addBtnPlus}>＋</Text>
+              <Text style={styles.addBtnText}>{t('addCoop')}</Text>
+            </Pressable>
+            <HelpButton t={t} screen="dashboard" />
+          </View>
         </View>
 
         {/* ── List (header holds briefing, insights, banners, filters) ── */}
@@ -689,19 +727,6 @@ export default function DashboardScreen({ navigation }) {
             ) : null
           }
         />
-
-        {/* ── FAB ── */}
-        <Animated.View style={[styles.fabWrap, { transform: [{ scale: fabScale }] }]}>
-          <Pressable
-            onPress={() => setModalVisible(true)}
-            onPressIn={onFabPressIn}
-            onPressOut={onFabPressOut}
-            android_ripple={{ color: '#ffffff66', borderless: true }}
-            style={styles.fab}
-          >
-            <Text style={styles.fabIcon}>＋</Text>
-          </Pressable>
-        </Animated.View>
 
         {/* ── Add coop modal ── */}
         <Modal
@@ -811,27 +836,52 @@ const makeStyles = () => ({
 
   // Minimal top bar (brand + help)
   topBar: {
+    position: 'relative',
+    overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
+    paddingTop: 14,
+    paddingBottom: 16,
+    backgroundColor: colors.accent + '08',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accent + '24',
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoMini: {
-    width: 38, height: 38, borderRadius: 12,
-    backgroundColor: colors.card,
-    borderWidth: 1.5,
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  logoBadge: {
+    width: 40, height: 40, borderRadius: 13,
+    backgroundColor: colors.accent + '24',
     alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden',
   },
-  logoImg: { width: 38, height: 38 },
   brandMini: {
     color: colors.textPrimary,
     fontSize: 17, fontWeight: '900',
-    letterSpacing: 0.3,
   },
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 3 },
+  liveDotWrap: {
+    width: 8, height: 8,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  liveHalo: {
+    position: 'absolute',
+    width: 8, height: 8, borderRadius: 4,
+  },
+  liveDot: { width: 7, height: 7, borderRadius: 4 },
+  liveText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  topActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingStart: 12,
+    paddingEnd: 14,
+    height: 38,
+    borderRadius: 999,
+    backgroundColor: colors.accent,
+  },
+  addBtnPlus: { color: '#fff', fontSize: 17, fontWeight: '700', marginTop: -2 },
+  addBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' },
 
   // Old header (kept for any leftover refs, unused now)
   header: {
@@ -1198,18 +1248,6 @@ const makeStyles = () => ({
     color: colors.textSecondary,
   },
 
-  // FAB
-  fabWrap: {
-    position: 'absolute',
-    right: 20, bottom: 20,
-  },
-  fab: {
-    width: 60, height: 60, borderRadius: 30,
-    backgroundColor: colors.accent,
-    alignItems: 'center', justifyContent: 'center',
-    ...shadows.glow(colors.accent),
-  },
-  fabIcon: { color: '#fff', fontSize: 30, fontWeight: '300', lineHeight: 32 },
 
   // Modal
   modalBackdrop: {

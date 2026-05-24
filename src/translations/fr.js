@@ -319,6 +319,8 @@ export default {
   maxLevel: 'Maximum',
   warnLow: 'Alerte basse',
   dangerLow: 'Danger bas',
+  whenAbove: 'Si au-dessus',
+  whenBelow: 'Si en-dessous',
 
   // Guide
   guide: 'Guide',
@@ -349,6 +351,11 @@ export default {
   healthFairBody: 'Plusieurs poulaillers demandent attention — agissez avant que ça empire.',
   healthPoorBody: 'État critique — plusieurs poulaillers exigent une action urgente.',
   healthNoDataBody: 'Ajoutez un poulailler pour commencer.',
+  farmAllOk: 'Tous vos poulaillers vont bien',
+  farmAttention1: '1 poulailler demande votre attention',
+  farmAttentionN: '{n} poulaillers demandent votre attention',
+  farmDanger1: 'Danger dans 1 poulailler',
+  farmDangerN: 'Danger dans {n} poulaillers',
   tasksDoneToday: 'tâches du jour faites',
   allTasksDone: 'Toutes les tâches faites — bravo',
 
