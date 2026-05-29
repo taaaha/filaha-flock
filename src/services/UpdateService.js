@@ -49,12 +49,11 @@ import { getAppVersionInfo, installApk as nativeInstallApk } from './SmsService'
 
 // ── Config ──────────────────────────────────────────────────────────────
 // Raw version.json URL the updater polls. Points at the GitHub repo where CI
-// commits version.json (the workflows commit to `master`). If your GitHub user
-// isn't `ash99999` or you name the repo something other than `filaha-flock`,
-// edit the slug below — or override without touching source via app.json
-// `extra.versionManifestUrl`.
+// commits version.json (the workflows commit to `master`). To move it to a
+// different repo, edit the slug below — or override without touching source
+// via app.json `extra.versionManifestUrl`.
 export const VERSION_MANIFEST_URL =
-  'https://raw.githubusercontent.com/ash99999/filaha-flock/master/version.json';
+  'https://raw.githubusercontent.com/taaaha/filaha-flock/master/version.json';
 
 const CACHE_KEY = '@filaha:updateManifest';
 const CACHE_TS_KEY = '@filaha:updateManifestTs';
