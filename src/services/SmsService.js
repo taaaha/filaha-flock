@@ -3,11 +3,28 @@ import { DeviceEventEmitter, NativeModules, PermissionsAndroid, Platform } from 
 const { FilahaSms } = NativeModules || {};
 
 // JS expects this version. Bump in lockstep with NATIVE_VERSION in SmsPackage.java.
-export const EXPECTED_NATIVE_VERSION = 'v8-2026-05-17a';
+export const EXPECTED_NATIVE_VERSION = 'v9-2026-05-29a';
 
 export async function getNativeVersion() {
   if (!FilahaSms || !FilahaSms.getNativeVersion) return null;
   try { return await FilahaSms.getNativeVersion(); } catch (e) { return null; }
+}
+
+// Installed APK version info { versionName, versionCode, packageName }.
+// Used by the in-app updater to compare against the latest published build.
+export async function getAppVersionInfo() {
+  if (!FilahaSms || !FilahaSms.getAppVersionInfo) return null;
+  try { return await FilahaSms.getAppVersionInfo(); } catch (e) { return null; }
+}
+
+// Launches the system installer for a downloaded APK (content:// URI).
+// Returns 'OK' | 'NEEDS_PERMISSION' | null (native method unavailable).
+export async function installApk(contentUri) {
+  if (!FilahaSms || !FilahaSms.installApk) return null;
+  try { return await FilahaSms.installApk(String(contentUri || '')); } catch (e) {
+    if (__DEV__) console.warn('installApk failed:', e?.message);
+    return null;
+  }
 }
 
 // Route a tapped notification asked the app to open ('insights' | null).
@@ -23,6 +40,7 @@ export function listMissingNativeMethods() {
     'setAlertConfig', 'saveEmergencyContact', 'drainQueue',
     'getNativeVersion', 'scheduleDailyReminder', 'cancelDailyReminder',
     'startMonitoring', 'stopMonitoring', 'getPendingRoute',
+    'getAppVersionInfo', 'installApk',
   ];
   if (!FilahaSms) return required;
   return required.filter((k) => typeof FilahaSms[k] !== 'function');

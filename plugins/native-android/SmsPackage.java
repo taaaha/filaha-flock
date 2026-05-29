@@ -9,6 +9,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
@@ -27,12 +28,14 @@ import androidx.core.content.ContextCompat;
 
 import com.facebook.react.ReactPackage;
 import com.facebook.react.bridge.ActivityEventListener;
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.uimanager.ViewManager;
 
 import org.json.JSONObject;
@@ -116,11 +119,86 @@ public class SmsPackage implements ReactPackage {
 
         // Bump this string whenever native code changes so JS can detect
         // when the installed APK is older than the JS code expects.
-        private static final String NATIVE_VERSION = "v8-2026-05-17a";
+        private static final String NATIVE_VERSION = "v9-2026-05-29a";
 
         @ReactMethod
         public void getNativeVersion(Promise promise) {
             promise.resolve(NATIVE_VERSION);
+        }
+
+        // ── In-app update support ──────────────────────────────────────
+        // Returns the installed APK's versionName + versionCode so JS can
+        // compare against the latest published build (GitHub version.json).
+        @ReactMethod
+        public void getAppVersionInfo(Promise promise) {
+            try {
+                Context context = getReactApplicationContext();
+                PackageInfo info = context.getPackageManager()
+                        .getPackageInfo(context.getPackageName(), 0);
+                long code;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    code = info.getLongVersionCode();
+                } else {
+                    code = info.versionCode;
+                }
+                WritableMap map = Arguments.createMap();
+                map.putString("versionName", info.versionName);
+                map.putDouble("versionCode", (double) code);
+                map.putString("packageName", context.getPackageName());
+                promise.resolve(map);
+            } catch (Exception e) {
+                promise.reject("VERSION_INFO_ERROR", e.getMessage());
+            }
+        }
+
+        // Launches the system package installer for an already-downloaded APK.
+        // `contentUri` MUST be a content:// URI (from expo-file-system's
+        // getContentUriAsync) so the installer can read it across apps.
+        // Same package name + signing key ⇒ Android updates in place, with
+        // NO need to uninstall the previous version first.
+        // Resolves: "OK" (installer shown) | "NEEDS_PERMISSION" (the user was
+        // sent to enable "install unknown apps" and must retry afterwards).
+        @ReactMethod
+        public void installApk(String contentUri, Promise promise) {
+            try {
+                Context context = getReactApplicationContext();
+                if (contentUri == null || contentUri.isEmpty()) {
+                    promise.reject("INSTALL_ERROR", "Empty APK URI");
+                    return;
+                }
+                // Android O+ gates sideloaded installs behind a per-app toggle.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    boolean allowed = context.getPackageManager()
+                            .canRequestPackageInstalls();
+                    if (!allowed) {
+                        Intent settings = new Intent(
+                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:" + context.getPackageName()));
+                        settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        try {
+                            context.startActivity(settings);
+                        } catch (Exception ignored) {}
+                        promise.resolve("NEEDS_PERMISSION");
+                        return;
+                    }
+                }
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setDataAndType(Uri.parse(contentUri),
+                        "application/vnd.android.package-archive");
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                Activity activity = getCurrentActivity();
+                if (activity != null) {
+                    activity.startActivity(intent);
+                } else {
+                    context.startActivity(intent);
+                }
+                Log.i(TAG, "installApk: launched installer");
+                promise.resolve("OK");
+            } catch (Exception e) {
+                Log.e(TAG, "installApk failed", e);
+                promise.reject("INSTALL_ERROR", e.getMessage());
+            }
         }
 
         @ReactMethod

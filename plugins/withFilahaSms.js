@@ -20,6 +20,9 @@ const REQUIRED_PERMISSIONS = [
   'android.permission.FOREGROUND_SERVICE_DATA_SYNC',
   'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
   'android.permission.RECEIVE_BOOT_COMPLETED',
+  // Lets the app launch the system installer for a downloaded APK
+  // (in-app self-update). Same signature ⇒ in-place update, no uninstall.
+  'android.permission.REQUEST_INSTALL_PACKAGES',
 ];
 
 function ensurePermissions(manifest) {

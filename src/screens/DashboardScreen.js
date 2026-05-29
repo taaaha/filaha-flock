@@ -19,6 +19,7 @@ import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'reac
 import { TextInput } from 'react-native';
 import Icon from '../components/Icon';
 import { useApp } from '../contexts/AppContext';
+import { useUpdates } from '../contexts/UpdateContext';
 import { colors, STATUS, statusColor, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { deviceStatus, statusPriority } from '../utils/thresholds';
@@ -82,6 +83,7 @@ export default function DashboardScreen({ navigation }) {
   const [error, setError] = useState('');
   const [permIssue, setPermIssue] = useState(null);
   const [buildIssue, setBuildIssue] = useState(null);
+  const { checkNow: checkForUpdate } = useUpdates();
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -419,17 +421,21 @@ export default function DashboardScreen({ navigation }) {
 
       {/* ── Build issue banner (highest priority) ── */}
       {buildIssue ? (
-        <View style={styles.buildBanner}>
+        <Pressable
+          onPress={() => checkForUpdate({ silent: false })}
+          android_ripple={{ color: colors.danger + '22' }}
+          style={styles.buildBanner}
+          accessibilityRole="button"
+        >
           <Text style={styles.buildBannerIcon}>⚠️</Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.buildBannerTitle}>{t('apkOutOfDate')}</Text>
             <Text style={styles.buildBannerHint} numberOfLines={2}>
-              {buildIssue.kind === 'missing'
-                ? `missing: ${buildIssue.detail}`
-                : buildIssue.detail}
+              {t('updateTapToInstall')}
             </Text>
           </View>
-        </View>
+          <Icon name="chevronRight" size={18} color={colors.danger} strokeWidth={2.4} />
+        </Pressable>
       ) : null}
 
       {/* ── Permission banner ── */}

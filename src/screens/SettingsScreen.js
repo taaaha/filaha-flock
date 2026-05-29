@@ -25,6 +25,7 @@ import {
   sendSms,
 } from '../services/SmsService';
 import { makeDirectCall } from '../services/CallService';
+import { useUpdates } from '../contexts/UpdateContext';
 import Field from '../components/Field';
 import ToggleRow from '../components/ToggleRow';
 import ThresholdSlider from '../components/ThresholdSlider';
@@ -38,6 +39,16 @@ export default function SettingsScreen() {
     setLanguage, setTheme, updateSettings, updateThresholds, resetThresholds,
   } = useApp();
   const styles = useStyles(makeStyles);
+  const { installed, status: updateStatus, checkNow } = useUpdates();
+
+  const onCheckUpdates = async () => {
+    const result = await checkNow({ silent: false });
+    // When an update exists, the global UpdateHost surfaces the banner/modal.
+    // Only the "up to date" outcome needs an explicit acknowledgement here.
+    if (result && result.type === 'none') {
+      showToast(t('updateUpToDate'), 'success');
+    }
+  };
 
   const [farmerName, setFarmerName] = useState(settings.farmerName || '');
   const [farmName, setFarmName] = useState(settings.farmName || '');
@@ -564,8 +575,27 @@ export default function SettingsScreen() {
           onPress={onRequestBattery}
         />
 
+        <Text style={styles.sectionTitle}>{t('updatesSection')}</Text>
+        <View style={styles.updateRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.updateRowTitle}>{t('updateCurrentVersion')}</Text>
+            <Text style={styles.updateRowVersion}>
+              {installed?.versionName || '1.0.0'}
+              {installed?.versionCode ? `  (${installed.versionCode})` : ''}
+            </Text>
+          </View>
+          <PrimaryButton
+            title={updateStatus === 'checking' ? t('updateChecking') : t('updateCheck')}
+            onPress={onCheckUpdates}
+            loading={updateStatus === 'checking'}
+            variant="subtle"
+            icon="↻"
+            style={styles.updateCheckBtn}
+          />
+        </View>
+
         <Text style={styles.versionText}>
-          Filaha Flock • {t('version')} 1.0.0
+          Filaha Flock • {t('version')} {installed?.versionName || '1.0.0'}
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -827,6 +857,29 @@ const makeStyles = () => ({
   permBadgeOk: { backgroundColor: colors.ok + '22', borderColor: colors.ok + '55' },
   permBadgeBad: { backgroundColor: colors.danger + '22', borderColor: colors.danger + '55' },
   permBadgeText: { fontSize: 11, fontWeight: '800' },
+  updateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  updateRowTitle: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  updateRowVersion: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  updateCheckBtn: { minWidth: 130 },
   versionText: {
     color: colors.textTertiary,
     fontSize: 12,

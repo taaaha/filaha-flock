@@ -27,6 +27,8 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import InsightsScreen from './src/screens/InsightsScreen';
 import InsightDetailScreen from './src/screens/InsightDetailScreen';
 import ToastHost from './src/components/Toast';
+import UpdateHost from './src/components/UpdateHost';
+import { UpdateProvider } from './src/contexts/UpdateContext';
 import Icon from './src/components/Icon';
 import Tutorial, { shouldShowTutorial } from './src/components/Tutorial';
 import ErrorBoundary from './src/components/ErrorBoundary';
@@ -298,6 +300,7 @@ function RootNav() {
         t={t}
       />
       <ToastHost />
+      <UpdateHost />
     </NavigationContainer>
   );
 }
@@ -309,7 +312,9 @@ export default function App() {
         <SafeAreaProvider>
           <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
           <AppProvider>
-            <RootNav />
+            <UpdateProvider>
+              <RootNav />
+            </UpdateProvider>
           </AppProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

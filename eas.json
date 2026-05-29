@@ -17,6 +17,13 @@
       },
       "channel": "production"
     },
+    "production-apk": {
+      "extends": "production",
+      "channel": "production",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",

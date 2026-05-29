@@ -1,0 +1,118 @@
+name: Bump Version
+
+# Manually bump app.json's version + android.versionCode, commit to master,
+# and open a DRAFT GitHub Release for review.
+#
+# Why a draft? Releases created by the built-in GITHUB_TOKEN do NOT trigger
+# other workflows (GitHub's anti-recursion rule). Publishing the draft yourself
+# in the UI is a *human* action, so it DOES fire release-apk.yml — which builds
+# the signed APK, attaches it, and regenerates version.json.
+#
+# ── Flow ──────────────────────────────────────────────────────────────────
+#   1. Run this workflow (Actions → Bump Version → Run workflow).
+#      Pick patch / minor / major and optionally paste the changelog.
+#   2. It bumps app.json, commits to master, and drafts release v<version>.
+#   3. Open the draft release, review the notes, click **Publish release**.
+#   4. release-apk.yml takes over (build → attach APK → publish version.json).
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Which part of the version to bump"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+        required: true
+      notes:
+        description: "Release notes / changelog (becomes the release body → version.json notes)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bump-version
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Bump app.json
+        id: bump
+        env:
+          BUMP: ${{ github.event.inputs.bump }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const file = "app.json";
+            let s = fs.readFileSync(file, "utf8");
+            const bump = process.env.BUMP || "patch";
+
+            const verMatch = s.match(/"version":\s*"(\d+)\.(\d+)\.(\d+)"/);
+            if (!verMatch) { console.error("Could not find expo.version in app.json"); process.exit(1); }
+            let major = Number(verMatch[1]);
+            let minor = Number(verMatch[2]);
+            let patch = Number(verMatch[3]);
+            if (bump === "major") { major++; minor = 0; patch = 0; }
+            else if (bump === "minor") { minor++; patch = 0; }
+            else { patch++; }
+            const newVersion = major + "." + minor + "." + patch;
+
+            const codeMatch = s.match(/"versionCode":\s*(\d+)/);
+            if (!codeMatch) { console.error("Could not find android.versionCode in app.json"); process.exit(1); }
+            const newCode = Number(codeMatch[1]) + 1;
+
+            s = s.replace(/("version":\s*")\d+\.\d+\.\d+(")/, "$1" + newVersion + "$2");
+            s = s.replace(/("versionCode":\s*)\d+/, "$1" + newCode);
+            fs.writeFileSync(file, s);
+
+            const out = process.env.GITHUB_OUTPUT;
+            fs.appendFileSync(out, "version=" + newVersion + "\n");
+            fs.appendFileSync(out, "code=" + newCode + "\n");
+            fs.appendFileSync(out, "tag=v" + newVersion + "\n");
+            console.log("Bumped to " + newVersion + " (versionCode " + newCode + ")");
+          '
+
+      - name: Commit bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app.json
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.tag }} (versionCode ${{ steps.bump.outputs.code }})"
+          git push origin master
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ github.event.inputs.notes }}
+        run: |
+          BODY="$NOTES"
+          if [ -z "$BODY" ]; then BODY="• Performance and stability improvements"; fi
+          gh release create "${{ steps.bump.outputs.tag }}" \
+            --draft \
+            --title "${{ steps.bump.outputs.tag }}" \
+            --notes "$BODY" \
+            --target master
+
+      - name: Summary
+        run: |
+          {
+            echo "### Version bumped to ${{ steps.bump.outputs.tag }} 🎉"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| versionName | ${{ steps.bump.outputs.version }} |"
+            echo "| versionCode | ${{ steps.bump.outputs.code }} |"
+            echo ""
+            echo "A **draft release** \`${{ steps.bump.outputs.tag }}\` was created."
+            echo ""
+            echo "**Next step:** open Releases → \`${{ steps.bump.outputs.tag }}\` → review the notes → **Publish release**."
+            echo "Publishing triggers \`release-apk.yml\` (build signed APK → attach → regenerate \`version.json\`)."
+          } >> "$GITHUB_STEP_SUMMARY"

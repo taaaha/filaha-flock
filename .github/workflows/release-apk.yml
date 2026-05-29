@@ -1,0 +1,123 @@
+name: Release APK
+
+# On publishing a GitHub Release, this:
+#   1. builds a signed APK on EAS (same keystore every time → in-place update),
+#   2. attaches the APK to the release,
+#   3. regenerates version.json from app.json, and
+#   4. commits version.json back to master.
+# The in-app updater then offers the new build to every user automatically.
+#
+# ── Release procedure (single source of truth = app.json) ────────────────
+#   1. Bump  expo.version          (e.g. "1.0.1")  ← OTA runtimeVersion
+#      and   expo.android.versionCode (e.g. 2)     ← updater compares this
+#   2. Commit + push to master
+#   3. Create a GitHub Release with tag  v<version>  (e.g. v1.0.1).
+#      Put the changelog in the release body — it becomes version.json notes.
+#
+# Required repo secret:
+#   EXPO_TOKEN — Expo access token with build permissions.
+# GITHUB_TOKEN is provided automatically (needs contents: write, set below).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-apk
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Read app version
+        id: ver
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          CODE=$(node -p "require('./app.json').expo.android.versionCode")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "apk=filaha-flock-$VERSION.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          if [ -z "$TAG" ]; then TAG="v${{ steps.ver.outputs.version }}"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK on EAS
+        id: build
+        run: |
+          eas build --platform android --profile production-apk --non-interactive --wait --json > build.json
+          URL=$(jq -r '.[0].artifacts.applicationArchiveUrl // .[0].artifacts.buildUrl' build.json)
+          if [ -z "$URL" ] || [ "$URL" = "null" ]; then
+            echo "Could not resolve APK artifact URL from EAS output:"; cat build.json; exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Download APK
+        run: |
+          curl -fL -o "${{ steps.ver.outputs.apk }}" "${{ steps.build.outputs.url }}"
+          ls -lh "${{ steps.ver.outputs.apk }}"
+
+      - name: Attach APK to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ steps.tag.outputs.tag }}" "${{ steps.ver.outputs.apk }}" --clobber
+
+      - name: Generate version.json
+        env:
+          NOTES: ${{ github.event.release.body }}
+          CODE: ${{ steps.ver.outputs.code }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          APK_URL: https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/${{ steps.ver.outputs.apk }}
+        run: |
+          export SIZE=$(stat -c%s "${{ steps.ver.outputs.apk }}")
+          node -e '
+            const fs = require("fs");
+            const notes = (process.env.NOTES || "").trim()
+              || "• Performance and stability improvements";
+            const out = {
+              versionCode: Number(process.env.CODE),
+              versionName: process.env.VERSION,
+              apkUrl: process.env.APK_URL,
+              mandatory: false,
+              minSupportedVersionCode: 1,
+              sizeBytes: Number(process.env.SIZE),
+              publishedAt: new Date().toISOString().slice(0, 10),
+              // Same text for all locales — localize by editing version.json.
+              notes: { ar: notes, fr: notes, en: notes },
+            };
+            fs.writeFileSync("version.json", JSON.stringify(out, null, 2) + "\n");
+            console.log(fs.readFileSync("version.json", "utf8"));
+          '
+
+      - name: Commit version.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.json
+          git commit -m "chore: publish version.json for ${{ steps.tag.outputs.tag }}" || { echo "version.json unchanged"; exit 0; }
+          git push origin master

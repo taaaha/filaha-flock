@@ -1,0 +1,57 @@
+name: OTA Update (expo-updates)
+
+# Publishes a JS-only over-the-air update to the "production" channel.
+# Users receive it on next launch — no APK, no reinstall.
+#
+# Use this for changes that DON'T touch native code, permissions, or the
+# native parts of app.json. For native changes, cut a new APK release
+# instead (see release-apk.yml) — an OTA can't carry native code.
+#
+# Required repo secret:
+#   EXPO_TOKEN — an Expo access token (expo.dev → Account → Access tokens).
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "Update message (shown in the EAS dashboard)"
+        required: false
+        default: "OTA update"
+  # Auto-publish on JS-only pushes to master. Native dirs are intentionally
+  # excluded so an accidental native change can't ship without an APK build.
+  push:
+    branches: [master]
+    paths:
+      - "src/**"
+      - "App.js"
+      - "index.js"
+      - "assets/**"
+
+concurrency:
+  group: ota-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish OTA update
+        run: |
+          MSG="${{ github.event.inputs.message }}"
+          if [ -z "$MSG" ]; then MSG="${{ github.event.head_commit.message }}"; fi
+          eas update --branch production --message "$MSG" --non-interactive
