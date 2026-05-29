@@ -2,7 +2,7 @@
   "expo": {
     "name": "Filaha Flock",
     "slug": "filaha-monitor",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "runtimeVersion": { "policy": "appVersion" },
     "updates": {
       "url": "https://u.expo.dev/19541610-9acc-4823-b1b6-69108e461fca",
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.filaha",
-      "versionCode": 1,
+      "versionCode": 2,
       "userInterfaceStyle": "automatic",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
