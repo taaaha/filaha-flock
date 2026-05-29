@@ -69,6 +69,11 @@ jobs:
 
       - name: Build APK on EAS
         id: build
+        # EAS_NO_VCS=1 stops eas-cli from shelling out to git (avoids the CI
+        # "git exit 128" on detached-HEAD/shallow checkouts); it archives the
+        # working directory directly instead.
+        env:
+          EAS_NO_VCS: "1"
         run: |
           eas build --platform android --profile production-apk --non-interactive --wait --json > build.json
           URL=$(jq -r '.[0].artifacts.applicationArchiveUrl // .[0].artifacts.buildUrl' build.json)
