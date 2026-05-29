@@ -333,3 +333,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
+// NOTE: editing this file — or anything under src/**, index.js, or assets/** —
+// on `master` triggers .github/workflows/ota-update.yml, which publishes a
+// JS-only over-the-air update to the `production` channel. See RELEASE.md.
