@@ -116,3 +116,5 @@ jobs:
             echo "**Next step:** open Releases → \`${{ steps.bump.outputs.tag }}\` → review the notes → **Publish release**."
             echo "Publishing triggers \`release-apk.yml\` (build signed APK → attach → regenerate \`version.json\`)."
           } >> "$GITHUB_STEP_SUMMARY"
+
+# No push/PR trigger by design — run this from Actions → Bump Version → Run workflow.
