@@ -312,6 +312,9 @@ export default function App() {
         <SafeAreaProvider>
           <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
           <AppProvider>
+            {/* UpdateProvider is nested inside AppProvider because it reads
+                useApp() (ready / onboardingDone / language) to gate and
+                localize its update checks. */}
             <UpdateProvider>
               <RootNav />
             </UpdateProvider>
