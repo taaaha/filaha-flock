@@ -1,82 +1,107 @@
 import { useEffect, useState } from 'react';
 
 // ── Theme palettes ─────────────────────────────────────────────────────
+// "Warm Agricultural Daylight" — the app should feel like morning sun on a
+// farm, not a crypto dashboard. Light is the home theme (farmers open it in
+// daylight); dark is a warm "night barn" charcoal, never cold slate-navy.
+//
+// Brand is a deep organic LEAF green. Status hues are warmed toward nature:
+// terracotta danger, honey warn, vital-leaf ok, taupe offline. Sensor accents
+// are softened so the 2×2 tile grid reads calm, not neon.
+
+// ── DARK — "Night Barn" (warm charcoal, lantern-lit) ───────────────────
 const DARK = {
-  // Backgrounds
-  bg: '#070b14',
-  bgElevated: '#0d1322',
-  card: '#11182a',
-  cardElevated: '#1a2238',
-  cardHover: '#1f293f',
+  // Backgrounds — warm soil-black, layered
+  bg: '#1b1714',
+  bgElevated: '#241f19',
+  card: '#272019',
+  cardElevated: '#322a20',
+  cardHover: '#3c3227',
 
-  // Borders
-  border: '#1e2a44',
-  borderLight: '#2a3a58',
-  borderStrong: '#36476b',
+  // Borders — warm, low-contrast
+  border: '#3a3228',
+  borderLight: '#4c4133',
+  borderStrong: '#5f5240',
 
-  // Brand — agricultural green (distinct from the emerald "ok" status)
-  accent: '#22c55e',
-  accentSoft: '#4ade80',
-  accentGlow: '#22c55e80',
+  // Brand — leaf green (brighter so it lifts off the warm dark)
+  accent: '#5fb874',
+  accentSoft: '#7ccb8d',
+  accentGlow: '#5fb87440',
 
-  // Status
-  ok: '#10b981',
-  okSoft: '#34d399',
-  warn: '#f59e0b',
-  warnSoft: '#fbbf24',
-  danger: '#ef4444',
-  dangerSoft: '#f87171',
-  offline: '#64748b',
-  power: '#f97316',
+  // Status — warmed
+  ok: '#6cbf72',
+  okSoft: '#86d28a',
+  warn: '#e0a44e',
+  warnSoft: '#edbd6f',
+  danger: '#e0654a',
+  dangerSoft: '#ec8266',
+  offline: '#8a8073',
+  power: '#e08a4a',
 
-  // Text
-  textPrimary: '#f8fafc',
-  textSecondary: '#94a3b8',
-  textTertiary: '#64748b',
-  textDim: '#475569',
+  // Text — warm off-white, taupe greys
+  textPrimary: '#f3ece0',
+  textSecondary: '#b6ab98',
+  textTertiary: '#8a8073',
+  textDim: '#5e5446',
 
-  // Sensor accents
-  co2: '#60a5fa',
-  nh3: '#a78bfa',
-  temp: '#fb923c',
-  hum: '#22d3ee',
-  battery: '#facc15',
+  // Sensor accents — softened
+  co2: '#7aa3d8',
+  nh3: '#b79ad6',
+  temp: '#e89262',
+  hum: '#5fb8bf',
+  battery: '#e0bb55',
+
+  // Secondary decorative accent — harvest amber (use sparingly; never for UI
+  // that competes with the amber `warn` status)
+  harvest: '#e0a44e',
+  harvestSoft: '#edbd6f',
 };
 
+// ── LIGHT — "Warm Agricultural Daylight" (cream paper, leaf green) ──────
 const LIGHT = {
-  bg: '#f5f7fb',
-  bgElevated: '#ffffff',
-  card: '#ffffff',
-  cardElevated: '#f1f5f9',
-  cardHover: '#e2e8f0',
+  // Backgrounds — warm paper/cream; cards sit a touch lighter so they lift
+  bg: '#faf7f0',
+  bgElevated: '#fffdfa',
+  card: '#fffefb',
+  cardElevated: '#f4eee2',   // warm sand — recessed tiles inside white cards
+  cardHover: '#ece4d4',
 
-  border: '#e2e8f0',
-  borderLight: '#cbd5e1',
-  borderStrong: '#94a3b8',
+  // Borders — warm sand, soft
+  border: '#e8e0d0',
+  borderLight: '#d9cdb8',
+  borderStrong: '#c3b598',
 
-  accent: '#16a34a',
-  accentSoft: '#22c55e',
-  accentGlow: '#16a34a40',
+  // Brand — deep leaf green
+  accent: '#3f7d4f',
+  accentSoft: '#5a9968',
+  accentGlow: '#3f7d4f33',
 
-  ok: '#059669',
-  okSoft: '#10b981',
-  warn: '#d97706',
-  warnSoft: '#f59e0b',
-  danger: '#dc2626',
-  dangerSoft: '#ef4444',
-  offline: '#64748b',
-  power: '#ea580c',
+  // Status — natural/earthy
+  ok: '#5a8f4d',
+  okSoft: '#74a85f',
+  warn: '#cf9322',
+  warnSoft: '#e0a838',
+  danger: '#c0533a',
+  dangerSoft: '#d27259',
+  offline: '#9c9183',
+  power: '#cf7426',
 
-  textPrimary: '#0f172a',
-  textSecondary: '#475569',
-  textTertiary: '#64748b',
-  textDim: '#94a3b8',
+  // Text — warm charcoal, never slate
+  textPrimary: '#2a2420',
+  textSecondary: '#6b6253',
+  textTertiary: '#938977',
+  textDim: '#b9af9d',
 
-  co2: '#2563eb',
-  nh3: '#7c3aed',
-  temp: '#ea580c',
-  hum: '#0891b2',
-  battery: '#ca8a04',
+  // Sensor accents — softened, distinguishable
+  co2: '#5b86c4',
+  nh3: '#9b7fc0',
+  temp: '#d97a45',
+  hum: '#3f9aa3',
+  battery: '#bd9633',
+
+  // Secondary decorative accent — harvest amber
+  harvest: '#cf8a3a',
+  harvestSoft: '#e0a45c',
 };
 
 // ── Theme state ────────────────────────────────────────────────────────
@@ -90,6 +115,11 @@ const listeners = new Set();
 export const colors = { ...LIGHT };
 
 export function getActiveTheme() { return activeMode; }
+
+// Convenience for StatusBar / native chrome decisions. Screens used to compare
+// `colors.bg === '#070b14'` against a hardcoded hex — brittle and now wrong.
+export function isDark() { return activeMode === 'dark'; }
+export function barStyle() { return activeMode === 'dark' ? 'light-content' : 'dark-content'; }
 
 export function setActiveTheme(mode) {
   if (mode !== 'dark' && mode !== 'light') return;
@@ -131,35 +161,39 @@ export function statusColor(status) {
 // Clean & minimal: barely-there elevation, no neon glow. A calm surface
 // reads as "premium" — heavy shadows/glows read as amateur. Editing these
 // presets centrally calms every card in the app at once.
+// Warm, earthy shadow — a soft brown cast on the cream surface reads natural,
+// where a pure-black drop reads digital/cold. Kept low-opacity and calm: a
+// premium surface whispers its elevation. Editing these calms every card at once.
+const WARM_SHADOW = '#3a2c1a';
 export const shadows = {
   sm: {
-    shadowColor: '#000',
+    shadowColor: WARM_SHADOW,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.07,
     shadowRadius: 3,
     elevation: 1,
   },
-  lg: {
-    shadowColor: '#000',
+  md: {
+    shadowColor: WARM_SHADOW,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 2,
   },
-  // Intentionally NOT a glow anymore — same calm shadow as `sm`. Status is
-  // communicated by color/borders, never by a neon halo.
+  lg: {
+    shadowColor: WARM_SHADOW,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  // Intentionally NOT a glow — a calm soft shadow. Status is communicated by
+  // color/borders, never by a neon halo.
   glow: () => ({
-    shadowColor: '#000',
+    shadowColor: WARM_SHADOW,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.07,
+    shadowRadius: 3,
     elevation: 1,
   }),
 };

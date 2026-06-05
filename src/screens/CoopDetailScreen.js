@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
-import { colors, STATUS, statusColor } from '../utils/colors';
+import { colors, STATUS, statusColor, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { deviceStatus } from '../utils/thresholds';
 import { isToday, formatRelativeTime, formatTime } from '../utils/formatters';
@@ -96,7 +96,7 @@ export default function CoopDetailScreen({ route, navigation }) {
   if (!device) {
     return (
       <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+        <StatusBar barStyle={barStyle()} backgroundColor={colors.bg} />
         <View style={styles.header}>
           <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Icon name="chevronLeft" size={26} color={colors.textPrimary} />
@@ -179,12 +179,12 @@ export default function CoopDetailScreen({ route, navigation }) {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+      <StatusBar barStyle={barStyle()} backgroundColor={colors.bg} />
       <View style={styles.header}>
         <Pressable
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
-          android_ripple={{ color: '#1a2235', borderless: true }}
+          android_ripple={{ color: colors.textPrimary + '10', borderless: true }}
         >
           <Icon name="chevronLeft" size={26} color={colors.textPrimary} />
         </Pressable>

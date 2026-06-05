@@ -7,7 +7,7 @@ const PALETTES = {
   primary: { bg: colors.accent, fg: '#ffffff', glow: colors.accent },
   danger:  { bg: colors.danger, fg: '#ffffff', glow: colors.danger },
   success: { bg: colors.ok,     fg: '#ffffff', glow: colors.ok },
-  warn:    { bg: colors.warn,   fg: '#0a0f1e', glow: colors.warn },
+  warn:    { bg: colors.warn,   fg: '#2a1c0a', glow: colors.warn },
   ghost:   { bg: 'transparent', fg: colors.accent, border: colors.accent + '60' },
   subtle:  { bg: colors.card,   fg: colors.textPrimary, border: colors.border },
 };

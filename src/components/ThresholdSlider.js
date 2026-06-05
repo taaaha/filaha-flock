@@ -152,7 +152,7 @@ const makeStyles = () => ({
   sectionLabel: {
     color: colors.textTertiary,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     marginTop: 6,
     marginBottom: 2,
   },

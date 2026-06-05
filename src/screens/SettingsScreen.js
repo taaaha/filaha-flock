@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
-import { colors, useTheme } from '../utils/colors';
+import { colors, useTheme, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import Icon from '../components/Icon';
 import { WilayaPicker } from '../components/GuideExtras';
@@ -226,7 +226,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+      <StatusBar barStyle={barStyle()} backgroundColor={colors.bg} />
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
@@ -329,9 +329,9 @@ export default function SettingsScreen() {
             android_ripple={{ color: colors.accent + '22' }}
             style={[styles.themeBtn, theme === 'dark' && styles.themeBtnActive]}
           >
-            <View style={[styles.themePreview, { backgroundColor: '#070b14', borderColor: '#1e2a44' }]}>
-              <View style={[styles.themePreviewBar, { backgroundColor: '#3b82f6' }]} />
-              <View style={[styles.themePreviewCard, { backgroundColor: '#11182a' }]} />
+            <View style={[styles.themePreview, { backgroundColor: '#1b1714', borderColor: '#3a3228' }]}>
+              <View style={[styles.themePreviewBar, { backgroundColor: '#5fb874' }]} />
+              <View style={[styles.themePreviewCard, { backgroundColor: '#272019' }]} />
             </View>
             <View style={styles.themeBtnLabelRow}>
               <Icon name="moon" size={16} color={theme === 'dark' ? colors.accent : colors.textSecondary} />
@@ -345,9 +345,9 @@ export default function SettingsScreen() {
             android_ripple={{ color: colors.accent + '22' }}
             style={[styles.themeBtn, theme === 'light' && styles.themeBtnActive]}
           >
-            <View style={[styles.themePreview, { backgroundColor: '#f5f7fb', borderColor: '#e2e8f0' }]}>
-              <View style={[styles.themePreviewBar, { backgroundColor: '#2563eb' }]} />
-              <View style={[styles.themePreviewCard, { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0' }]} />
+            <View style={[styles.themePreview, { backgroundColor: '#faf7f0', borderColor: '#e8e0d0' }]}>
+              <View style={[styles.themePreviewBar, { backgroundColor: '#3f7d4f' }]} />
+              <View style={[styles.themePreviewCard, { backgroundColor: '#fffefb', borderWidth: 1, borderColor: '#e8e0d0' }]} />
             </View>
             <View style={styles.themeBtnLabelRow}>
               <Icon name="sun" size={16} color={theme === 'light' ? colors.accent : colors.textSecondary} />
@@ -608,7 +608,7 @@ function PermissionRow({ label, granted, grantedLabel, deniedLabel, hint, onPres
   return (
     <Pressable
       onPress={onPress}
-      android_ripple={{ color: '#1a2235' }}
+      android_ripple={{ color: colors.textPrimary + '10' }}
       style={[styles.permRow, isGranted && styles.permRowOk]}
     >
       <View style={{ flex: 1 }}>
@@ -635,7 +635,7 @@ const makeStyles = () => ({
   screenTitle: {
     color: colors.textPrimary,
     fontSize: 26,
-    fontWeight: '900',
+    fontWeight: '800',
     marginBottom: 18,
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
@@ -649,7 +649,7 @@ const makeStyles = () => ({
   sectionTitle: {
     color: colors.accent,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
     marginTop: 24,
     marginBottom: 12,
     borderStartWidth: 3,
@@ -767,7 +767,7 @@ const makeStyles = () => ({
   },
   langText: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
   langTextActive: { color: colors.accent, fontWeight: '800' },
-  langCheck: { color: colors.accent, fontSize: 18, fontWeight: '900' },
+  langCheck: { color: colors.accent, fontSize: 18, fontWeight: '800' },
 
   themeRow: {
     flexDirection: 'row',
@@ -876,7 +876,7 @@ const makeStyles = () => ({
   updateRowVersion: {
     color: colors.textPrimary,
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '800',
     marginTop: 2,
   },
   updateCheckBtn: { minWidth: 130 },

@@ -31,7 +31,7 @@ function AlertItem({ alert, onPress, t, now }) {
   return (
     <Pressable
       onPress={onPress}
-      android_ripple={{ color: '#1a2235' }}
+      android_ripple={{ color: colors.textPrimary + '10' }}
       style={[
         styles.item,
         alert.acknowledged && { opacity: 0.55 },

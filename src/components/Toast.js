@@ -14,7 +14,7 @@ const PALETTES = {
   success: { bg: colors.ok,     fg: '#fff',     icon: '✓' },
   error:   { bg: colors.danger, fg: '#fff',     icon: '✕' },
   info:    { bg: colors.accent, fg: '#fff',     icon: 'ℹ' },
-  warn:    { bg: colors.warn,   fg: '#0a0f1e',  icon: '⚠' },
+  warn:    { bg: colors.warn,   fg: '#2a1c0a',  icon: '⚠' },
 };
 
 export default function ToastHost() {
@@ -110,6 +110,6 @@ const makeStyles = () => ({
     backgroundColor: 'rgba(255,255,255,0.22)',
     alignItems: 'center', justifyContent: 'center',
   },
-  icon: { fontSize: 15, fontWeight: '900' },
+  icon: { fontSize: 15, fontWeight: '800' },
   message: { fontSize: 14, fontWeight: '700', flex: 1 },
 });

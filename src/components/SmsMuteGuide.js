@@ -81,7 +81,7 @@ export default function SmsMuteGuide({ visible, t, onClose, onAck }) {
 const makeStyles = () => ({
   backdrop: {
     flex: 1,
-    backgroundColor: '#00000099',
+    backgroundColor: '#231a0f99',
     justifyContent: 'flex-end',
   },
   card: {
@@ -139,7 +139,7 @@ const makeStyles = () => ({
   stepNumText: {
     color: '#fff',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   stepText: {
     flex: 1,

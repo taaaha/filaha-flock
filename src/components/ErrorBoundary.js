@@ -30,29 +30,29 @@ export default class ErrorBoundary extends React.Component {
     const { error, info } = this.state;
     return (
       <View style={{
-        flex: 1, backgroundColor: '#0a0f1e',
+        flex: 1, backgroundColor: '#1b1714',
         padding: 20, paddingTop: 60,
       }}>
         <Text style={{
-          color: '#ef4444', fontSize: 22, fontWeight: '900', marginBottom: 8,
+          color: '#e0654a', fontSize: 22, fontWeight: '800', marginBottom: 8,
         }}>
           ⚠ Filaha Flock crashed
         </Text>
         <Text style={{
-          color: '#94a3b8', fontSize: 13, marginBottom: 16,
+          color: '#b6ab98', fontSize: 13, marginBottom: 16,
         }}>
           Please screenshot this entire screen and send it to the developer.
         </Text>
 
         <View style={{
-          backgroundColor: '#1a2238', padding: 12, borderRadius: 8, marginBottom: 12,
-          borderWidth: 1, borderColor: '#ef4444',
+          backgroundColor: '#272019', padding: 12, borderRadius: 10, marginBottom: 12,
+          borderWidth: 1, borderColor: '#e0654a',
         }}>
-          <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800', marginBottom: 4 }}>
+          <Text style={{ color: '#e0a44e', fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 4 }}>
             ERROR MESSAGE
           </Text>
           <Text selectable style={{
-            color: '#f87171', fontSize: 13, fontWeight: '700',
+            color: '#ec8266', fontSize: 13, fontWeight: '600',
             fontFamily: 'monospace',
           }}>
             {String(error?.message || error)}
@@ -60,26 +60,26 @@ export default class ErrorBoundary extends React.Component {
         </View>
 
         <Text style={{
-          color: '#fbbf24', fontSize: 11, fontWeight: '800', marginBottom: 4,
+          color: '#e0a44e', fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 4,
         }}>
           STACK TRACE
         </Text>
         <ScrollView style={{
-          flex: 1, backgroundColor: '#11182a', padding: 12, borderRadius: 8,
-          borderWidth: 1, borderColor: '#1e2a44',
+          flex: 1, backgroundColor: '#241f19', padding: 12, borderRadius: 10,
+          borderWidth: 1, borderColor: '#3a3228',
         }}>
           <Text selectable style={{
-            color: '#94a3b8', fontSize: 11, fontFamily: 'monospace',
+            color: '#b6ab98', fontSize: 11, fontFamily: 'monospace',
           }}>
             {String(error?.stack || 'no stack')}
           </Text>
           {info?.componentStack ? (
             <>
-              <Text style={{ color: '#fbbf24', fontSize: 11, fontWeight: '800', marginTop: 16, marginBottom: 4 }}>
+              <Text style={{ color: '#e0a44e', fontSize: 11, fontWeight: '700', letterSpacing: 1, marginTop: 16, marginBottom: 4 }}>
                 COMPONENT STACK
               </Text>
               <Text selectable style={{
-                color: '#94a3b8', fontSize: 11, fontFamily: 'monospace',
+                color: '#b6ab98', fontSize: 11, fontFamily: 'monospace',
               }}>
                 {info.componentStack}
               </Text>
@@ -91,10 +91,10 @@ export default class ErrorBoundary extends React.Component {
           onPress={this.reset}
           style={{
             marginTop: 16, padding: 14,
-            backgroundColor: '#3b82f6', borderRadius: 10, alignItems: 'center',
+            backgroundColor: '#5fb874', borderRadius: 12, alignItems: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>
+          <Text style={{ color: '#1b1714', fontWeight: '800', fontSize: 14 }}>
             Try again
           </Text>
         </Pressable>

@@ -266,7 +266,7 @@ export const TOPICS = [
   {
     id: 'vaccination',
     icon: 'shield',
-    color: '#10b981',
+    color: '#5a8f4d',
     titleKey: 'topicVaccination',
     summary: {
       ar: 'برنامج التلقيح المعتاد للدجاج اللاحم في الجزائر',
@@ -303,7 +303,7 @@ export const TOPICS = [
   {
     id: 'health',
     icon: 'heart',
-    color: '#ef4444',
+    color: '#c0533a',
     titleKey: 'topicHealth',
     summary: {
       ar: 'علامات المرض المبكرة وكيفية الوقاية',
@@ -340,7 +340,7 @@ export const TOPICS = [
   {
     id: 'summer',
     icon: 'sun',
-    color: '#f59e0b',
+    color: '#cf9322',
     titleKey: 'topicSummer',
     summary: {
       ar: 'حرّ الصيف خطر على الدجاج — تعرّف كيف تحميه',

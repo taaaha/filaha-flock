@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApp } from '../contexts/AppContext';
-import { colors, shadows } from '../utils/colors';
+import { colors, shadows, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { DAILY_TASKS as BUNDLED_TASKS, AGE_PHASES as BUNDLED_PHASES, TOPICS as BUNDLED_TOPICS } from '../utils/guideContent';
 import { getRemoteContent, applyRemote } from '../services/RemoteContent';
@@ -37,11 +37,11 @@ function pickLang(obj, lang) {
 }
 
 const TABS = [
-  { id: 'today',    icon: 'checkCircle', color: '#10b981' },
+  { id: 'today',    icon: 'checkCircle', color: '#5a8f4d' },
   { id: 'phases',   icon: 'clock',       color: '#fb923c' },
-  { id: 'tools',    icon: 'target',      color: '#3b82f6' },
-  { id: 'health',   icon: 'heart',       color: '#ef4444' },
-  { id: 'market',   icon: 'feather',     color: '#f59e0b' },
+  { id: 'tools',    icon: 'target',      color: '#3f7d4f' },
+  { id: 'health',   icon: 'heart',       color: '#c0533a' },
+  { id: 'market',   icon: 'feather',     color: '#cf9322' },
   { id: 'topics',   icon: 'book',        color: '#a78bfa' },
 ];
 
@@ -135,7 +135,7 @@ export default function GuideScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+      <StatusBar barStyle={barStyle()} backgroundColor={colors.bg} />
 
       {/* ── Header ── */}
       <View style={styles.header}>
@@ -481,7 +481,7 @@ const makeStyles = () => ({
     borderWidth: 1, borderColor: colors.accent + '40',
     alignItems: 'center', justifyContent: 'center',
   },
-  title: { color: colors.textPrimary, fontSize: 20, fontWeight: '900', letterSpacing: 0.2 },
+  title: { color: colors.textPrimary, fontSize: 20, fontWeight: '800', letterSpacing: 0.2 },
   subtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 3, lineHeight: 17 },
 
   // 2 rows × 3 cards. Fixed size — never changes on selection.
@@ -522,7 +522,7 @@ const makeStyles = () => ({
     ...shadows.sm,
   },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '900' },
+  sectionTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '800' },
   sectionHint: { color: colors.textTertiary, fontSize: 12, marginBottom: 12, lineHeight: 17 },
   progressText: { color: colors.ok, fontSize: 13, fontWeight: '800' },
   progressBar: { height: 5, backgroundColor: colors.bgElevated, borderRadius: 3, overflow: 'hidden', marginBottom: 12 },
@@ -579,7 +579,7 @@ const makeStyles = () => ({
   phaseDot: { width: 8, height: 8, borderRadius: 4, marginBottom: 6 },
   phaseRange: { color: colors.textTertiary, fontSize: 10, fontWeight: '800', letterSpacing: 0.6, marginBottom: 4 },
   phaseTitle: { color: colors.textPrimary, fontSize: 12, fontWeight: '800', textAlign: 'center', marginBottom: 6 },
-  phaseTemp: { fontSize: 14, fontWeight: '900' },
+  phaseTemp: { fontSize: 14, fontWeight: '800' },
 
   calcCard: {
     backgroundColor: colors.card,
@@ -606,7 +606,7 @@ const makeStyles = () => ({
 });
 
 const makeModalStyles = () => ({
-  backdrop: { flex: 1, backgroundColor: '#000000cc', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: '#231a0fcc', justifyContent: 'flex-end' },
   card: {
     backgroundColor: colors.bgElevated,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
@@ -619,8 +619,8 @@ const makeModalStyles = () => ({
     paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 14,
   },
   headIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  headTitle: { flex: 1, color: colors.textPrimary, fontSize: 17, fontWeight: '900' },
-  headSub: { fontSize: 12, fontWeight: '700', marginTop: 2 },
+  headTitle: { flex: 1, color: colors.textPrimary, fontSize: 17, fontWeight: '800' },
+  headSub: { fontSize: 12, fontWeight: '600', marginTop: 2 },
   closeBtn: {
     width: 34, height: 34, borderRadius: 17,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
@@ -628,7 +628,7 @@ const makeModalStyles = () => ({
   },
   summary: { color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginBottom: 16 },
   sectionBlock: { marginBottom: 16 },
-  sectionH: { color: colors.accentSoft, fontSize: 13, fontWeight: '900', marginBottom: 6 },
+  sectionH: { color: colors.accentSoft, fontSize: 13, fontWeight: '800', marginBottom: 6 },
   sectionB: { color: colors.textPrimary, fontSize: 14, lineHeight: 22 },
   point: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
   pointDot: { width: 6, height: 6, borderRadius: 3, marginTop: 8 },

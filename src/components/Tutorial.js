@@ -16,19 +16,19 @@ export function shouldShowTutorial() {
 const STEPS = [
   {
     icon: 'home',
-    color: '#3b82f6',
+    color: '#3f7d4f',
     titleKey: 'tutStep1Title',
     bodyKey: 'tutStep1Body',
   },
   {
     icon: 'plus',
-    color: '#10b981',
+    color: '#5a8f4d',
     titleKey: 'tutStep2Title',
     bodyKey: 'tutStep2Body',
   },
   {
     icon: 'phone',
-    color: '#ef4444',
+    color: '#c0533a',
     titleKey: 'tutStep3Title',
     bodyKey: 'tutStep3Body',
   },
@@ -40,7 +40,7 @@ const STEPS = [
   },
   {
     icon: 'bell',
-    color: '#f59e0b',
+    color: '#cf9322',
     titleKey: 'tutStep5Title',
     bodyKey: 'tutStep5Body',
   },
@@ -143,7 +143,7 @@ const makeStyles = () => ({
   title: {
     color: colors.textPrimary,
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: 12,
     letterSpacing: 0.2,
@@ -196,7 +196,7 @@ const makeStyles = () => ({
   nextText: {
     color: '#fff',
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: 0.3,
   },
 });

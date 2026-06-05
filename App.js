@@ -32,7 +32,7 @@ import { UpdateProvider } from './src/contexts/UpdateContext';
 import Icon from './src/components/Icon';
 import Tutorial, { shouldShowTutorial } from './src/components/Tutorial';
 import ErrorBoundary from './src/components/ErrorBoundary';
-import { useTheme } from './src/utils/colors';
+import { useTheme, barStyle } from './src/utils/colors';
 import { colors } from './src/utils/colors';
 import { getPendingRoute } from './src/services/SmsService';
 
@@ -310,7 +310,7 @@ export default function App() {
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
         <SafeAreaProvider>
-          <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+          <StatusBar barStyle={barStyle()} backgroundColor={colors.bg} />
           <AppProvider>
             {/* UpdateProvider is nested inside AppProvider because it reads
                 useApp() (ready / onboardingDone / language) to gate and

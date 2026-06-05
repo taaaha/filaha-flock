@@ -117,6 +117,6 @@ const makeStyles = () => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  number: { fontWeight: '900' },
-  check:  { fontWeight: '900', lineHeight: undefined },
+  number: { fontWeight: '800' },
+  check:  { fontWeight: '800', lineHeight: undefined },
 });

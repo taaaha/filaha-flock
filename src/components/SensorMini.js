@@ -36,32 +36,34 @@ function SensorMini({ sensorKey, value, label, thresholds }) {
 const makeStyles = () => ({
   tile: {
     flex: 1,
-    minHeight: 84,
-    backgroundColor: colors.bgElevated,
+    minHeight: 86,
+    backgroundColor: colors.cardElevated,   // warm sand, recessed in the card
     borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
     borderStartWidth: 3,
     borderStartColor: colors.border,
     justifyContent: 'space-between',
   },
   label: {
     color: colors.textSecondary,
-    fontSize: 12.5,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '500',          // a label, not a headline
+    letterSpacing: 0.2,
     lineHeight: 16,
     minHeight: 32, // 2-line slot → all four tiles align
   },
   value: {
-    fontSize: 23,
-    fontWeight: '800',
-    lineHeight: 27,
+    fontSize: 25,
+    fontWeight: '700',          // the number carries the weight
+    letterSpacing: 0.3,
+    lineHeight: 28,
     marginTop: 6,
   },
   unit: {
     color: colors.textTertiary,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',          // unit recedes behind the number
   },
 });
 

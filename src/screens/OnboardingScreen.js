@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
-import { colors } from '../utils/colors';
+import { colors, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import PrimaryButton from '../components/PrimaryButton';
 import { LANGS } from '../translations';
@@ -41,7 +41,7 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+      <StatusBar barStyle={barStyle()} backgroundColor={colors.bg} />
       <View style={styles.langRow}>
         {Object.keys(LANGS).map((code) => (
           <Pressable
@@ -135,7 +135,7 @@ const makeStyles = () => ({
   brand: {
     color: colors.accent,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: 2,
     textTransform: 'uppercase',
     marginBottom: 16,
@@ -165,7 +165,7 @@ const makeStyles = () => ({
   title: {
     color: colors.textPrimary,
     fontSize: 26,
-    fontWeight: '900',
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: 12,
   },

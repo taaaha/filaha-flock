@@ -166,7 +166,7 @@ const makeStyles = () => ({
   headerTitle: {
     color: colors.textSecondary,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   headerCountPill: {
     minWidth: 24,
@@ -180,7 +180,7 @@ const makeStyles = () => ({
   headerCount: {
     color: colors.accent,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '800',
   },
 
   stack: {
@@ -218,7 +218,7 @@ const makeStyles = () => ({
   },
   tagText: {
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   cardTitle: {
     color: colors.textPrimary,
@@ -246,7 +246,7 @@ const makeStyles = () => ({
   },
   ctaText: {
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
   },
 
   showMore: {
@@ -265,6 +265,6 @@ const makeStyles = () => ({
   showMoreText: {
     color: colors.accent,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '800',
   },
 });

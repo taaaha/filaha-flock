@@ -21,7 +21,7 @@ function SensorTile({ sensorKey, label, value, min, max, thresholds, selected, o
   return (
     <Pressable
       onPress={onPress}
-      android_ripple={{ color: '#1a2235' }}
+      android_ripple={{ color: colors.textPrimary + '10' }}
       style={[
         styles.tile,
         { borderColor: selected ? meta.accent : colors.border },
@@ -97,7 +97,7 @@ const makeStyles = () => ({
   },
   value: {
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   unit: {
     color: colors.textTertiary,

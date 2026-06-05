@@ -15,7 +15,7 @@ function AnimatedCount({ value, color, size = 28 }) {
 
   return (
     <Text style={{
-      color, fontSize: size, fontWeight: '900',
+      color, fontSize: size, fontWeight: '800',
       lineHeight: size * 1.1,
       letterSpacing: -0.5,
     }}>{display}</Text>

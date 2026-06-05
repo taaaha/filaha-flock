@@ -9,16 +9,16 @@
       "fallbackToCacheTimeout": 0
     },
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "scheme": "filaha",
     "newArchEnabled": false,
     "icon": "./assets/icon.png",
     "splash": {
-      "backgroundColor": "#0a0f1e"
+      "backgroundColor": "#faf7f0"
     },
     "androidNavigationBar": {
-      "barStyle": "light-content",
-      "backgroundColor": "#070b14"
+      "barStyle": "dark-content",
+      "backgroundColor": "#faf7f0"
     },
     "android": {
       "package": "com.filaha",
@@ -43,7 +43,7 @@
       ],
       "softwareKeyboardLayoutMode": "pan",
       "splash": {
-        "backgroundColor": "#0a0f1e"
+        "backgroundColor": "#faf7f0"
       }
     },
     "plugins": [

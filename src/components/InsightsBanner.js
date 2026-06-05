@@ -84,7 +84,7 @@ const makeStyles = () => ({
   kicker: {
     color: colors.textSecondary,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '800',
     flex: 1,
   },
   countPill: {
@@ -95,7 +95,7 @@ const makeStyles = () => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  countText: { fontSize: 12, fontWeight: '900' },
+  countText: { fontSize: 12, fontWeight: '800' },
   title: {
     color: colors.textPrimary,
     fontSize: 15,

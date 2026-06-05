@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
-import { colors } from '../utils/colors';
+import { colors, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { isToday } from '../utils/formatters';
 import AlertItem from '../components/AlertItem';
@@ -49,7 +49,7 @@ export default function AlertsScreen() {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
       <StatusBar
-        barStyle={colors.bg === '#070b14' ? 'light-content' : 'dark-content'}
+        barStyle={barStyle()}
         backgroundColor={colors.bg}
       />
       <View style={styles.header}>
@@ -76,7 +76,7 @@ export default function AlertsScreen() {
           <Pressable
             key={f}
             onPress={() => setFilter(f)}
-            android_ripple={{ color: '#1a2235' }}
+            android_ripple={{ color: colors.textPrimary + '10' }}
             style={[
               styles.filterChip,
               filter === f && styles.filterChipActive,
@@ -136,7 +136,7 @@ const makeStyles = () => ({
   title: {
     color: colors.textPrimary,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   clearBtn: {
     paddingHorizontal: 12,

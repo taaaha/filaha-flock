@@ -174,7 +174,8 @@ const makeStyles = () => ({
   name: {
     color: colors.textPrimary,
     fontSize: 19,
-    fontWeight: '800',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   metaRow: {
     flexDirection: 'row',
@@ -186,7 +187,7 @@ const makeStyles = () => ({
   metaId: {
     color: colors.textTertiary,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
     // The device id is always Latin/numeric — isolate it LTR so it
     // renders correctly inside the RTL (Arabic) layout.
     writingDirection: 'ltr',
@@ -209,7 +210,7 @@ const makeStyles = () => ({
     borderRadius: 999,
   },
   statusDot: { width: 7, height: 7, borderRadius: 4 },
-  statusText: { fontSize: 12, fontWeight: '800' },
+  statusText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
 
   powerBanner: {
     backgroundColor: colors.power + '22',

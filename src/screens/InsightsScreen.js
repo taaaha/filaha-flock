@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../components/Icon';
 import SmartInsights from '../components/SmartInsights';
 import { useApp } from '../contexts/AppContext';
-import { colors } from '../utils/colors';
+import { colors, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { generateInsights } from '../services/Insights';
 import { Haptics } from '../services/Haptics';
@@ -38,7 +38,7 @@ export default function InsightsScreen({ navigation }) {
 
   return (
     <View style={styles.safe}>
-      <StatusBar barStyle={colors.bg === '#070b14' ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />
+      <StatusBar barStyle={barStyle()} backgroundColor={colors.bg} />
       <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
@@ -137,7 +137,7 @@ const makeStyles = () => ({
   title: {
     color: colors.textPrimary,
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   subtitle: {
     color: colors.textSecondary,
@@ -167,7 +167,7 @@ const makeStyles = () => ({
   chipNum: {
     color: colors.textPrimary,
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   chipLabel: {
     color: colors.textSecondary,
@@ -190,7 +190,7 @@ const makeStyles = () => ({
   emptyTitle: {
     color: colors.textPrimary,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: 8,
   },

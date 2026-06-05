@@ -154,7 +154,7 @@ export default function CoopEditModal({ visible, device, t, onClose, onSave }) {
 const makeStyles = () => ({
   backdrop: {
     flex: 1,
-    backgroundColor: '#00000099',
+    backgroundColor: '#231a0f99',
     justifyContent: 'flex-end',
   },
   card: {

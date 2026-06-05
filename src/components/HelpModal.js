@@ -118,7 +118,7 @@ export default function HelpModal({ visible, onClose, t, screen, title, bullets 
 }
 
 const makeStyles = () => ({
-  backdrop: { flex: 1, backgroundColor: '#000000cc', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: '#231a0fcc', justifyContent: 'flex-end' },
   card: {
     backgroundColor: colors.bgElevated,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
@@ -141,7 +141,7 @@ const makeStyles = () => ({
     borderWidth: 1, borderColor: colors.accent + '40',
     alignItems: 'center', justifyContent: 'center',
   },
-  headTitle: { flex: 1, color: colors.textPrimary, fontSize: 17, fontWeight: '900' },
+  headTitle: { flex: 1, color: colors.textPrimary, fontSize: 17, fontWeight: '800' },
   closeBtn: {
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
@@ -166,5 +166,5 @@ const makeStyles = () => ({
     paddingVertical: 14,
     alignItems: 'center',
   },
-  gotItText: { color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 0.3 },
+  gotItText: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
 });

@@ -242,11 +242,12 @@ const makeStyles = () => ({
     flex: 1,
     color: colors.textPrimary,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   status: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
 
   tasksBtn: {
@@ -259,7 +260,7 @@ const makeStyles = () => ({
     borderWidth: 1,
     backgroundColor: colors.bgElevated,
   },
-  tasksTxt: { fontSize: 13, fontWeight: '900' },
+  tasksTxt: { fontSize: 13, fontWeight: '800' },
 
   insRow: {
     flexDirection: 'row',
@@ -275,7 +276,7 @@ const makeStyles = () => ({
     flex: 1,
     color: colors.textSecondary,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   morePill: {
     paddingHorizontal: 8,
@@ -285,5 +286,5 @@ const makeStyles = () => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  moreTxt: { color: colors.accent, fontSize: 12, fontWeight: '900' },
+  moreTxt: { color: colors.accent, fontSize: 12, fontWeight: '800' },
 });

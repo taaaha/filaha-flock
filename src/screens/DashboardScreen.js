@@ -20,7 +20,7 @@ import { TextInput } from 'react-native';
 import Icon from '../components/Icon';
 import { useApp } from '../contexts/AppContext';
 import { useUpdates } from '../contexts/UpdateContext';
-import { colors, STATUS, statusColor, shadows } from '../utils/colors';
+import { colors, STATUS, statusColor, shadows, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { deviceStatus, statusPriority } from '../utils/thresholds';
 import { buildFakeDataSms } from '../utils/smsParser';
@@ -580,7 +580,7 @@ export default function DashboardScreen({ navigation }) {
   return (
     <View style={styles.safe}>
       <StatusBar
-        barStyle={colors.bg === '#070b14' ? 'light-content' : 'dark-content'}
+        barStyle={barStyle()}
         backgroundColor={colors.bg}
       />
 
@@ -862,7 +862,7 @@ const makeStyles = () => ({
   },
   brandMini: {
     color: colors.textPrimary,
-    fontSize: 17, fontWeight: '900',
+    fontSize: 17, fontWeight: '800', letterSpacing: 0.3,
   },
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 3 },
   liveDotWrap: {
@@ -917,7 +917,7 @@ const makeStyles = () => ({
   brandTitle: {
     color: colors.textPrimary,
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: 0.3,
   },
   statusRow: {
@@ -973,7 +973,7 @@ const makeStyles = () => ({
     borderRadius: 14,
   },
   buildBannerIcon: { fontSize: 22, marginTop: 1 },
-  buildBannerTitle: { color: colors.danger, fontSize: 14, fontWeight: '900' },
+  buildBannerTitle: { color: colors.danger, fontSize: 14, fontWeight: '800' },
   buildBannerHint: {
     color: colors.textSecondary,
     fontSize: 11,
@@ -1044,9 +1044,9 @@ const makeStyles = () => ({
   },
   dangerIcon: { fontSize: 20 },
   dangerTitle: {
-    color: colors.dangerSoft,
+    color: colors.danger,
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   dangerHint: {
     color: colors.textSecondary,
@@ -1094,9 +1094,9 @@ const makeStyles = () => ({
     flex: 1,
   },
   dangerItemTitle: {
-    color: colors.dangerSoft,
+    color: colors.danger,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
     flex: 1,
   },
   dangerItemAction: {
@@ -1108,7 +1108,7 @@ const makeStyles = () => ({
   },
   dangerMore: {
     textAlign: 'center',
-    color: colors.dangerSoft,
+    color: colors.danger,
     fontSize: 12,
     fontWeight: '700',
     paddingVertical: 6,
@@ -1189,7 +1189,7 @@ const makeStyles = () => ({
   emptyIcon: { fontSize: 50, opacity: 0.7 },
   emptyTitle: {
     color: colors.textPrimary,
-    fontSize: 19, fontWeight: '800',
+    fontSize: 19, fontWeight: '700', letterSpacing: 0.2,
     marginBottom: 8, textAlign: 'center',
   },
   emptyHint: {
@@ -1207,7 +1207,7 @@ const makeStyles = () => ({
     paddingVertical: 14,
     ...shadows.glow(colors.accent),
   },
-  emptyBtnText: { color: '#fff', fontWeight: '900', fontSize: 15 },
+  emptyBtnText: { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 0.3 },
 
   demoSection: {
     marginTop: 18,
@@ -1258,7 +1258,7 @@ const makeStyles = () => ({
   // Modal
   modalBackdrop: {
     flex: 1,
-    backgroundColor: '#000000cc',
+    backgroundColor: '#231a0fcc',   // warm dark scrim, not pure black
     justifyContent: 'flex-end',
   },
   modalCard: {
@@ -1280,18 +1280,19 @@ const makeStyles = () => ({
   },
   modalTitle: {
     color: colors.textPrimary,
-    fontSize: 19, fontWeight: '900',
+    fontSize: 20, fontWeight: '800', letterSpacing: 0.2,
     marginBottom: 16,
   },
   errorText: { color: colors.danger, fontSize: 13, marginBottom: 8, fontWeight: '600' },
 
   formLabel: {
     color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '600',
     marginBottom: 6,
     marginTop: 4,
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   formHint: {
     color: colors.textTertiary,
@@ -1318,7 +1319,7 @@ const makeStyles = () => ({
     borderColor: colors.accent,
     backgroundColor: colors.accent + '14',
   },
-  breedChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '800' },
+  breedChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '700' },
   breedChipTextActive: { color: colors.accent },
   strainGrid: {
     flexDirection: 'row',

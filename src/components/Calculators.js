@@ -327,7 +327,7 @@ const makeStyles = () => ({
   },
   resultValue: {
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: -0.5,
     marginTop: 2,
   },
@@ -363,7 +363,7 @@ const makeStyles = () => ({
   },
   kpiValue: {
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: '800',
     marginTop: 3,
   },
   vaccineRow: {
@@ -387,7 +387,7 @@ const makeStyles = () => ({
   vaccineDayNum: {
     color: colors.accent,
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   vaccineDayLabel: {
     color: colors.textTertiary,

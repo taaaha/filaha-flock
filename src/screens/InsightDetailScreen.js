@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../components/Icon';
 import { BrooderCalc, DensityCalc, VaccineSchedule } from '../components/Calculators';
 import { useApp } from '../contexts/AppContext';
-import { colors, statusColor } from '../utils/colors';
+import { colors, statusColor, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { TOPICS } from '../utils/guideContent';
 import { sensorStatus } from '../utils/thresholds';
@@ -45,7 +45,7 @@ export default function InsightDetailScreen({ route, navigation }) {
   return (
     <View style={styles.safe}>
       <StatusBar
-        barStyle={colors.bg === '#070b14' ? 'light-content' : 'dark-content'}
+        barStyle={barStyle()}
         backgroundColor={colors.bg}
       />
       <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>

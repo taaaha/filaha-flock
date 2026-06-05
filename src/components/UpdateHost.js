@@ -279,7 +279,7 @@ const makeStyles = () => ({
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 20, fontWeight: '900',
+    fontSize: 20, fontWeight: '800',
     marginTop: 14,
   },
   versionLine: {

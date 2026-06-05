@@ -377,7 +377,7 @@ const makeStyles = () => ({
   },
   benchValue: {
     color: colors.textPrimary,
-    fontSize: 20, fontWeight: '900', marginTop: 4,
+    fontSize: 20, fontWeight: '800', marginTop: 4,
   },
   benchHint: {
     color: colors.textSecondary, fontSize: 11, fontWeight: '600', marginTop: 2,
@@ -408,7 +408,7 @@ const makeStyles = () => ({
     borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10,
   },
   diseaseSection: {
-    color: colors.accentSoft, fontSize: 11, fontWeight: '900', letterSpacing: 0.5,
+    color: colors.accentSoft, fontSize: 11, fontWeight: '800', letterSpacing: 0.5,
     marginBottom: 4,
   },
   diseaseItem: {
@@ -429,7 +429,7 @@ const makeStyles = () => ({
     color: colors.textSecondary, fontSize: 13, fontWeight: '700', flex: 1,
   },
   priceValue: {
-    color: colors.textPrimary, fontSize: 16, fontWeight: '900',
+    color: colors.textPrimary, fontSize: 16, fontWeight: '800',
   },
   priceUnit: {
     color: colors.textTertiary, fontSize: 11, fontWeight: '600',
@@ -448,7 +448,7 @@ const makeStyles = () => ({
   },
   // Wilaya — modal
   wilayaModalBackdrop: {
-    flex: 1, backgroundColor: '#000000cc', justifyContent: 'flex-end',
+    flex: 1, backgroundColor: '#231a0fcc', justifyContent: 'flex-end',
   },
   wilayaModalCard: {
     backgroundColor: colors.bgElevated,
@@ -462,7 +462,7 @@ const makeStyles = () => ({
     backgroundColor: colors.borderLight, marginBottom: 12,
   },
   wilayaModalTitle: {
-    color: colors.textPrimary, fontSize: 17, fontWeight: '900', marginBottom: 12,
+    color: colors.textPrimary, fontSize: 17, fontWeight: '800', marginBottom: 12,
   },
   wilayaSearch: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -484,7 +484,7 @@ const makeStyles = () => ({
     backgroundColor: colors.accent + '10',
   },
   wilayaItemCode: {
-    color: colors.textTertiary, fontSize: 12, fontWeight: '900',
+    color: colors.textTertiary, fontSize: 12, fontWeight: '800',
     width: 24, textAlign: 'center',
   },
   wilayaItemName: {
@@ -529,7 +529,7 @@ const makeStyles = () => ({
   metricLabel: {
     color: colors.textTertiary, fontSize: 9, fontWeight: '800', letterSpacing: 0.5,
   },
-  metricValue: { color: colors.textPrimary, fontSize: 13, fontWeight: '900', marginTop: 2 },
+  metricValue: { color: colors.textPrimary, fontSize: 13, fontWeight: '800', marginTop: 2 },
 
   formulaNote: {
     color: colors.textTertiary, fontSize: 11, fontStyle: 'italic',
