@@ -74,6 +74,7 @@ const navTheme = {
 };
 
 function DashboardStack() {
+  useTheme(); // re-render on theme change so contentStyle re-reads colors.bg
   return (
     <Stack.Navigator
       screenOptions={{
@@ -89,6 +90,7 @@ function DashboardStack() {
 }
 
 function InsightsStack() {
+  useTheme(); // re-render on theme change so contentStyle re-reads colors.bg
   return (
     <Stack.Navigator
       screenOptions={{
@@ -154,8 +156,6 @@ function MainTabs() {
           backgroundColor: colors.bgElevated,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          borderTopLeftRadius: 22,
-          borderTopRightRadius: 22,
           height: 76,
           paddingBottom: 12,
           paddingTop: 8,
