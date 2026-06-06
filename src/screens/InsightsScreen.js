@@ -45,7 +45,7 @@ export default function InsightsScreen({ navigation }) {
         <View style={styles.header}>
           <View style={styles.titleRow}>
             <View style={styles.iconBadge}>
-              <Icon name="feather" size={24} color={colors.accent} strokeWidth={2.3} />
+              <CoopMascot status={actionable > 0 ? 'warn' : 'ok'} size={36} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.title} numberOfLines={1}>
@@ -60,13 +60,19 @@ export default function InsightsScreen({ navigation }) {
           {/* Summary chips */}
           <View style={styles.chipsRow}>
             <View style={styles.chip}>
+              <View style={[styles.chipIcon, { backgroundColor: colors.accent + '1f' }]}>
+                <Icon name="target" size={15} color={colors.accent} strokeWidth={2.4} />
+              </View>
               <Text style={styles.chipNum}>{insights.length}</Text>
               <Text style={styles.chipLabel}>{t('smartInsights') || 'Insights'}</Text>
             </View>
             <View style={[
               styles.chip,
-              actionable > 0 && { backgroundColor: colors.warn + '14', borderColor: colors.warn + '50' },
+              actionable > 0 && { backgroundColor: colors.warn + '12', borderColor: colors.warn + '50' },
             ]}>
+              <View style={[styles.chipIcon, { backgroundColor: (actionable > 0 ? colors.warn : colors.textTertiary) + '1f' }]}>
+                <Icon name="alertTriangle" size={15} color={actionable > 0 ? colors.warn : colors.textTertiary} strokeWidth={2.4} />
+              </View>
               <Text style={[
                 styles.chipNum,
                 { color: actionable > 0 ? colors.warn : colors.textPrimary },
@@ -157,18 +163,22 @@ const makeStyles = () => ({
   chip: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
     backgroundColor: colors.card,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  chipIcon: {
+    width: 30, height: 30, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
   chipNum: {
     color: colors.textPrimary,
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '800',
   },
   chipLabel: {

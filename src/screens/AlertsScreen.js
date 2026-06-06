@@ -35,6 +35,13 @@ export default function AlertsScreen() {
     return list;
   }, [alerts, filter]);
 
+  const counts = useMemo(() => ({
+    all: alerts.length,
+    alerts: alerts.filter((a) => a.type === 'ALERT').length,
+    cleared: alerts.filter((a) => a.type === 'CLEAR').length,
+    today: alerts.filter((a) => isToday(a.timestamp)).length,
+  }), [alerts]);
+
   const onClearAll = () => {
     if (alerts.length === 0) return;
     Alert.alert(
@@ -56,41 +63,47 @@ export default function AlertsScreen() {
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <View style={styles.logoSm}>
-            <Icon name="feather" size={19} color={colors.accent} strokeWidth={2.3} />
+            <CoopMascot status={counts.alerts > 0 ? 'danger' : 'ok'} size={32} />
           </View>
           <Text style={styles.title}>{t('alerts')}</Text>
         </View>
         <Pressable
           onPress={onClearAll}
-          style={[
+          android_ripple={{ color: colors.danger + '18' }}
+          style={({ pressed }) => [
             styles.clearBtn,
             alerts.length === 0 && { opacity: 0.4 },
+            pressed && { opacity: 0.85 },
           ]}
           disabled={alerts.length === 0}
         >
+          <Icon name="trash" size={15} color={colors.danger} strokeWidth={2.3} />
           <Text style={styles.clearBtnText}>{t('clearAll')}</Text>
         </Pressable>
       </View>
 
       <View style={styles.filterRow}>
-        {FILTERS.map((f) => (
-          <Pressable
-            key={f}
-            onPress={() => setFilter(f)}
-            android_ripple={{ color: colors.textPrimary + '10' }}
-            style={[
-              styles.filterChip,
-              filter === f && styles.filterChipActive,
-            ]}
-          >
-            <Text style={[
-              styles.filterText,
-              filter === f && styles.filterTextActive,
-            ]}>
-              {t(f === 'all' ? 'all' : f === 'alerts' ? 'alertsTab' : f === 'cleared' ? 'cleared' : 'today')}
-            </Text>
-          </Pressable>
-        ))}
+        {FILTERS.map((f) => {
+          const active = filter === f;
+          const label = t(f === 'all' ? 'all' : f === 'alerts' ? 'alertsTab' : f === 'cleared' ? 'cleared' : 'today');
+          return (
+            <Pressable
+              key={f}
+              onPress={() => setFilter(f)}
+              android_ripple={{ color: colors.accent + '22' }}
+              style={[styles.filterChip, active && styles.filterChipActive]}
+            >
+              <Text style={[styles.filterText, active && styles.filterTextActive]}>
+                {label}
+              </Text>
+              <View style={[styles.filterCount, active && styles.filterCountActive]}>
+                <Text style={[styles.filterCountText, active && styles.filterCountTextActive]}>
+                  {counts[f]}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
       </View>
 
       <FlatList
@@ -126,29 +139,33 @@ const makeStyles = () => ({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   logoSm: {
-    width: 34, height: 34, borderRadius: 13,
-    backgroundColor: colors.card,
-    borderWidth: 1, borderColor: colors.border,
+    width: 44, height: 44, borderRadius: 15,
+    backgroundColor: colors.accent + '1f',
+    alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
-  logoSmImg: { width: 34, height: 34 },
   title: {
     color: colors.textPrimary,
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: '800',
+    letterSpacing: 0.2,
   },
   clearBtn: {
-    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 13,
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.danger + '45',
+    backgroundColor: colors.danger + '0e',
   },
   clearBtnText: {
     color: colors.danger,
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 13,
   },
   filterRow: {
@@ -159,8 +176,12 @@ const makeStyles = () => ({
     flexWrap: 'wrap',
   },
   filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingStart: 13,
+    paddingEnd: 8,
+    paddingVertical: 7,
     borderRadius: 999,
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -176,6 +197,18 @@ const makeStyles = () => ({
     fontSize: 13,
   },
   filterTextActive: { color: '#fff' },
+  filterCount: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    backgroundColor: colors.textTertiary + '24',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterCountActive: { backgroundColor: '#ffffff33' },
+  filterCountText: { color: colors.textSecondary, fontSize: 11, fontWeight: '800' },
+  filterCountTextActive: { color: '#fff' },
   empty: {
     alignItems: 'center',
     paddingTop: 80,
