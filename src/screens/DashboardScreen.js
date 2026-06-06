@@ -28,6 +28,7 @@ import { actionFor } from '../utils/actionSteps';
 import { sensorStatus } from '../utils/thresholds';
 import { BREEDS, STRAINS_BY_BREED, strainLabel, heatStressTHI } from '../utils/poultryData';
 import CoopCard from '../components/CoopCard';
+import CoopMascot from '../components/CoopMascot';
 import PrimaryButton from '../components/PrimaryButton';
 import Field from '../components/Field';
 import { showToast } from '../components/Toast';
@@ -604,7 +605,7 @@ export default function DashboardScreen({ navigation }) {
 
           <View style={styles.brandRow}>
             <View style={styles.logoBadge}>
-              <Icon name="feather" size={20} color={colors.accent} strokeWidth={2.3} />
+              <CoopMascot status={counts.total === 0 ? 'offline' : counts.danger > 0 ? 'danger' : counts.warn > 0 ? 'warn' : 'ok'} size={34} />
             </View>
             <View>
               <Text style={styles.brandMini}>Filaha Flock</Text>
@@ -689,7 +690,7 @@ export default function DashboardScreen({ navigation }) {
             ) : (
               <View style={styles.empty}>
                 <View style={styles.emptyIconBox}>
-                  <Text style={styles.emptyIcon}>🐔</Text>
+                  <CoopMascot status="ok" size={88} />
                 </View>
                 <Text style={styles.emptyTitle}>{t('noCoopsYet')}</Text>
                 <Text style={styles.emptyHint}>{t('noCoopsHint')}</Text>

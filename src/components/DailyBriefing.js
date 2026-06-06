@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import Icon from './Icon';
-import HealthScore from './HealthScore';
+import CoopMascot from './CoopMascot';
 import { DAILY_TASKS } from '../utils/guideContent';
 import TaskChecklistModal from './TaskChecklistModal';
 import { deviceStatus } from '../utils/thresholds';
@@ -128,7 +128,12 @@ export default function DailyBriefing({
     <View style={[styles.card, shadows.sm]}>
       {/* Top strip: ring · greeting+status · tasks */}
       <View style={styles.strip}>
-        <HealthScore counts={counts} size={54} strokeWidth={6} />
+        <View style={[styles.mascotHug, { backgroundColor: worstColor + '1f' }]}>
+          <CoopMascot
+            status={counts.total === 0 ? 'offline' : counts.danger > 0 ? 'danger' : counts.attention > 0 ? 'warn' : 'ok'}
+            size={46}
+          />
+        </View>
 
         <View style={styles.mid}>
           <View style={styles.greetLine}>
@@ -224,10 +229,10 @@ const makeStyles = () => ({
     marginTop: 4,
     marginBottom: 12,
     backgroundColor: colors.card,
-    borderRadius: 16,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 14,
   },
 
@@ -235,6 +240,13 @@ const makeStyles = () => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  mascotHug: {
+    width: 56,
+    height: 56,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mid: { flex: 1, gap: 3 },
   greetLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },

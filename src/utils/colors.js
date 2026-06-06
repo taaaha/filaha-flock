@@ -51,6 +51,14 @@ const DARK = {
   hum: '#5fb8bf',
   battery: '#e0bb55',
 
+  // Soft status "washes" — a whole playful coop card is tinted by status,
+  // with a readable "ink" for text/icons sitting on that wash.
+  okWash: '#22301e',       okInk: '#9ed79b',
+  warnWash: '#352b19',     warnInk: '#ecc483',
+  dangerWash: '#37231b',   dangerInk: '#f2a591',
+  offlineWash: '#2a251e',  offlineInk: '#beb09b',
+  powerWash: '#382818',    powerInk: '#eeb67a',
+
   // Secondary decorative accent — harvest amber (use sparingly; never for UI
   // that competes with the amber `warn` status)
   harvest: '#e0a44e',
@@ -98,6 +106,14 @@ const LIGHT = {
   temp: '#d97a45',
   hum: '#3f9aa3',
   battery: '#bd9633',
+
+  // Soft status "washes" — a whole playful coop card is tinted by status,
+  // with a readable "ink" for text/icons sitting on that wash.
+  okWash: '#e7f1de',       okInk: '#3c6a31',
+  warnWash: '#f8edd1',     warnInk: '#86591a',
+  dangerWash: '#f7ddd5',   dangerInk: '#8c3a28',
+  offlineWash: '#efe9df',  offlineInk: '#6b6253',
+  powerWash: '#f8e3cd',    powerInk: '#8a4e1c',
 
   // Secondary decorative accent — harvest amber
   harvest: '#cf8a3a',
@@ -154,6 +170,30 @@ export function statusColor(status) {
     case STATUS.POWER_CUT: return colors.power;
     case STATUS.OFFLINE:
     default: return colors.offline;
+  }
+}
+
+// Soft full-card background for the playful coop cards (whole card tinted).
+export function statusWash(status) {
+  switch (status) {
+    case STATUS.OK: return colors.okWash;
+    case STATUS.WARN: return colors.warnWash;
+    case STATUS.DANGER: return colors.dangerWash;
+    case STATUS.POWER_CUT: return colors.powerWash;
+    case STATUS.OFFLINE:
+    default: return colors.offlineWash;
+  }
+}
+
+// Readable text/icon color to sit on top of the matching wash.
+export function statusInk(status) {
+  switch (status) {
+    case STATUS.OK: return colors.okInk;
+    case STATUS.WARN: return colors.warnInk;
+    case STATUS.DANGER: return colors.dangerInk;
+    case STATUS.POWER_CUT: return colors.powerInk;
+    case STATUS.OFFLINE:
+    default: return colors.offlineInk;
   }
 }
 

@@ -56,9 +56,9 @@ export default function PrimaryButton({
 
 const makeStyles = () => ({
   btn: {
-    minHeight: 50,
-    paddingHorizontal: 18,
-    borderRadius: 14,
+    minHeight: 54,
+    paddingHorizontal: 20,
+    borderRadius: 18,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',

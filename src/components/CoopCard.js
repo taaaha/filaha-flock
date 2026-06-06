@@ -1,11 +1,11 @@
 import React, { memo, useRef } from 'react';
 import { View, Text, Pressable, Animated } from 'react-native';
-import { colors, STATUS, statusColor, shadows } from '../utils/colors';
+import { colors, STATUS, statusColor, statusWash, statusInk, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
-import { strainLabel } from '../utils/poultryData';
 import SensorMini from './SensorMini';
 import BatteryBar from './BatteryBar';
 import Pulse from './Pulse';
+import CoopMascot from './CoopMascot';
 import { formatRelativeTime } from '../utils/formatters';
 
 function coopAgeDays(device, now) {
@@ -13,14 +13,6 @@ function coopAgeDays(device, now) {
   const ms = now - device.chickArrivalDate;
   if (ms < 0) return 0;
   return Math.floor(ms / (24 * 60 * 60 * 1000)) + 1;
-}
-
-function phaseColor(age) {
-  if (age == null) return null;
-  if (age <= 7) return '#fb923c';   // brooding
-  if (age <= 21) return '#facc15';  // grower
-  if (age <= 45) return '#22d3ee';  // finisher
-  return '#94a3b8';                  // adult
 }
 
 function statusLabel(status, t) {
@@ -37,13 +29,14 @@ function statusLabel(status, t) {
 function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
   const styles = useStyles(makeStyles);
   const sColor = statusColor(status);
+  const wash = statusWash(status);
+  const ink = statusInk(status);
   const isDanger = status === STATUS.DANGER || status === STATUS.POWER_CUT;
   const isPower = status === STATUS.POWER_CUT;
   const isOffline = status === STATUS.OFFLINE;
   const r = reading || {};
   const ageText = reading ? formatRelativeTime(reading.timestamp, t, now) : null;
   const chickAge = coopAgeDays(device, now);
-  const phColor = phaseColor(chickAge);
   const showSensors = !isOffline || isPower;
 
   const scale = useRef(new Animated.Value(1)).current;
@@ -51,30 +44,31 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
   const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5 }).start();
 
   return (
-    <Pulse active={isDanger} color={sColor} intensity={0.5} style={styles.wrapper} borderRadius={20}>
+    <Pulse active={isDanger} color={sColor} intensity={0.5} style={styles.wrapper} borderRadius={26}>
       <Animated.View style={{ transform: [{ scale }] }}>
         <Pressable
           onPress={onPress}
           onPressIn={onPressIn}
           onPressOut={onPressOut}
-          android_ripple={{ color: sColor + '20', foreground: true }}
+          android_ripple={{ color: sColor + '18', foreground: true }}
           accessibilityRole="button"
           accessibilityLabel={`${device.name}. ${statusLabel(status, t)}`}
           style={[
             styles.card,
-            isDanger && { borderColor: sColor + '55' },
-            shadows.sm,
+            { backgroundColor: wash, borderColor: sColor + '3a' },
+            shadows.md,
           ]}
         >
-          {/* Status stripe — logical start edge (RTL-correct) */}
-          <View style={[styles.stripe, { backgroundColor: sColor }]} />
+          {/* Header — mascot + name + status chip */}
+          <View style={styles.topRow}>
+            <View style={styles.mascotHug}>
+              <CoopMascot status={status} size={50} />
+            </View>
 
-          {/* Header — status-tinted zone */}
-          <View style={[styles.headerRow, { backgroundColor: sColor + '14' }]}>
-            <View style={styles.headerLeft}>
-              <Text style={styles.name} numberOfLines={1}>{device.name}</Text>
-              {/* Each token is its own Text so the bidi algorithm can't
-                  jumble the LTR device id with the Arabic age label. */}
+            <View style={styles.headMid}>
+              <Text style={[styles.name, { color: colors.textPrimary }]} numberOfLines={1}>
+                {device.name}
+              </Text>
               <View style={styles.metaRow}>
                 <Text style={styles.metaId} numberOfLines={1}>{device.id}</Text>
                 {chickAge !== null ? (
@@ -87,30 +81,26 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
                 ) : null}
               </View>
             </View>
-            <View style={[styles.statusPill, { backgroundColor: sColor + '1a' }]}>
+
+            <View style={[styles.statusPill, { borderColor: sColor + '55' }]}>
               <View style={[styles.statusDot, { backgroundColor: sColor }]} />
-              <Text style={[styles.statusText, { color: sColor }]} numberOfLines={1}>
+              <Text style={[styles.statusText, { color: ink }]} numberOfLines={1}>
                 {statusLabel(status, t)}
               </Text>
             </View>
           </View>
 
-          {/* Power-cut banner */}
+          {/* Friendly status line for the special states */}
           {isPower ? (
-            <View style={styles.powerBanner}>
-              <Text style={styles.powerBannerText}>⚡  {t('powerCut')}</Text>
-            </View>
+            <Text style={[styles.bannerLine, { color: ink }]}>⚡  {t('powerCut')}</Text>
           ) : null}
-
-          {/* Offline banner */}
           {isOffline && !isPower ? (
-            <View style={styles.offlineBanner}>
-              <Text style={styles.offlineEmoji}>📡</Text>
-              <Text style={styles.offlineBannerText}>{t('offline')}</Text>
-            </View>
+            <Text style={[styles.bannerLine, { color: ink }]}>
+              📡  {t('offline')}{ageText ? `  ·  ${ageText}` : ''}
+            </Text>
           ) : null}
 
-          {/* Sensors — 2×2 tiles */}
+          {/* Sensors — 2×2 friendly pills */}
           {showSensors ? (
             <View style={styles.sensorGrid}>
               <View style={styles.sensorRow}>
@@ -126,7 +116,7 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
 
           {/* Battery footer */}
           {showSensors ? (
-            <View style={styles.footer}>
+            <View style={[styles.footer, { borderTopColor: sColor + '22' }]}>
               <BatteryBar value={r.bat} compact label={t('battery')} />
             </View>
           ) : null}
@@ -139,42 +129,34 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
 const makeStyles = () => ({
   wrapper: {
     marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 20,
+    marginBottom: 14,
+    borderRadius: 26,
   },
   card: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingTop: 18,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    paddingTop: 16,
     paddingBottom: 16,
-    paddingEnd: 18,
-    paddingStart: 22,
+    paddingHorizontal: 16,
     overflow: 'hidden',
   },
-  stripe: {
-    position: 'absolute',
-    start: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-  },
-  headerRow: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    marginBottom: 16,
   },
-  headerLeft: { flex: 1 },
+  mascotHug: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    backgroundColor: '#ffffff55',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headMid: { flex: 1, minWidth: 0 },
   name: {
-    color: colors.textPrimary,
-    fontSize: 19,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     letterSpacing: 0.2,
   },
   metaRow: {
@@ -182,68 +164,39 @@ const makeStyles = () => ({
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 5,
+    marginTop: 3,
   },
   metaId: {
-    color: colors.textTertiary,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
-    // The device id is always Latin/numeric — isolate it LTR so it
-    // renders correctly inside the RTL (Arabic) layout.
     writingDirection: 'ltr',
   },
-  metaSep: {
-    color: colors.textDim,
-    fontSize: 13,
-  },
-  metaAge: {
-    color: colors.textTertiary,
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  metaSep: { color: colors.textTertiary, fontSize: 13 },
+  metaAge: { color: colors.textSecondary, fontSize: 13, fontWeight: '500' },
+
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     borderRadius: 999,
+    borderWidth: 1.5,
+    backgroundColor: colors.bgElevated,
   },
   statusDot: { width: 7, height: 7, borderRadius: 4 },
-  statusText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+  statusText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
 
-  powerBanner: {
-    backgroundColor: colors.power + '22',
-    borderColor: colors.power + '70',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 12,
-  },
-  powerBannerText: {
-    color: colors.power,
-    fontWeight: '800',
+  bannerLine: {
     fontSize: 14,
-  },
-  offlineBanner: {
-    backgroundColor: colors.offline + '14',
-    borderColor: colors.offline + '40',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 22,
-    alignItems: 'center',
-  },
-  offlineEmoji: { fontSize: 22, marginBottom: 4, opacity: 0.7 },
-  offlineBannerText: {
-    color: colors.offline,
     fontWeight: '700',
-    fontSize: 14,
+    marginTop: 12,
   },
 
   sensorGrid: {
     gap: 10,
-    marginBottom: 16,
+    marginTop: 14,
   },
   sensorRow: {
     flexDirection: 'row',
@@ -252,8 +205,8 @@ const makeStyles = () => ({
 
   footer: {
     borderTopWidth: 1,
-    borderTopColor: colors.border,
     paddingTop: 12,
+    marginTop: 14,
   },
 });
 
