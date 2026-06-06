@@ -157,108 +157,96 @@ export default function DailyBriefing({
         </View>
       </View>
 
-      {/* ── Body: status ring + sentence, then tasks + insight ── */}
+      {/* ── Body: status ring + sentence + tasks, then smart guidance ── */}
       <View style={styles.body}>
         <View style={styles.statusRow}>
           <HealthScore counts={counts} size={46} strokeWidth={6} />
           <Text style={[styles.status, { color: worstColor }]} numberOfLines={2}>
             {sentence}
           </Text>
+          {hasDevices ? (
+            <Pressable
+              onPress={() => setTasksOpen(true)}
+              android_ripple={{ color: (allDone ? colors.ok : colors.accent) + '22' }}
+              accessibilityRole="button"
+              accessibilityLabel={t('tasksDoneToday') || 'Daily tasks'}
+              style={({ pressed }) => [
+                styles.tasksBtn,
+                { borderColor: (allDone ? colors.ok : colors.accent) + '55' },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Icon
+                name={allDone ? 'checkCircle' : 'clock'}
+                size={15}
+                color={allDone ? colors.ok : colors.accent}
+                strokeWidth={2.5}
+              />
+              <Text style={[styles.tasksTxt, { color: allDone ? colors.ok : colors.accent }]}>
+                {doneCount}/{DAILY_TASKS.length}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
-        {(hasDevices || topInsight) ? (
-          <View style={styles.actionRow}>
-            {hasDevices ? (
-              <Pressable
-                onPress={() => setTasksOpen(true)}
-                android_ripple={{ color: (allDone ? colors.ok : colors.accent) + '22' }}
-                accessibilityRole="button"
-                accessibilityLabel={t('tasksDoneToday') || 'Daily tasks'}
-                style={({ pressed }) => [
-                  styles.tasksBtn,
-                  { borderColor: (allDone ? colors.ok : colors.accent) + '55' },
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <Icon
-                  name={allDone ? 'checkCircle' : 'clock'}
-                  size={15}
-                  color={allDone ? colors.ok : colors.accent}
-                  strokeWidth={2.5}
-                />
-                <Text style={[styles.tasksTxt, { color: allDone ? colors.ok : colors.accent }]}>
-                  {doneCount}/{DAILY_TASKS.length}
-                </Text>
-              </Pressable>
-            ) : null}
-
-            {topInsight ? (
-              <Pressable
-                onPress={() => onOpenInsight && onOpenInsight(topInsight)}
-                android_ripple={{ color: colors.accent + '18' }}
-                accessibilityRole="button"
-                accessibilityLabel={topInsight.title}
-                style={({ pressed }) => [styles.insRow, pressed && { opacity: 0.85 }]}
-              >
-                <View style={[
-                  styles.insDot,
-                  { backgroundColor: colors[SEV_COLOR[topInsight.severity]] || colors.accent },
-                ]} />
-                <Text style={styles.insText} numberOfLines={2}>{topInsight.title}</Text>
-                {moreCount > 0 ? (
-                  <Pressable
-                    onPress={() => setInsExpanded((v) => !v)}
-                    hitSlop={8}
-                    android_ripple={{ color: colors.accent + '22', borderless: true, radius: 18 }}
-                    accessibilityRole="button"
-                    accessibilityLabel={insExpanded ? (t('insightsShowLess') || 'Show less') : `+${moreCount}`}
-                    style={styles.morePill}
-                  >
-                    <Text style={styles.moreTxt}>{insExpanded ? '–' : `+${moreCount}`}</Text>
-                    <Icon
-                      name={insExpanded ? 'chevronUp' : 'chevronDown'}
-                      size={13}
-                      color={colors.accent}
-                      strokeWidth={2.6}
-                    />
-                  </Pressable>
-                ) : (
-                  <Icon name="chevronRight" size={16} color={colors.textTertiary} strokeWidth={2.4} />
-                )}
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-
-        {/* Expanded list — every other insight, each tappable to its detail */}
-        {insExpanded && moreCount > 0 ? (
-          <View style={styles.moreList}>
-            {sortedInsights.slice(1).map((ins) => (
+        {/* Smart guidance — each insight is a full-width tappable row; a big
+            full-width button reveals the rest (no tiny tap targets). */}
+        {topInsight ? (
+          <View style={styles.insSection}>
+            {(insExpanded ? sortedInsights : [topInsight]).map((ins, i) => (
               <Pressable
                 key={ins.id}
                 onPress={() => onOpenInsight && onOpenInsight(ins)}
                 android_ripple={{ color: colors.accent + '14' }}
                 accessibilityRole="button"
                 accessibilityLabel={ins.title}
-                style={({ pressed }) => [styles.moreItem, pressed && { opacity: 0.85 }]}
+                style={({ pressed }) => [
+                  styles.insItem,
+                  i > 0 && { marginTop: 6 },
+                  pressed && { opacity: 0.85 },
+                ]}
               >
                 <View style={[
                   styles.insDot,
                   { backgroundColor: colors[SEV_COLOR[ins.severity]] || colors.accent },
                 ]} />
-                <Text style={styles.moreItemText} numberOfLines={2}>{ins.title}</Text>
-                <Icon name="chevronRight" size={16} color={colors.textTertiary} strokeWidth={2.4} />
+                <Text style={styles.insItemText} numberOfLines={2}>{ins.title}</Text>
+                <Icon name="chevronRight" size={17} color={colors.textTertiary} strokeWidth={2.4} />
               </Pressable>
             ))}
-            {onSeeAllInsights ? (
+
+            {moreCount > 0 ? (
               <Pressable
-                onPress={onSeeAllInsights}
+                onPress={() => setInsExpanded((v) => !v)}
                 android_ripple={{ color: colors.accent + '18' }}
                 accessibilityRole="button"
-                style={styles.seeAll}
+                accessibilityLabel={insExpanded ? (t('insightsShowLess') || 'Show less') : (t('insightsShowAll') || 'Show all')}
+                style={({ pressed }) => [styles.showAllBtn, pressed && { opacity: 0.85 }]}
               >
-                <Text style={styles.seeAllText}>{t('insightsShowAll') || 'See all in Insights'}</Text>
-                <Icon name="chevronRight" size={15} color={colors.accent} strokeWidth={2.6} />
+                <Text style={styles.showAllText}>
+                  {insExpanded
+                    ? (t('insightsShowLess') || 'Show less')
+                    : `${t('insightsShowAll') || 'Show all'} (${moreCount})`}
+                </Text>
+                <Icon
+                  name={insExpanded ? 'chevronUp' : 'chevronDown'}
+                  size={16}
+                  color={colors.accent}
+                  strokeWidth={2.6}
+                />
+              </Pressable>
+            ) : null}
+
+            {insExpanded && onSeeAllInsights ? (
+              <Pressable
+                onPress={onSeeAllInsights}
+                android_ripple={{ color: colors.accent + '14' }}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.seeAll, pressed && { opacity: 0.8 }]}
+              >
+                <Icon name="target" size={14} color={colors.accent} strokeWidth={2.5} />
+                <Text style={styles.seeAllText}>{t('smartInsights') || 'Insights'}</Text>
+                <Icon name="chevronRight" size={14} color={colors.accent} strokeWidth={2.6} />
               </Pressable>
             ) : null}
           </View>
@@ -354,63 +342,45 @@ const makeStyles = () => ({
   },
   tasksTxt: { fontSize: 13, fontWeight: '800' },
 
-  insRow: {
-    flex: 1,
+  // Smart guidance — full-width rows + a big show-all button
+  insSection: { marginTop: 12 },
+  insDot: { width: 9, height: 9, borderRadius: 5, flexShrink: 0 },
+  insItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
-    paddingVertical: 8,
+    gap: 10,
+    paddingVertical: 11,
     paddingHorizontal: 12,
     borderRadius: 14,
     backgroundColor: colors.cardElevated,
   },
-  insDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-  insText: {
+  insItemText: {
     flex: 1,
     color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '500',
-    lineHeight: 17,
-  },
-  morePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingStart: 9,
-    paddingEnd: 6,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: colors.accent + '22',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  moreTxt: { color: colors.accent, fontSize: 12, fontWeight: '800' },
-
-  // Expanded list of the remaining insights
-  moreList: { marginTop: 8, gap: 6 },
-  moreItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: colors.cardElevated,
-  },
-  moreItemText: {
-    flex: 1,
-    color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '600',
-    lineHeight: 17,
+    lineHeight: 18,
   },
+  showAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    marginTop: 8,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.accent + '40',
+    backgroundColor: colors.accent + '0e',
+  },
+  showAllText: { color: colors.accent, fontSize: 13, fontWeight: '800' },
   seeAll: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 9,
-    marginTop: 2,
+    gap: 6,
+    marginTop: 6,
+    paddingVertical: 8,
   },
   seeAllText: { color: colors.accent, fontSize: 13, fontWeight: '800' },
 });
