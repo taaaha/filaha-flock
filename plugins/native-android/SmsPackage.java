@@ -6,6 +6,7 @@ import android.app.AlarmManager;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -119,11 +120,65 @@ public class SmsPackage implements ReactPackage {
 
         // Bump this string whenever native code changes so JS can detect
         // when the installed APK is older than the JS code expects.
-        private static final String NATIVE_VERSION = "v9-2026-05-29a";
+        private static final String NATIVE_VERSION = "v10-2026-06-06a";
 
         @ReactMethod
         public void getNativeVersion(Promise promise) {
             promise.resolve(NATIVE_VERSION);
+        }
+
+        /**
+         * Dynamic launcher icon (Duolingo-style). Enables the activity-alias
+         * matching the worst coop status and disables the others. DONT_KILL_APP
+         * keeps the app running; the home-screen icon updates (some launchers
+         * cache it briefly). state: "ok" | "warn" | "danger" (else → happy).
+         */
+        @ReactMethod
+        public void setAppIcon(String state, Promise promise) {
+            try {
+                Context context = getReactApplicationContext();
+                PackageManager pm = context.getPackageManager();
+                String pkg = context.getPackageName();
+
+                String target;
+                if ("danger".equals(state) || "powerCut".equals(state)) {
+                    target = pkg + ".MainActivityAlarmed";
+                } else if ("warn".equals(state)) {
+                    target = pkg + ".MainActivityWorried";
+                } else {
+                    target = pkg + ".MainActivityHappy";
+                }
+
+                // Enable the target FIRST so the launcher is never left with
+                // zero enabled aliases for even an instant; then disable the rest.
+                ComponentName targetCn = new ComponentName(pkg, target);
+                if (pm.getComponentEnabledSetting(targetCn)
+                        != PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+                    pm.setComponentEnabledSetting(targetCn,
+                            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                            PackageManager.DONT_KILL_APP);
+                }
+                String[] aliases = {
+                        pkg + ".MainActivityHappy",
+                        pkg + ".MainActivityWorried",
+                        pkg + ".MainActivityAlarmed",
+                };
+                for (String alias : aliases) {
+                    if (alias.equals(target)) continue;
+                    ComponentName cn = new ComponentName(pkg, alias);
+                    if (pm.getComponentEnabledSetting(cn)
+                            != PackageManager.COMPONENT_ENABLED_STATE_DISABLED) {
+                        pm.setComponentEnabledSetting(cn,
+                                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                                PackageManager.DONT_KILL_APP);
+                    }
+                }
+                Log.i(TAG, "setAppIcon: " + state + " -> " + target);
+                promise.resolve(true);
+            } catch (Exception e) {
+                Log.e(TAG, "setAppIcon failed", e);
+                promise.reject("ICON_ERROR", e.getMessage());
+            }
         }
 
         // ── In-app update support ──────────────────────────────────────

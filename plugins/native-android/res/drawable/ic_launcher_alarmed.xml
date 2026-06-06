@@ -1,0 +1,29 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+  <!-- background -->
+  <path android:fillColor="#cf5a40"
+        android:pathData="M0,28 a28,28 0 0 1 28,-28 h52 a28,28 0 0 1 28,28 v52 a28,28 0 0 1 -28,28 h-52 a28,28 0 0 1 -28,-28 z"/>
+  <!-- comb -->
+  <path android:fillColor="#d9594a"
+        android:pathData="M37,30 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0 z M47,24 a7,7 0 1 0 14,0 a7,7 0 1 0 -14,0 z M59,30 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0 z"/>
+  <!-- legs -->
+  <path android:strokeColor="#e8923a" android:strokeWidth="3" android:strokeLineCap="round"
+        android:pathData="M47,84 L47,93 M44,93 L50,93 M61,84 L61,93 M58,93 L64,93"/>
+  <!-- body -->
+  <path android:fillColor="#fff7ec" android:strokeColor="#e6d6ba" android:strokeWidth="2.5"
+        android:pathData="M27,62 a27,25 0 1 0 54,0 a27,25 0 1 0 -54,0 z"/>
+  <!-- belly highlight -->
+  <path android:fillColor="#ffffff" android:fillAlpha="0.45"
+        android:pathData="M38,70 a16,13 0 1 0 32,0 a16,13 0 1 0 -32,0 z"/>
+  <!-- beak (open) -->
+  <path android:fillColor="#f0a13c" android:pathData="M47,66 L61,66 L54,80 z"/>
+  <!-- wide eyes -->
+  <path android:fillColor="#ffffff" android:strokeColor="#3a2c1a" android:strokeWidth="1.6"
+        android:pathData="M39,54 a5,5 0 1 0 10,0 a5,5 0 1 0 -10,0 z M59,54 a5,5 0 1 0 10,0 a5,5 0 1 0 -10,0 z"/>
+  <path android:fillColor="#3a2c1a"
+        android:pathData="M41.5,54 a2.5,2.5 0 1 0 5,0 a2.5,2.5 0 1 0 -5,0 z M61.5,54 a2.5,2.5 0 1 0 5,0 a2.5,2.5 0 1 0 -5,0 z"/>
+  <!-- alarmed brows -->
+  <path android:strokeColor="#3a2c1a" android:strokeWidth="3" android:strokeLineCap="round"
+        android:pathData="M36,45 L48,49 M72,45 L60,49"/>
+</vector>

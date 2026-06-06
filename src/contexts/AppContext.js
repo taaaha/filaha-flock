@@ -20,6 +20,7 @@ import {
   startMonitoring,
   scheduleDailyReminder,
   cancelDailyReminder,
+  setAppIcon,
 } from '../services/SmsService';
 import { computeFarmHealth } from '../utils/farmHealth';
 import { generateInsights } from '../services/Insights';
@@ -28,7 +29,7 @@ import { startRemoteContentRefresh } from '../services/RemoteContent';
 import { makePhoneCall, makeDirectCall } from '../services/CallService';
 import { vibrateDanger, vibrateWarn } from '../services/AlertService';
 import { parseSms } from '../utils/smsParser';
-import { DEFAULT_THRESHOLDS, sensorStatus } from '../utils/thresholds';
+import { DEFAULT_THRESHOLDS, sensorStatus, deviceStatus } from '../utils/thresholds';
 import { heatStressTHI } from '../utils/poultryData';
 import { STATUS } from '../utils/colors';
 import { uid } from '../utils/ids';
@@ -697,6 +698,29 @@ export function AppProvider({ children }) {
     state.ready, state.devices, state.readings,
     state.thresholds, state.powerCut, state.language, t,
   ]);
+
+  // ---------- Dynamic launcher icon (Duolingo-style) ----------
+  // Switch the home-screen chick to match the WORST coop status. Deduped via a
+  // ref so the (relatively expensive) component-enable switch only fires when
+  // the face actually changes — never on every reading/tick.
+  const lastIconRef = useRef('');
+  useEffect(() => {
+    if (!state.ready) return;
+    const s = stateRef.current;
+    let worst = 'ok';
+    for (const d of (s.devices || [])) {
+      const list = (s.readings && s.readings[d.id]) || [];
+      const reading = list.length ? list[list.length - 1] : null;
+      const isPowerCut = !!(s.powerCut && s.powerCut[d.id]);
+      const st = deviceStatus(d, reading, s.thresholds, Date.now(), isPowerCut);
+      if (st === STATUS.DANGER || st === STATUS.POWER_CUT) { worst = 'danger'; break; }
+      if (st === STATUS.WARN) worst = 'warn';
+    }
+    if (lastIconRef.current !== worst) {
+      lastIconRef.current = worst;
+      setAppIcon(worst).catch(() => {});
+    }
+  }, [state.ready, state.devices, state.readings, state.thresholds, state.powerCut, state.now]);
 
   // ---------- Public actions ----------
   const setLanguage = useCallback(async (lang) => {

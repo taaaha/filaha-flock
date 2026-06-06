@@ -133,6 +133,66 @@ function ensureForegroundService(application) {
   }
 }
 
+// ── Dynamic app icon (Duolingo-style) ──────────────────────────────────
+// Three launcher faces (happy/worried/alarmed) that the JS layer switches by
+// worst coop status via PackageManager (FilahaSms.setAppIcon). Implemented as
+// activity-aliases that target MainActivity, each carrying its own icon. The
+// MAIN/LAUNCHER intent-filter is moved OFF MainActivity onto the aliases so we
+// never end up with zero or duplicate launcher entries.
+const ICON_ALIASES = [
+  { name: '.MainActivityHappy',   icon: '@drawable/ic_launcher_happy',   enabled: 'true'  },
+  { name: '.MainActivityWorried', icon: '@drawable/ic_launcher_worried', enabled: 'false' },
+  { name: '.MainActivityAlarmed', icon: '@drawable/ic_launcher_alarmed', enabled: 'false' },
+];
+
+function isMainLauncherFilter(f) {
+  const hasMain = (f.action || []).some(
+    (a) => a && a.$ && a.$['android:name'] === 'android.intent.action.MAIN'
+  );
+  const hasLauncher = (f.category || []).some(
+    (c) => c && c.$ && c.$['android:name'] === 'android.intent.category.LAUNCHER'
+  );
+  return hasMain && hasLauncher;
+}
+
+function ensureDynamicIcons(application) {
+  // 1) Strip the MAIN/LAUNCHER filter off MainActivity (keep deep-link filters).
+  const mainActivity = (application.activity || []).find(
+    (a) => a && a.$ && a.$['android:name'] === '.MainActivity'
+  );
+  if (mainActivity && Array.isArray(mainActivity['intent-filter'])) {
+    mainActivity['intent-filter'] = mainActivity['intent-filter'].filter(
+      (f) => !isMainLauncherFilter(f)
+    );
+  }
+
+  // 2) Add the three launcher aliases (idempotent).
+  if (!application['activity-alias']) application['activity-alias'] = [];
+  ICON_ALIASES.forEach((al) => {
+    const exists = application['activity-alias'].some(
+      (x) => x && x.$ && x.$['android:name'] === al.name
+    );
+    if (exists) return;
+    application['activity-alias'].push({
+      $: {
+        'android:name': al.name,
+        'android:enabled': al.enabled,
+        'android:exported': 'true',
+        'android:targetActivity': '.MainActivity',
+        'android:icon': al.icon,
+        'android:roundIcon': al.icon,
+        'android:label': '@string/app_name',
+      },
+      'intent-filter': [
+        {
+          action: [{ $: { 'android:name': 'android.intent.action.MAIN' } }],
+          category: [{ $: { 'android:name': 'android.intent.category.LAUNCHER' } }],
+        },
+      ],
+    });
+  });
+}
+
 function withFilahaManifest(config) {
   return withAndroidManifest(config, async (cfg) => {
     const androidManifest = cfg.modResults;
@@ -144,10 +204,34 @@ function withFilahaManifest(config) {
     if (manifest.application && manifest.application[0]) {
       ensureSmsReceiver(manifest.application[0]);
       ensureForegroundService(manifest.application[0]);
+      ensureDynamicIcons(manifest.application[0]);
     }
 
     return cfg;
   });
+}
+
+// Copy the vector launcher icons into android res/drawable.
+function withDynamicIconResources(config) {
+  return withDangerousMod(config, [
+    'android',
+    async (cfg) => {
+      const projectRoot = cfg.modRequest.projectRoot;
+      const platformRoot = cfg.modRequest.platformProjectRoot;
+      const targetDir = path.join(platformRoot, 'app', 'src', 'main', 'res', 'drawable');
+      if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+
+      const sourceDir = path.join(projectRoot, 'plugins', 'native-android', 'res', 'drawable');
+      ['ic_launcher_happy.xml', 'ic_launcher_worried.xml', 'ic_launcher_alarmed.xml'].forEach((file) => {
+        const src = path.join(sourceDir, file);
+        if (!fs.existsSync(src)) {
+          throw new Error(`[withFilahaSms] Missing icon resource: ${src}`);
+        }
+        fs.writeFileSync(path.join(targetDir, file), fs.readFileSync(src, 'utf8'));
+      });
+      return cfg;
+    },
+  ]);
 }
 
 function injectKotlin(contents) {
@@ -309,5 +393,6 @@ module.exports = function withFilahaSms(config) {
   config = withFilahaManifest(config);
   config = withFilahaPackageRegistration(config);
   config = withFilahaJavaFiles(config);
+  config = withDynamicIconResources(config);
   return config;
 };

@@ -3,7 +3,7 @@ import { DeviceEventEmitter, NativeModules, PermissionsAndroid, Platform } from 
 const { FilahaSms } = NativeModules || {};
 
 // JS expects this version. Bump in lockstep with NATIVE_VERSION in SmsPackage.java.
-export const EXPECTED_NATIVE_VERSION = 'v9-2026-05-29a';
+export const EXPECTED_NATIVE_VERSION = 'v10-2026-06-06a';
 
 export async function getNativeVersion() {
   if (!FilahaSms || !FilahaSms.getNativeVersion) return null;
@@ -40,10 +40,26 @@ export function listMissingNativeMethods() {
     'setAlertConfig', 'saveEmergencyContact', 'drainQueue',
     'getNativeVersion', 'scheduleDailyReminder', 'cancelDailyReminder',
     'startMonitoring', 'stopMonitoring', 'getPendingRoute',
-    'getAppVersionInfo', 'installApk',
+    'getAppVersionInfo', 'installApk', 'setAppIcon',
   ];
   if (!FilahaSms) return required;
   return required.filter((k) => typeof FilahaSms[k] !== 'function');
+}
+
+/**
+ * Dynamic launcher icon (Duolingo-style). Switches the home-screen chick to
+ * match the worst coop status. No-op on older APKs without the native method.
+ * state: 'ok' | 'warn' | 'danger'
+ */
+export async function setAppIcon(state) {
+  if (!FilahaSms || typeof FilahaSms.setAppIcon !== 'function') return false;
+  try {
+    await FilahaSms.setAppIcon(String(state || 'ok'));
+    return true;
+  } catch (e) {
+    if (__DEV__) console.warn('setAppIcon failed:', e?.message);
+    return false;
+  }
 }
 
 export async function startMonitoring(title, body) {
