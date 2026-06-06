@@ -59,7 +59,7 @@ const makeStyles = () => ({
   tile: {
     flex: 1,
     backgroundColor: colors.card,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1.5,
     padding: 14,
     minHeight: 130,

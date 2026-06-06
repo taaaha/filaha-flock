@@ -198,7 +198,7 @@ const makeStyles = () => ({
 
   card: {
     backgroundColor: colors.card,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
@@ -211,7 +211,7 @@ const makeStyles = () => ({
     marginBottom: 12,
   },
   iconChip: {
-    width: 44, height: 44, borderRadius: 12,
+    width: 44, height: 44, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
   },
   issueTitle: {
@@ -302,7 +302,7 @@ const makeStyles = () => ({
     justifyContent: 'center',
     gap: 8,
     height: 52,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.accent + '50',
     backgroundColor: colors.accent + '12',

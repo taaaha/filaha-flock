@@ -130,7 +130,7 @@ function Row({ color, label, value, unit, onMinus, onPlus, styles }) {
 const makeStyles = () => ({
   wrap: {
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 14,
@@ -144,7 +144,7 @@ const makeStyles = () => ({
   },
   block: {
     backgroundColor: colors.bgElevated,
-    borderRadius: 10,
+    borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
@@ -181,7 +181,7 @@ const makeStyles = () => ({
   btn: {
     width: 36,
     height: 36,
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,

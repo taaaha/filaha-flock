@@ -15,8 +15,8 @@ export default function ToggleRow({ label, hint, value, onValueChange, disabled 
         value={!!value}
         onValueChange={onValueChange}
         disabled={disabled}
-        thumbColor={value ? colors.accent : '#888'}
-        trackColor={{ false: '#374151', true: colors.accent + '99' }}
+        thumbColor={value ? colors.accent : colors.textTertiary}
+        trackColor={{ false: colors.borderStrong, true: colors.accent + '99' }}
       />
     </View>
   );
@@ -29,7 +29,7 @@ const makeStyles = () => ({
     paddingVertical: 14,
     paddingHorizontal: 14,
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: 10,

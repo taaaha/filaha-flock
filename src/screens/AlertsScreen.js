@@ -9,6 +9,7 @@ import { useStyles } from '../utils/useStyles';
 import { isToday } from '../utils/formatters';
 import AlertItem from '../components/AlertItem';
 import Icon from '../components/Icon';
+import CoopMascot from '../components/CoopMascot';
 
 const FILTERS = ['all', 'alerts', 'cleared', 'today'];
 
@@ -106,7 +107,7 @@ export default function AlertsScreen() {
         contentContainerStyle={{ paddingTop: 8, paddingBottom: 100 }}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>✓</Text>
+            <CoopMascot animated status="ok" size={88} />
             <Text style={styles.emptyTitle}>{t('noAlerts')}</Text>
             <Text style={styles.emptyHint}>{t('noAlertsHint')}</Text>
           </View>
@@ -139,9 +140,9 @@ const makeStyles = () => ({
     fontWeight: '800',
   },
   clearBtn: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -180,15 +181,11 @@ const makeStyles = () => ({
     paddingTop: 80,
     paddingHorizontal: 40,
   },
-  emptyIcon: {
-    fontSize: 64,
-    color: colors.ok,
-    marginBottom: 12,
-  },
   emptyTitle: {
     color: colors.textPrimary,
     fontSize: 18,
     fontWeight: '700',
+    marginTop: 12,
   },
   emptyHint: {
     color: colors.textSecondary,

@@ -121,7 +121,7 @@ const makeStyles = () => ({
   backdrop: { flex: 1, backgroundColor: '#231a0fcc', justifyContent: 'flex-end' },
   card: {
     backgroundColor: colors.bgElevated,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
     paddingHorizontal: 20, paddingTop: 10, paddingBottom: 18,
     maxHeight: '85%',
     borderTopWidth: 1, borderColor: colors.border,
@@ -162,7 +162,7 @@ const makeStyles = () => ({
   gotIt: {
     marginTop: 8,
     backgroundColor: colors.accent,
-    borderRadius: 12,
+    borderRadius: 15,
     paddingVertical: 14,
     alignItems: 'center',
   },

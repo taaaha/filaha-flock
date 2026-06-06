@@ -141,9 +141,9 @@ function MainTabs() {
           backgroundColor: colors.bgElevated,
           borderTopColor: colors.border,
           borderTopWidth: 0.5,
-          height: 70,
-          paddingBottom: 10,
-          paddingTop: 8,
+          height: 74,
+          paddingBottom: 12,
+          paddingTop: 10,
           elevation: 0,             // no shadow → no ghost line under bar
           shadowOpacity: 0,
         },

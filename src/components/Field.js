@@ -52,7 +52,7 @@ const makeStyles = () => ({
     backgroundColor: colors.card,
     borderColor: colors.border,
     borderWidth: 1.5,
-    borderRadius: 12,
+    borderRadius: 15,
     color: colors.textPrimary,
     paddingHorizontal: 14,
     paddingVertical: 12,

@@ -100,8 +100,8 @@ const makeStyles = () => ({
   },
   card: {
     backgroundColor: colors.bgElevated,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     paddingHorizontal: 22,
     paddingTop: 14,
     paddingBottom: 24,

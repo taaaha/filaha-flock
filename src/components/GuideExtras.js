@@ -368,9 +368,9 @@ const makeStyles = () => ({
   benchCard: {
     flex: 1,
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1.5,
-    padding: 10,
+    padding: 12,
   },
   benchLabel: {
     fontSize: 10, fontWeight: '800', letterSpacing: 0.6,
@@ -389,7 +389,7 @@ const makeStyles = () => ({
   // Disease list
   diseaseCard: {
     backgroundColor: colors.bgElevated,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1, borderColor: colors.border,
     overflow: 'hidden',
   },
@@ -421,8 +421,8 @@ const makeStyles = () => ({
   // Market prices
   priceRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 12,
-    backgroundColor: colors.bgElevated, borderRadius: 10,
+    paddingVertical: 12, paddingHorizontal: 14,
+    backgroundColor: colors.bgElevated, borderRadius: 16,
     borderWidth: 1, borderColor: colors.border,
   },
   priceLabel: {
@@ -440,7 +440,7 @@ const makeStyles = () => ({
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingHorizontal: 14, paddingVertical: 14,
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1.5, borderColor: colors.border,
   },
   wilayaDropdownText: {
@@ -452,7 +452,7 @@ const makeStyles = () => ({
   },
   wilayaModalCard: {
     backgroundColor: colors.bgElevated,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
     paddingHorizontal: 18, paddingTop: 10, paddingBottom: 22,
     borderTopWidth: 1, borderColor: colors.border,
     maxHeight: '85%',
@@ -500,7 +500,7 @@ const makeStyles = () => ({
   },
   wilayaCloseBtn: {
     marginTop: 12, paddingVertical: 12,
-    backgroundColor: colors.card, borderRadius: 12, alignItems: 'center',
+    backgroundColor: colors.card, borderRadius: 16, alignItems: 'center',
     borderWidth: 1, borderColor: colors.border,
   },
   wilayaCloseBtnText: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
@@ -508,9 +508,9 @@ const makeStyles = () => ({
   // Feed phases
   phaseRow: {
     backgroundColor: colors.bgElevated,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1, borderColor: colors.border,
-    padding: 12, marginBottom: 8,
+    padding: 14, marginBottom: 8,
   },
   phaseHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -522,8 +522,8 @@ const makeStyles = () => ({
   metric: {
     flex: 1,
     backgroundColor: colors.card,
-    borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 6,
+    borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 7,
     borderWidth: 1, borderColor: colors.border,
   },
   metricLabel: {

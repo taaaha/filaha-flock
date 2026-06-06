@@ -190,7 +190,7 @@ const makeStyles = () => ({
 
   card: {
     backgroundColor: colors.card,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     borderStartWidth: 4,
     borderStartColor: colors.accent,
@@ -205,7 +205,7 @@ const makeStyles = () => ({
   iconChip: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -241,7 +241,7 @@ const makeStyles = () => ({
     gap: 6,
     marginTop: 14,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
   },
   ctaText: {
@@ -257,7 +257,7 @@ const makeStyles = () => ({
     marginHorizontal: 16,
     marginTop: 10,
     height: 42,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,

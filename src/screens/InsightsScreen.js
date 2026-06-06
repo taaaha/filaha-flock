@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StatusBar, RefreshControl, Image } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../components/Icon';
 import SmartInsights from '../components/SmartInsights';
+import CoopMascot from '../components/CoopMascot';
 import { useApp } from '../contexts/AppContext';
 import { colors, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
@@ -98,7 +99,7 @@ export default function InsightsScreen({ navigation }) {
           ) : (
             <View style={styles.empty}>
               <View style={styles.emptyIconBox}>
-                <Icon name="checkCircle" size={44} color={colors.ok} strokeWidth={2.2} />
+                <CoopMascot animated status="ok" size={88} />
               </View>
               <Text style={styles.emptyTitle}>
                 {t('insightsAllClear') || 'Everything under control'}
@@ -128,7 +129,7 @@ const makeStyles = () => ({
     gap: 12,
   },
   iconBadge: {
-    width: 46, height: 46, borderRadius: 14,
+    width: 46, height: 46, borderRadius: 16,
     backgroundColor: colors.accent + '1f',
     alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
@@ -138,6 +139,7 @@ const makeStyles = () => ({
     color: colors.textPrimary,
     fontSize: 22,
     fontWeight: '800',
+    letterSpacing: 0.2,
   },
   subtitle: {
     color: colors.textSecondary,
@@ -160,7 +162,7 @@ const makeStyles = () => ({
     paddingHorizontal: 14,
     paddingVertical: 12,
     backgroundColor: colors.card,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -183,7 +185,7 @@ const makeStyles = () => ({
   },
   emptyIconBox: {
     width: 96, height: 96, borderRadius: 28,
-    backgroundColor: colors.ok + '14',
+    backgroundColor: colors.okWash,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 22,
   },

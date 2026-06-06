@@ -1,13 +1,13 @@
 import React, { memo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { colors } from '../utils/colors';
+import { colors, STATUS, statusColor, statusWash, statusInk } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { formatRelativeTime, formatTime } from '../utils/formatters';
 
-function alertColor(alert) {
-  if (alert.type === 'CLEAR') return colors.ok;
-  if (alert.subType === 'POWER_CUT') return colors.power;
-  return colors.danger;
+function alertStatus(alert) {
+  if (alert.type === 'CLEAR') return STATUS.OK;
+  if (alert.subType === 'POWER_CUT') return STATUS.POWER_CUT;
+  return STATUS.DANGER;
 }
 
 function alertTitle(alert, t) {
@@ -25,7 +25,10 @@ function alertTitle(alert, t) {
 
 function AlertItem({ alert, onPress, t, now }) {
   const styles = useStyles(makeStyles);
-  const color = alertColor(alert);
+  const status = alertStatus(alert);
+  const color = statusColor(status);
+  const wash = statusWash(status);
+  const ink = statusInk(status);
   const title = alertTitle(alert, t);
 
   return (
@@ -34,13 +37,14 @@ function AlertItem({ alert, onPress, t, now }) {
       android_ripple={{ color: colors.textPrimary + '10' }}
       style={[
         styles.item,
+        { backgroundColor: wash, borderColor: color + '33' },
         alert.acknowledged && { opacity: 0.55 },
       ]}
     >
       <View style={[styles.stripe, { backgroundColor: color }]} />
       <View style={styles.body}>
         <View style={styles.topRow}>
-          <Text style={[styles.title, { color }]} numberOfLines={1}>
+          <Text style={[styles.title, { color: ink }]} numberOfLines={1}>
             {title}
           </Text>
           <Text style={styles.time}>
@@ -66,7 +70,7 @@ const makeStyles = () => ({
   item: {
     flexDirection: 'row',
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 18,
     marginHorizontal: 16,
     marginBottom: 10,
     overflow: 'hidden',
@@ -78,8 +82,8 @@ const makeStyles = () => ({
   },
   body: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
   },
   topRow: {
     flexDirection: 'row',

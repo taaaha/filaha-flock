@@ -476,7 +476,7 @@ const makeStyles = () => ({
     paddingBottom: 14,
   },
   headerIcon: {
-    width: 46, height: 46, borderRadius: 14,
+    width: 46, height: 46, borderRadius: 16,
     backgroundColor: colors.accent + '15',
     borderWidth: 1, borderColor: colors.accent + '40',
     alignItems: 'center', justifyContent: 'center',
@@ -501,7 +501,7 @@ const makeStyles = () => ({
     gap: 4,
     paddingHorizontal: 4,
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: colors.border,
   },
@@ -535,14 +535,14 @@ const makeStyles = () => ({
     paddingVertical: 12,
     paddingHorizontal: 12,
     backgroundColor: colors.bgElevated,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: 8,
   },
   taskRowDone: { opacity: 0.7, borderColor: colors.ok + '40', backgroundColor: colors.ok + '08' },
   taskIconBox: {
-    width: 34, height: 34, borderRadius: 10,
+    width: 34, height: 34, borderRadius: 12,
     backgroundColor: colors.accent + '1a',
     borderWidth: 1, borderColor: colors.accent + '30',
     alignItems: 'center', justifyContent: 'center', marginTop: 1,
@@ -560,8 +560,8 @@ const makeStyles = () => ({
   checkBoxOn: { backgroundColor: colors.ok, borderColor: colors.ok },
 
   reminderRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12,
-    backgroundColor: colors.bgElevated, borderRadius: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
+    backgroundColor: colors.bgElevated, borderRadius: 16,
     borderWidth: 1, borderColor: colors.border, marginTop: 4,
   },
   reminderTitle: { color: colors.textPrimary, fontSize: 13, fontWeight: '800' },
@@ -574,7 +574,7 @@ const makeStyles = () => ({
   phaseRow: { flexDirection: 'row', gap: 8 },
   phaseCard: {
     flex: 1, backgroundColor: colors.card,
-    borderRadius: 14, borderWidth: 1, padding: 14, alignItems: 'center',
+    borderRadius: 18, borderWidth: 1, padding: 14, alignItems: 'center',
   },
   phaseDot: { width: 8, height: 8, borderRadius: 4, marginBottom: 6 },
   phaseRange: { color: colors.textTertiary, fontSize: 10, fontWeight: '800', letterSpacing: 0.6, marginBottom: 4 },
@@ -583,12 +583,12 @@ const makeStyles = () => ({
 
   calcCard: {
     backgroundColor: colors.card,
-    borderRadius: 14, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 18, borderWidth: 1, borderColor: colors.border,
     marginBottom: 8, overflow: 'hidden',
   },
-  calcHead: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
+  calcHead: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   calcIconBox: {
-    width: 40, height: 40, borderRadius: 12, borderWidth: 1,
+    width: 40, height: 40, borderRadius: 14, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
   },
   calcTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
@@ -596,11 +596,11 @@ const makeStyles = () => ({
   calcBody: { padding: 12, borderTopWidth: 1, borderTopColor: colors.border },
 
   topicCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12,
-    backgroundColor: colors.card, borderRadius: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
+    backgroundColor: colors.card, borderRadius: 18,
     borderWidth: 1, borderColor: colors.border, marginBottom: 8,
   },
-  topicIconBox: { width: 42, height: 42, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  topicIconBox: { width: 42, height: 42, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   topicTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
   topicSummary: { color: colors.textSecondary, fontSize: 12, marginTop: 3, lineHeight: 17 },
 });
@@ -609,7 +609,7 @@ const makeModalStyles = () => ({
   backdrop: { flex: 1, backgroundColor: '#231a0fcc', justifyContent: 'flex-end' },
   card: {
     backgroundColor: colors.bgElevated,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
     paddingHorizontal: 20, paddingTop: 10, paddingBottom: 24,
     maxHeight: '85%',
   },
@@ -618,7 +618,7 @@ const makeModalStyles = () => ({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 14,
   },
-  headIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  headIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   headTitle: { flex: 1, color: colors.textPrimary, fontSize: 17, fontWeight: '800' },
   headSub: { fontSize: 12, fontWeight: '600', marginTop: 2 },
   closeBtn: {
