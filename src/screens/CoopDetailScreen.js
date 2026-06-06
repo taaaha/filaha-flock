@@ -16,6 +16,8 @@ import { deviceStatus } from '../utils/thresholds';
 import { isToday, formatRelativeTime, formatTime } from '../utils/formatters';
 import { buildFakeDataSms } from '../utils/smsParser';
 import Icon from '../components/Icon';
+import CoopMascot from '../components/CoopMascot';
+import { statusWash, statusInk } from '../utils/colors';
 import SensorTile from '../components/SensorTile';
 import BatteryBar from '../components/BatteryBar';
 import PrimaryButton from '../components/PrimaryButton';
@@ -202,6 +204,23 @@ export default function CoopDetailScreen({ route, navigation }) {
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Hero — the coop's chick + how it's feeling right now */}
+        <View style={[styles.hero, { backgroundColor: statusWash(status), borderColor: sColor + '33' }]}>
+          <View style={styles.heroMascotHug}>
+            <CoopMascot animated status={status} size={64} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[styles.heroStatus, { color: statusInk(status) }]} numberOfLines={1}>
+              {statusLabel(status, t)}
+            </Text>
+            <Text style={styles.heroSub} numberOfLines={1}>
+              {lastReading
+                ? formatRelativeTime(lastReading.timestamp, t, now)
+                : t('offline')}
+            </Text>
+          </View>
+        </View>
+
         {isOffline ? (
           <View style={styles.offlineBanner}>
             <Text style={styles.offlineText}>
@@ -423,6 +442,23 @@ const makeStyles = () => ({
   badgeText: { fontSize: 11, fontWeight: '800' },
   empty: { padding: 40, alignItems: 'center' },
   emptyTitle: { color: colors.textSecondary, fontSize: 18 },
+
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 14,
+  },
+  heroMascotHug: {
+    width: 72, height: 72, borderRadius: 24,
+    backgroundColor: '#ffffff55',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  heroStatus: { fontSize: 20, fontWeight: '800', letterSpacing: 0.2 },
+  heroSub: { color: colors.textSecondary, fontSize: 13, fontWeight: '500', marginTop: 2 },
   offlineBanner: {
     backgroundColor: colors.danger + '22',
     borderColor: colors.danger + '66',
@@ -448,8 +484,8 @@ const makeStyles = () => ({
     backgroundColor: colors.card,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 18,
+    padding: 14,
     marginBottom: 12,
     gap: 6,
   },
@@ -479,10 +515,10 @@ const makeStyles = () => ({
   },
   batteryWrap: {
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
+    padding: 16,
   },
   lastUpdate: {
     color: colors.textTertiary,

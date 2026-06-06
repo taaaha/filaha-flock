@@ -605,7 +605,11 @@ export default function DashboardScreen({ navigation }) {
 
           <View style={styles.brandRow}>
             <View style={styles.logoBadge}>
-              <CoopMascot status={counts.total === 0 ? 'offline' : counts.danger > 0 ? 'danger' : counts.warn > 0 ? 'warn' : 'ok'} size={34} />
+              <CoopMascot
+                animated
+                status={counts.total === 0 ? 'offline' : counts.danger > 0 ? 'danger' : counts.warn > 0 ? 'warn' : 'ok'}
+                size={38}
+              />
             </View>
             <View>
               <Text style={styles.brandMini}>Filaha Flock</Text>
@@ -690,7 +694,7 @@ export default function DashboardScreen({ navigation }) {
             ) : (
               <View style={styles.empty}>
                 <View style={styles.emptyIconBox}>
-                  <CoopMascot status="ok" size={88} />
+                  <CoopMascot animated status="ok" size={92} />
                 </View>
                 <Text style={styles.emptyTitle}>{t('noCoopsYet')}</Text>
                 <Text style={styles.emptyHint}>{t('noCoopsHint')}</Text>
@@ -841,7 +845,7 @@ export default function DashboardScreen({ navigation }) {
 const makeStyles = () => ({
   safe: { flex: 1, backgroundColor: colors.bg },
 
-  // Minimal top bar (brand + help)
+  // Friendly "sky" top band (brand + add), rounded at the bottom
   topBar: {
     position: 'relative',
     overflow: 'hidden',
@@ -850,15 +854,16 @@ const makeStyles = () => ({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 14,
-    paddingBottom: 16,
-    backgroundColor: colors.accent + '08',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.accent + '24',
+    paddingBottom: 20,
+    backgroundColor: colors.accent + '12',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   logoBadge: {
-    width: 40, height: 40, borderRadius: 13,
-    backgroundColor: colors.accent + '24',
+    width: 48, height: 48, borderRadius: 17,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1, borderColor: colors.accent + '33',
     alignItems: 'center', justifyContent: 'center',
   },
   brandMini: {

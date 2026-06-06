@@ -13,14 +13,15 @@ import { useApp } from '../contexts/AppContext';
 import { colors, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import PrimaryButton from '../components/PrimaryButton';
+import CoopMascot from '../components/CoopMascot';
 import { LANGS } from '../translations';
 
 const { width } = Dimensions.get('window');
 
 const SLIDES = [
-  { icon: '🐔', titleKey: 'onboardingTitle1', descKey: 'onboardingDesc1' },
-  { icon: '⚠️', titleKey: 'onboardingTitle2', descKey: 'onboardingDesc2' },
-  { icon: '📡', titleKey: 'onboardingTitle3', descKey: 'onboardingDesc3' },
+  { status: 'ok',      titleKey: 'onboardingTitle1', descKey: 'onboardingDesc1' },
+  { status: 'danger',  titleKey: 'onboardingTitle2', descKey: 'onboardingDesc2' },
+  { status: 'offline', titleKey: 'onboardingTitle3', descKey: 'onboardingDesc3' },
 ];
 
 export default function OnboardingScreen() {
@@ -65,7 +66,7 @@ export default function OnboardingScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.brand}>Filaha Flock</Text>
         <View style={styles.iconWrap}>
-          <Text style={styles.icon}>{slide.icon}</Text>
+          <CoopMascot animated status={slide.status} size={120} />
         </View>
         <Text style={styles.title}>{t(slide.titleKey)}</Text>
         <Text style={styles.desc}>{t(slide.descKey)}</Text>

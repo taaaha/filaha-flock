@@ -130,6 +130,7 @@ export default function DailyBriefing({
       <View style={styles.strip}>
         <View style={[styles.mascotHug, { backgroundColor: worstColor + '1f' }]}>
           <CoopMascot
+            animated
             status={counts.total === 0 ? 'offline' : counts.danger > 0 ? 'danger' : counts.attention > 0 ? 'warn' : 'ok'}
             size={46}
           />

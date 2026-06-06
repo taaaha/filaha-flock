@@ -59,6 +59,10 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
             shadows.md,
           ]}
         >
+          {/* Decorative soft blobs — organic depth, clipped by the card */}
+          <View pointerEvents="none" style={[styles.blob, { backgroundColor: sColor + '1f' }]} />
+          <View pointerEvents="none" style={[styles.blobSmall, { backgroundColor: sColor + '17' }]} />
+
           {/* Header — mascot + name + status chip */}
           <View style={styles.topRow}>
             <View style={styles.mascotHug}>
@@ -139,6 +143,22 @@ const makeStyles = () => ({
     paddingBottom: 16,
     paddingHorizontal: 16,
     overflow: 'hidden',
+  },
+  blob: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    top: -56,
+    right: -44,
+  },
+  blobSmall: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    bottom: -34,
+    left: -28,
   },
   topRow: {
     flexDirection: 'row',
