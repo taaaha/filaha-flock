@@ -97,8 +97,8 @@ function cloudsFor(statusKey, night) {
     : [{ top: 0.24, scale: 0.8,  color: '#ffffff', opacity: 0.92, duration: 78000, delay: 0 }];
 }
 
-export default function LivingSky({ statusKey = 'ok', hour = 12, height = 200 }) {
-  const W = SCREEN_W;
+export default function LivingSky({ statusKey = 'ok', hour = 12, height = 200, width }) {
+  const W = width || SCREEN_W;
   const H = height;
   const bucket = bucketOf(hour);
   const storm = statusKey === 'danger';

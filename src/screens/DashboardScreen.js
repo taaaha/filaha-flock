@@ -29,10 +29,7 @@ import { sensorStatus } from '../utils/thresholds';
 import { BREEDS, STRAINS_BY_BREED, strainLabel, heatStressTHI } from '../utils/poultryData';
 import CoopCard from '../components/CoopCard';
 import CoopMascot from '../components/CoopMascot';
-import LivingSky from '../components/LivingSky';
 import PrimaryButton from '../components/PrimaryButton';
-
-const HEADER_H = 150;
 import Field from '../components/Field';
 import { showToast } from '../components/Toast';
 import DailyBriefing from '../components/DailyBriefing';
@@ -301,15 +298,6 @@ export default function DashboardScreen({ navigation }) {
     : hour < 18 ? '🌤️'
     : '🌆';
 
-  // Living-sky header: overall farm mood + whether the sky is dark (night or
-  // storm) so the overlaid title/status text picks a legible color.
-  const skyStatusKey = counts.total === 0 ? 'offline'
-    : counts.danger > 0 ? 'danger'
-    : counts.warn > 0 ? 'warn'
-    : counts.offline === counts.total ? 'offline'
-    : 'ok';
-  const darkSky = hour < 5 || hour >= 20 || counts.danger > 0;
-  const onSky = darkSky ? '#ffffff' : '#33271d';
 
   const onTestData = () => {
     if (devices.length === 0) { showToast(t('noCoopsYet'), 'warn'); return; }
@@ -418,12 +406,14 @@ export default function DashboardScreen({ navigation }) {
   // WHOLE page scrolls as one — fixes content overflowing off-screen.
   const listHeader = (
     <View>
-      {/* ── DAILY BRIEFING — hero card with embedded smart guidance ── */}
+      {/* ── HERO — living sky + greeting + status + tasks + top insight ── */}
       <DailyBriefing
         t={t} language={language} settings={settings}
         devices={devices} readings={readings}
         thresholds={thresholds} powerCut={powerCut} now={now}
         insights={insights}
+        onAddCoop={() => setModalVisible(true)}
+        helpButton={<HelpButton t={t} screen="dashboard" />}
         onOpenInsight={(ins) =>
           navigation.getParent()?.navigate('Insights', {
             screen: 'InsightDetail',
@@ -599,40 +589,7 @@ export default function DashboardScreen({ navigation }) {
       />
 
       <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
-        {/* ── Living farm header ── */}
-        <View style={styles.topBar}>
-          <LivingSky statusKey={skyStatusKey} hour={hour} height={HEADER_H} />
-
-          <View style={styles.headerOverlay} pointerEvents="box-none">
-            <View style={styles.headerTopRow} pointerEvents="box-none">
-              <Text style={[styles.brandTitleNew, { color: onSky }]} numberOfLines={1}>
-                Filaha Flock
-              </Text>
-              <View style={styles.topActions}>
-                <Pressable
-                  onPress={() => setModalVisible(true)}
-                  android_ripple={{ color: '#ffffff44' }}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('addCoop')}
-                  style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
-                >
-                  <Text style={styles.addBtnPlus}>＋</Text>
-                  <Text style={styles.addBtnText}>{t('addCoop')}</Text>
-                </Pressable>
-                <HelpButton t={t} screen="dashboard" />
-              </View>
-            </View>
-
-            <View style={[styles.livePill, { backgroundColor: darkSky ? '#0000003a' : '#ffffff80' }]}>
-              <View style={[styles.liveDot, { backgroundColor: heroColor }]} />
-              <Text style={[styles.livePillText, { color: onSky }]} numberOfLines={1}>
-                {heroLabel}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ── List (header holds briefing, insights, banners, filters) ── */}
+        {/* ── List (header holds the living-sky hero, banners, filters) ── */}
         <FlatList
           ListHeaderComponent={listHeader}
           keyboardShouldPersistTaps="handled"
