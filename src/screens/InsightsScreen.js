@@ -184,7 +184,7 @@ const makeStyles = () => ({
     paddingHorizontal: 40,
   },
   emptyIconBox: {
-    width: 96, height: 96, borderRadius: 28,
+    width: 96, height: 96, borderRadius: 26,
     backgroundColor: colors.okWash,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 22,

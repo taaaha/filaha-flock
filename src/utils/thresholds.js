@@ -18,6 +18,22 @@ export const SENSOR_LIMITS = {
 
 export const OFFLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
+// Temperature-Humidity Index tier. Heat stress is a COMBINED danger that the
+// temperature threshold alone misses (28°C at 85% humidity can be lethal to
+// birds while 28°C reads only "warn"). Inlined here — same formula/cutoffs as
+// poultryData.heatStressTHI — so deviceStatus stays a leaf module with no
+// import cycle. Tiers: safe / alert(≥70) / danger(≥75) / emergency(≥83).
+export function thiTier(tempC, humidityPct) {
+  if (tempC == null || typeof tempC !== 'number' || isNaN(tempC)) return 'safe';
+  const rh = (humidityPct == null || isNaN(humidityPct)) ? 60 : humidityPct;
+  const thi = tempC - (0.55 - 0.0055 * rh) * (tempC - 14.5);
+  if (isNaN(thi)) return 'safe';
+  if (thi >= 83) return 'emergency';
+  if (thi >= 75) return 'danger';
+  if (thi >= 70) return 'alert';
+  return 'safe';
+}
+
 export function sensorStatus(key, value, thresholds) {
   if (value === null || value === undefined || isNaN(value)) return STATUS.OFFLINE;
   const t = thresholds[key];
@@ -51,6 +67,12 @@ export function deviceStatus(device, lastReading, thresholds, now = Date.now(), 
     sensorStatus('hum', lastReading.hum, thresholds),
     batteryStatus(lastReading.bat, thresholds),
   ];
+
+  // Heat stress folds into the device status so the coop card, the dashboard
+  // danger list, and the alert pipeline all agree.
+  const tier = thiTier(lastReading.temp, lastReading.hum);
+  if (tier === 'danger' || tier === 'emergency') sensorStatuses.push(STATUS.DANGER);
+  else if (tier === 'alert') sensorStatuses.push(STATUS.WARN);
 
   if (sensorStatuses.includes(STATUS.DANGER)) return STATUS.DANGER;
   if (sensorStatuses.includes(STATUS.WARN)) return STATUS.WARN;

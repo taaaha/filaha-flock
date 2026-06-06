@@ -29,6 +29,7 @@ import { makePhoneCall, makeDirectCall } from '../services/CallService';
 import { vibrateDanger, vibrateWarn } from '../services/AlertService';
 import { parseSms } from '../utils/smsParser';
 import { DEFAULT_THRESHOLDS, sensorStatus } from '../utils/thresholds';
+import { heatStressTHI } from '../utils/poultryData';
 import { STATUS } from '../utils/colors';
 import { uid } from '../utils/ids';
 import { DEFAULT_LANG, isRTL, makeT } from '../translations';
@@ -318,6 +319,93 @@ export function AppProvider({ children }) {
           });
         }
         devState[key] = { status: STATUS.OK, firedAt: 0 };
+      }
+    }
+
+    // ── Heat stress (combined temp+hum) — can be lethal even when temperature
+    // alone reads only "warn" (e.g. 28°C at 85% RH). Fires through the same
+    // danger pipeline so it matches the heat-stress danger the dashboard shows.
+    if (typeof reading.temp === 'number' && !isNaN(reading.temp)
+        && typeof reading.hum === 'number' && !isNaN(reading.hum)) {
+      const hs = heatStressTHI(reading.temp, reading.hum);
+      const tier = hs ? hs.tier : 'safe';
+      const prevHS = devState.heatStress || { status: STATUS.OK, firedAt: 0 };
+      if (tier === 'danger' || tier === 'emergency') {
+        const isNew = prevHS.status !== STATUS.DANGER;
+        const cooledDown = now - (prevHS.firedAt || 0) > DANGER_REFIRE_MS;
+        if (isNew || cooledDown) {
+          const farm = s.farms.find((f) => f.id === device.farmId);
+          const farmName = farm ? farm.name : (s.settings.farmName || '');
+          const thiTxt = hs ? `THI ${hs.thi}` : '';
+          newAlerts.push({
+            id: uid('a_'),
+            deviceId: device.id,
+            deviceName: device.name,
+            farmName,
+            type: 'ALERT',
+            subType: 'HEAT_STRESS',
+            message: `${tRef.current('heatStress')} ${thiTxt}`.trim(),
+            timestamp: reading.timestamp || now,
+            acknowledged: false,
+          });
+          devState.heatStress = { status: STATUS.DANGER, firedAt: now };
+          if (s.settings.vibrate) vibrateDanger();
+          // Native never computes THI, so JS always raises this notification
+          // (even for real SMS that natively handled the plain thresholds).
+          const action = actionFor('temp', s.language);
+          const whatToDo = tRef.current('whatToDo') || 'What to do';
+          const sev = tier === 'emergency'
+            ? (tRef.current('heatStressEmergency') || '')
+            : (tRef.current('heatStressDanger') || '');
+          showAlertNotification(
+            `🚨 ${device.name} — ${tRef.current('heatStress')}`,
+            `${thiTxt} ${sev}\n\n▶ ${whatToDo}:\n${action}`.trim(),
+            true
+          ).catch(() => {});
+        } else {
+          devState.heatStress = { ...prevHS, status: STATUS.DANGER };
+        }
+      } else {
+        devState.heatStress = { status: STATUS.OK, firedAt: 0 };
+      }
+    }
+
+    // ── Critically low battery (≤5%) — the coop card already turns red; make
+    // sure the farmer is actually told. This is maintenance, NOT a flock
+    // emergency, so it notifies + vibrates but never auto-calls/SMS.
+    if (typeof reading.bat === 'number' && !isNaN(reading.bat)) {
+      const prevB = devState.battery || { status: STATUS.OK, firedAt: 0 };
+      if (reading.bat <= 5) {
+        const isNew = prevB.status !== STATUS.DANGER;
+        const cooledDown = now - (prevB.firedAt || 0) > DANGER_REFIRE_MS;
+        if (isNew || cooledDown) {
+          const farm = s.farms.find((f) => f.id === device.farmId);
+          const farmName = farm ? farm.name : (s.settings.farmName || '');
+          newAlerts.push({
+            id: uid('a_'),
+            deviceId: device.id,
+            deviceName: device.name,
+            farmName,
+            type: 'ALERT',
+            subType: 'BATTERY',
+            message: `${tRef.current('lowBattery')} (${Math.round(reading.bat)}%)`,
+            timestamp: reading.timestamp || now,
+            acknowledged: false,
+          });
+          devState.battery = { status: STATUS.DANGER, firedAt: now };
+          if (s.settings.vibrate) vibrateWarn();
+          if (!nativeHandled) {
+            showAlertNotification(
+              `🔋 ${device.name} — ${tRef.current('lowBattery')}`,
+              `${Math.round(reading.bat)}%`,
+              false
+            ).catch(() => {});
+          }
+        } else {
+          devState.battery = { ...prevB, status: STATUS.DANGER };
+        }
+      } else {
+        devState.battery = { status: STATUS.OK, firedAt: 0 };
       }
     }
 

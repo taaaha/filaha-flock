@@ -128,7 +128,7 @@ const makeStyles = () => ({
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logoSm: {
-    width: 34, height: 34, borderRadius: 11,
+    width: 34, height: 34, borderRadius: 13,
     backgroundColor: colors.card,
     borderWidth: 1, borderColor: colors.border,
     overflow: 'hidden',

@@ -241,7 +241,7 @@ const makeStyles = () => ({
   dot: { width: 9, height: 9, borderRadius: 5, alignSelf: 'center' },
   dataValue: {
     color: colors.textPrimary,
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: '700',
   },
   dataUnit: {

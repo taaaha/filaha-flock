@@ -32,7 +32,7 @@ import CoopMascot from '../components/CoopMascot';
 import LivingSky from '../components/LivingSky';
 import PrimaryButton from '../components/PrimaryButton';
 
-const HEADER_H = 200;
+const HEADER_H = 150;
 import Field from '../components/Field';
 import { showToast } from '../components/Toast';
 import DailyBriefing from '../components/DailyBriefing';
@@ -836,14 +836,14 @@ const makeStyles = () => ({
   topBar: {
     position: 'relative',
     overflow: 'hidden',
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   headerOverlay: {
     ...StyleSheet.absoluteFillObject,
     paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
     justifyContent: 'space-between',
   },
   headerTopRow: {

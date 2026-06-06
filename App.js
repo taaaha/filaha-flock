@@ -116,13 +116,26 @@ function TabBarLabel({ focused, color, label }) {
 }
 
 function TabBarIcon({ name, focused }) {
+  // Active tab: icon sits in a soft rounded "pill" so the selection reads
+  // clearly and warmly — a small friendly touch that matches the cards.
   return (
-    <Icon
-      name={name}
-      size={focused ? 24 : 22}
-      color={focused ? colors.accent : colors.textSecondary}
-      strokeWidth={focused ? 2.4 : 2}
-    />
+    <View
+      style={{
+        width: 46,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: focused ? colors.accent + '22' : 'transparent',
+      }}
+    >
+      <Icon
+        name={name}
+        size={focused ? 23 : 22}
+        color={focused ? colors.accent : colors.textSecondary}
+        strokeWidth={focused ? 2.5 : 2}
+      />
+    </View>
   );
 }
 
@@ -140,13 +153,20 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: colors.bgElevated,
           borderTopColor: colors.border,
-          borderTopWidth: 0.5,
-          height: 74,
+          borderTopWidth: 1,
+          borderTopLeftRadius: 22,
+          borderTopRightRadius: 22,
+          height: 76,
           paddingBottom: 12,
-          paddingTop: 10,
-          elevation: 0,             // no shadow → no ghost line under bar
-          shadowOpacity: 0,
+          paddingTop: 8,
+          // soft warm lift (iOS); Android relies on the border for definition
+          shadowColor: '#3a2c1a',
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+          elevation: 0,             // no Android elevation → no ghost line
         },
+        tabBarItemStyle: { paddingTop: 2 },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textSecondary,
       }}

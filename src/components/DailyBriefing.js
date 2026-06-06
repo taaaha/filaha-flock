@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import Icon from './Icon';
-import CoopMascot from './CoopMascot';
+import HealthScore from './HealthScore';
 import { DAILY_TASKS } from '../utils/guideContent';
 import TaskChecklistModal from './TaskChecklistModal';
 import { deviceStatus } from '../utils/thresholds';
@@ -128,13 +128,7 @@ export default function DailyBriefing({
     <View style={[styles.card, shadows.sm]}>
       {/* Top strip: ring · greeting+status · tasks */}
       <View style={styles.strip}>
-        <View style={[styles.mascotHug, { backgroundColor: worstColor + '1f', borderColor: worstColor + '3a' }]}>
-          <CoopMascot
-            animated
-            status={counts.total === 0 ? 'offline' : counts.danger > 0 ? 'danger' : counts.attention > 0 ? 'warn' : 'ok'}
-            size={46}
-          />
-        </View>
+        <HealthScore counts={counts} size={52} strokeWidth={6} />
 
         <View style={styles.mid}>
           <View style={styles.greetLine}>

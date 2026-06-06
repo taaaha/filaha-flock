@@ -640,7 +640,7 @@ const makeStyles = () => ({
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   logoSm: {
-    width: 36, height: 36, borderRadius: 11,
+    width: 36, height: 36, borderRadius: 13,
     backgroundColor: colors.card,
     borderWidth: 1, borderColor: colors.border,
     overflow: 'hidden',
@@ -791,7 +791,7 @@ const makeStyles = () => ({
   themePreview: {
     width: '100%',
     height: 68,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     padding: 8,
     gap: 6,
