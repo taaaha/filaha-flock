@@ -1,5 +1,5 @@
-import React, { memo, useRef } from 'react';
-import { View, Text, Pressable, Animated } from 'react-native';
+import React, { memo, useRef, useEffect } from 'react';
+import { View, Text, Pressable, Animated, Easing } from 'react-native';
 import { colors, STATUS, statusColor, statusWash, statusInk, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import SensorMini from './SensorMini';
@@ -26,7 +26,7 @@ function statusLabel(status, t) {
   }
 }
 
-function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
+function CoopCard({ device, reading, status, thresholds, onPress, t, now, index = 0 }) {
   const styles = useStyles(makeStyles);
   const sColor = statusColor(status);
   const wash = statusWash(status);
@@ -43,9 +43,22 @@ function CoopCard({ device, reading, status, thresholds, onPress, t, now }) {
   const onPressIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, friction: 7 }).start();
   const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 5 }).start();
 
+  // Staggered entrance — cards float up + fade in, offset by list position.
+  const enter = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(enter, {
+      toValue: 1,
+      duration: 360,
+      delay: Math.min(index, 8) * 55,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [enter, index]);
+  const enterY = enter.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
+
   return (
     <Pulse active={isDanger} color={sColor} intensity={0.5} style={styles.wrapper} borderRadius={26}>
-      <Animated.View style={{ transform: [{ scale }] }}>
+      <Animated.View style={{ opacity: enter, transform: [{ scale }, { translateY: enterY }] }}>
         <Pressable
           onPress={onPress}
           onPressIn={onPressIn}

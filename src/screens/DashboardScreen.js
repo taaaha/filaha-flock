@@ -29,7 +29,10 @@ import { sensorStatus } from '../utils/thresholds';
 import { BREEDS, STRAINS_BY_BREED, strainLabel, heatStressTHI } from '../utils/poultryData';
 import CoopCard from '../components/CoopCard';
 import CoopMascot from '../components/CoopMascot';
+import LivingSky from '../components/LivingSky';
 import PrimaryButton from '../components/PrimaryButton';
+
+const HEADER_H = 200;
 import Field from '../components/Field';
 import { showToast } from '../components/Toast';
 import DailyBriefing from '../components/DailyBriefing';
@@ -297,6 +300,16 @@ export default function DashboardScreen({ navigation }) {
     : hour < 12 ? '☀️'
     : hour < 18 ? '🌤️'
     : '🌆';
+
+  // Living-sky header: overall farm mood + whether the sky is dark (night or
+  // storm) so the overlaid title/status text picks a legible color.
+  const skyStatusKey = counts.total === 0 ? 'offline'
+    : counts.danger > 0 ? 'danger'
+    : counts.warn > 0 ? 'warn'
+    : counts.offline === counts.total ? 'offline'
+    : 'ok';
+  const darkSky = hour < 5 || hour >= 20 || counts.danger > 0;
+  const onSky = darkSky ? '#ffffff' : '#33271d';
 
   const onTestData = () => {
     if (devices.length === 0) { showToast(t('noCoopsYet'), 'warn'); return; }
@@ -586,63 +599,36 @@ export default function DashboardScreen({ navigation }) {
       />
 
       <SafeAreaView edges={['top', 'left', 'right']} style={{ flex: 1 }}>
-        {/* ── Brand header band ── */}
+        {/* ── Living farm header ── */}
         <View style={styles.topBar}>
-          <Svg
-            style={StyleSheet.absoluteFill}
-            width="100%"
-            height="100%"
-            pointerEvents="none"
-          >
-            <Defs>
-              <SvgLinearGradient id="hdr" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor={colors.accent} stopOpacity="0.20" />
-                <Stop offset="1" stopColor={colors.accent} stopOpacity="0" />
-              </SvgLinearGradient>
-            </Defs>
-            <Rect x="0" y="0" width="100%" height="100%" fill="url(#hdr)" />
-          </Svg>
+          <LivingSky statusKey={skyStatusKey} hour={hour} height={HEADER_H} />
 
-          <View style={styles.brandRow}>
-            <View style={styles.logoBadge}>
-              <CoopMascot
-                animated
-                status={counts.total === 0 ? 'offline' : counts.danger > 0 ? 'danger' : counts.warn > 0 ? 'warn' : 'ok'}
-                size={38}
-              />
-            </View>
-            <View>
-              <Text style={styles.brandMini}>Filaha Flock</Text>
-              <View style={styles.liveRow}>
-                <View style={styles.liveDotWrap}>
-                  <Animated.View
-                    style={[
-                      styles.liveHalo,
-                      {
-                        backgroundColor: heroColor,
-                        opacity: livePulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }),
-                        transform: [{ scale: livePulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2.8] }) }],
-                      },
-                    ]}
-                  />
-                  <View style={[styles.liveDot, { backgroundColor: heroColor }]} />
-                </View>
-                <Text style={styles.liveText} numberOfLines={1}>{heroLabel}</Text>
+          <View style={styles.headerOverlay} pointerEvents="box-none">
+            <View style={styles.headerTopRow} pointerEvents="box-none">
+              <Text style={[styles.brandTitleNew, { color: onSky }]} numberOfLines={1}>
+                Filaha Flock
+              </Text>
+              <View style={styles.topActions}>
+                <Pressable
+                  onPress={() => setModalVisible(true)}
+                  android_ripple={{ color: '#ffffff44' }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('addCoop')}
+                  style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
+                >
+                  <Text style={styles.addBtnPlus}>＋</Text>
+                  <Text style={styles.addBtnText}>{t('addCoop')}</Text>
+                </Pressable>
+                <HelpButton t={t} screen="dashboard" />
               </View>
             </View>
-          </View>
-          <View style={styles.topActions}>
-            <Pressable
-              onPress={() => setModalVisible(true)}
-              android_ripple={{ color: '#ffffff44' }}
-              accessibilityRole="button"
-              accessibilityLabel={t('addCoop')}
-              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
-            >
-              <Text style={styles.addBtnPlus}>＋</Text>
-              <Text style={styles.addBtnText}>{t('addCoop')}</Text>
-            </Pressable>
-            <HelpButton t={t} screen="dashboard" />
+
+            <View style={[styles.livePill, { backgroundColor: darkSky ? '#0000003a' : '#ffffff80' }]}>
+              <View style={[styles.liveDot, { backgroundColor: heroColor }]} />
+              <Text style={[styles.livePillText, { color: onSky }]} numberOfLines={1}>
+                {heroLabel}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -660,7 +646,7 @@ export default function DashboardScreen({ navigation }) {
           }
           data={filtered}
           keyExtractor={(item) => item.device.id}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <CoopCard
               device={item.device}
               reading={item.reading}
@@ -668,6 +654,7 @@ export default function DashboardScreen({ navigation }) {
               thresholds={thresholds}
               t={t}
               now={now}
+              index={index}
               onPress={() => navigation.navigate('CoopDetail', { deviceId: item.device.id })}
             />
           )}
@@ -845,20 +832,44 @@ export default function DashboardScreen({ navigation }) {
 const makeStyles = () => ({
   safe: { flex: 1, backgroundColor: colors.bg },
 
-  // Friendly "sky" top band (brand + add), rounded at the bottom
+  // Living farm header band — LivingSky paints it; controls overlay on top.
   topBar: {
     position: 'relative',
     overflow: 'hidden',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 20,
-    backgroundColor: colors.accent + '12',
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
+  headerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
+    justifyContent: 'space-between',
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  brandTitleNew: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    textShadowColor: '#00000026',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  livePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  livePillText: { fontSize: 12, fontWeight: '700' },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   logoBadge: {
     width: 48, height: 48, borderRadius: 17,

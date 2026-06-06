@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 import Svg, { Circle, Ellipse, Path, Polygon, G } from 'react-native-svg';
 import { STATUS } from '../utils/colors';
@@ -35,7 +35,8 @@ function bucketOf(status) {
   if (status === STATUS.OK) return 'happy';
   if (status === STATUS.WARN) return 'worried';
   if (status === STATUS.OFFLINE) return 'sleepy';
-  return 'alarmed'; // danger + powerCut
+  if (status === STATUS.DANGER || status === STATUS.POWER_CUT) return 'alarmed';
+  return 'alarmed'; // any other → treat as alarmed
 }
 
 export default function CoopMascot({ status = STATUS.OFFLINE, size = 56, animated = false }) {
@@ -55,6 +56,26 @@ export default function CoopMascot({ status = STATUS.OFFLINE, size = 56, animate
     loop.start();
     return () => loop.stop();
   }, [animated, bucket, bob]);
+
+  // Periodic blink — a tiny life signal. Only for animated mascots, and not
+  // for the already-closed sleepy face. Closed eyes for ~130ms at random gaps.
+  const [blink, setBlink] = useState(false);
+  useEffect(() => {
+    if (!animated || bucket === 'sleepy') return undefined;
+    let openTimer; let closeTimer; let cancelled = false;
+    const schedule = () => {
+      openTimer = setTimeout(() => {
+        if (cancelled) return;
+        setBlink(true);
+        closeTimer = setTimeout(() => { if (!cancelled) { setBlink(false); schedule(); } }, 130);
+      }, 2200 + Math.random() * 2400);
+    };
+    schedule();
+    return () => { cancelled = true; clearTimeout(openTimer); clearTimeout(closeTimer); };
+  }, [animated, bucket]);
+
+  // While blinking, draw the closed (sleepy) eyes regardless of mood.
+  const faceBucket = blink ? 'sleepy' : bucket;
 
   // Alarmed → side-to-side wiggle; otherwise a soft vertical float. Static
   // (non-animated) mascots get no transform so they sit perfectly upright.
@@ -96,8 +117,8 @@ export default function CoopMascot({ status = STATUS.OFFLINE, size = 56, animate
           ? <Polygon points="28,41 36,41 32,50" fill={BEAK} />
           : <Polygon points="28,41 36,41 32,47" fill={BEAK} />}
 
-        {/* Face per status */}
-        {bucket === 'happy' && (
+        {/* Face per status (faceBucket flips to closed eyes during a blink) */}
+        {faceBucket === 'happy' && (
           <G>
             <Circle cx="20" cy="40" r="4" fill={CHEEK} opacity="0.6" />
             <Circle cx="44" cy="40" r="4" fill={CHEEK} opacity="0.6" />
@@ -106,7 +127,7 @@ export default function CoopMascot({ status = STATUS.OFFLINE, size = 56, animate
           </G>
         )}
 
-        {bucket === 'worried' && (
+        {faceBucket === 'worried' && (
           <G>
             <Circle cx="24" cy="35" r="2.6" fill={EYE} />
             <Circle cx="40" cy="35" r="2.6" fill={EYE} />
@@ -115,7 +136,7 @@ export default function CoopMascot({ status = STATUS.OFFLINE, size = 56, animate
           </G>
         )}
 
-        {bucket === 'alarmed' && (
+        {faceBucket === 'alarmed' && (
           <G>
             <Circle cx="24" cy="34" r="4" fill="#ffffff" stroke={EYE} strokeWidth="1.6" />
             <Circle cx="40" cy="34" r="4" fill="#ffffff" stroke={EYE} strokeWidth="1.6" />
@@ -126,7 +147,7 @@ export default function CoopMascot({ status = STATUS.OFFLINE, size = 56, animate
           </G>
         )}
 
-        {bucket === 'sleepy' && (
+        {faceBucket === 'sleepy' && (
           <G>
             <Path d="M20 35 L29 35" fill="none" stroke={EYE} strokeWidth="2.6" strokeLinecap="round" />
             <Path d="M35 35 L44 35" fill="none" stroke={EYE} strokeWidth="2.6" strokeLinecap="round" />

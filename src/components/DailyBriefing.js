@@ -128,7 +128,7 @@ export default function DailyBriefing({
     <View style={[styles.card, shadows.sm]}>
       {/* Top strip: ring · greeting+status · tasks */}
       <View style={styles.strip}>
-        <View style={[styles.mascotHug, { backgroundColor: worstColor + '1f' }]}>
+        <View style={[styles.mascotHug, { backgroundColor: worstColor + '1f', borderColor: worstColor + '3a' }]}>
           <CoopMascot
             animated
             status={counts.total === 0 ? 'offline' : counts.danger > 0 ? 'danger' : counts.attention > 0 ? 'warn' : 'ok'}
@@ -243,9 +243,10 @@ const makeStyles = () => ({
     gap: 12,
   },
   mascotHug: {
-    width: 56,
-    height: 56,
-    borderRadius: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 22,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -254,8 +255,8 @@ const makeStyles = () => ({
   greeting: {
     flex: 1,
     color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
     letterSpacing: 0.2,
   },
   status: {
@@ -279,10 +280,11 @@ const makeStyles = () => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: colors.cardElevated,
   },
   insDot: { width: 8, height: 8, borderRadius: 4 },
   insText: {
