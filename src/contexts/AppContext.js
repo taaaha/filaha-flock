@@ -212,7 +212,10 @@ export function AppProvider({ children }) {
   // For each sensor on a reading, compare against thresholds and detect
   // transitions to/from DANGER. Fire the alert pipeline accordingly.
   // ─────────────────────────────────────────────────────────────────────
-  const evaluateReadingForDanger = useCallback(async (device, reading, nativeHandled = false) => {
+  // silent=true → update alert state only (no notify / vibrate / call / SMS).
+  // Used by the threshold-change re-eval (a settings edit must never call the
+  // farmer) and the queue-drain path (historical/stale SMS already handled).
+  const evaluateReadingForDanger = useCallback(async (device, reading, nativeHandled = false, silent = false) => {
     if (!device || !reading) return;
     const s = stateRef.current;
     const thresholds = s.thresholds;
@@ -268,9 +271,9 @@ export function AppProvider({ children }) {
           });
           devState[key] = { status: STATUS.DANGER, firedAt: now };
 
-          // Only fire notification from JS when native didn't already handle.
-          // Real SMS arrivals are handled by SmsReceiver natively.
-          if (!nativeHandled) {
+          // Only fire notification from JS when native didn't already handle
+          // (real SMS are handled by SmsReceiver) and not in silent mode.
+          if (!nativeHandled && !silent) {
             const action = actionFor(key, s.language);
             const whatToDo = tRef.current('whatToDo') || 'What to do';
             const body = `${sensorMessages[key]}\n${value.toFixed(1)} ${sensorUnits[key]} (${tRef.current('maxLevel') || 'max'} ${thresholds[key].danger})\n\n▶ ${whatToDo}:\n${action}`;
@@ -350,19 +353,25 @@ export function AppProvider({ children }) {
             acknowledged: false,
           });
           devState.heatStress = { status: STATUS.DANGER, firedAt: now };
-          if (s.settings.vibrate) vibrateDanger();
-          // Native never computes THI, so JS always raises this notification
-          // (even for real SMS that natively handled the plain thresholds).
-          const action = actionFor('temp', s.language);
-          const whatToDo = tRef.current('whatToDo') || 'What to do';
-          const sev = tier === 'emergency'
-            ? (tRef.current('heatStressEmergency') || '')
-            : (tRef.current('heatStressDanger') || '');
-          showAlertNotification(
-            `🚨 ${device.name} — ${tRef.current('heatStress')}`,
-            `${thiTxt} ${sev}\n\n▶ ${whatToDo}:\n${action}`.trim(),
-            true
-          ).catch(() => {});
+          // Heat stress always NOTIFIES (it reddens the card + raises a heads-up)
+          // but does not auto-call by itself — genuinely extreme heat trips the
+          // temp ≥ danger threshold, which owns the auto-call. This avoids double
+          // calls and the native-has-no-THI gap.
+          if (!silent) {
+            if (s.settings.vibrate) vibrateDanger();
+            // Native never computes THI, so JS always raises this notification
+            // (even for real SMS that natively handled the plain thresholds).
+            const action = actionFor('temp', s.language);
+            const whatToDo = tRef.current('whatToDo') || 'What to do';
+            const sev = tier === 'emergency'
+              ? (tRef.current('heatStressEmergency') || '')
+              : (tRef.current('heatStressDanger') || '');
+            showAlertNotification(
+              `🚨 ${device.name} — ${tRef.current('heatStress')}`,
+              `${thiTxt} ${sev}\n\n▶ ${whatToDo}:\n${action}`.trim(),
+              true
+            ).catch(() => {});
+          }
         } else {
           devState.heatStress = { ...prevHS, status: STATUS.DANGER };
         }
@@ -394,8 +403,9 @@ export function AppProvider({ children }) {
             acknowledged: false,
           });
           devState.battery = { status: STATUS.DANGER, firedAt: now };
-          if (s.settings.vibrate) vibrateWarn();
-          if (!nativeHandled) {
+          // Native doesn't watch battery, so JS always raises it (except silent).
+          if (!silent) {
+            if (s.settings.vibrate) vibrateWarn();
             showAlertNotification(
               `🔋 ${device.name} — ${tRef.current('lowBattery')}`,
               `${Math.round(reading.bat)}%`,
@@ -416,7 +426,7 @@ export function AppProvider({ children }) {
       dispatch({ type: 'SET_ALERTS', payload: merged });
     }
 
-    if (firedAny) {
+    if (firedAny && !silent) {
       // Vibration always fires — it's a foreground UX cue
       if (s.settings.vibrate) vibrateDanger();
 
@@ -446,7 +456,9 @@ export function AppProvider({ children }) {
   }, []);
 
   // ---------- SMS handlers ----------
-  const handleParsedMessage = useCallback(async (parsed, nativeHandled = false) => {
+  // silent=true → update state/alerts only, no notify/vibrate/call/SMS (used by
+  // the queue-drain path for historical messages already handled when they arrived).
+  const handleParsedMessage = useCallback(async (parsed, nativeHandled = false, silent = false) => {
     if (!parsed) return;
     const s = stateRef.current;
     const deviceId = parsed.deviceId;
@@ -469,7 +481,7 @@ export function AppProvider({ children }) {
       }
 
       // ★ THRESHOLD-BREACH DETECTION
-      await evaluateReadingForDanger(device, parsed.reading, nativeHandled);
+      await evaluateReadingForDanger(device, parsed.reading, nativeHandled, silent);
       return;
     }
 
@@ -502,18 +514,28 @@ export function AppProvider({ children }) {
       }
 
       if (parsed.kind === 'alert') {
-        if (s.settings.vibrate) vibrateDanger();
-        // Skip native triggers if native already handled
-        if (!nativeHandled) {
+        if (!silent && s.settings.vibrate) vibrateDanger();
+        // Skip native triggers if native already handled, or in silent mode.
+        if (!nativeHandled && !silent) {
           const num = (s.settings.emergencyContact || '').trim();
-          const shouldAutoCallDanger = (s.settings.autoCall || s.settings.autoCallOnDanger) &&
-            parsed.subType !== 'POWER_CUT';
-          const shouldAutoCallPower = s.settings.autoCallOnPowerCut && parsed.subType === 'POWER_CUT';
+          const isPowerCut = parsed.subType === 'POWER_CUT';
+          const shouldAutoCallDanger = (s.settings.autoCall || s.settings.autoCallOnDanger) && !isPowerCut;
+          const shouldAutoCallPower = s.settings.autoCallOnPowerCut && isPowerCut;
           if (num && (shouldAutoCallDanger || shouldAutoCallPower)) {
             makeDirectCall(num).catch(() => {});
           }
+          // Auto-SMS on danger — mirrors the data-path and the native receiver
+          // (was missing here, so injected/simulated alerts never texted).
+          if (num && s.settings.autoSmsOnDanger && !isPowerCut) {
+            const action = actionFor((parsed.subType || 'GENERIC').toLowerCase(), s.language);
+            const whatToDo = tRef.current('whatToDo') || 'What to do';
+            const body =
+              `🚨 Filaha Flock\n${device.name} (${device.id}):\n• ${parsed.message}` +
+              `\n\n▶ ${whatToDo}: ${action}\n${new Date().toLocaleTimeString()}`;
+            sendSms(num, body).catch(() => {});
+          }
         }
-      } else if (s.settings.vibrate) {
+      } else if (!silent && s.settings.vibrate) {
         vibrateWarn();
       }
     }
@@ -534,9 +556,10 @@ export function AppProvider({ children }) {
       const queue = await drainSmsQueue();
       for (const item of queue) {
         const parsed = parseSms(item.message, item.timestamp);
-        // Queue items were already processed by native SmsReceiver when
-        // they arrived — JS just updates the UI now.
-        if (parsed) await handleParsedMessage(parsed, true);
+        // Queue items were already processed by native SmsReceiver when they
+        // arrived — JS just updates the UI now. silent=true so a backlog never
+        // bursts stale notifications/calls on app open.
+        if (parsed) await handleParsedMessage(parsed, true, true);
       }
     })();
 
@@ -549,13 +572,15 @@ export function AppProvider({ children }) {
   }, [state.ready, handleSmsEvent, handleParsedMessage]);
 
   // ---------- Re-evaluate when thresholds change ----------
+  // silent=true: editing a threshold updates the alert/danger state but must
+  // NEVER auto-call/SMS the farmer or fire a notification — there was no SMS event.
   useEffect(() => {
     if (!state.ready) return;
     state.devices.forEach((device) => {
       const list = state.readings[device.id];
       if (!list || list.length === 0) return;
       const latest = list[list.length - 1];
-      evaluateReadingForDanger(device, latest);
+      evaluateReadingForDanger(device, latest, false, true);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.thresholds, state.ready]);

@@ -424,7 +424,7 @@ public class SmsPackage implements ReactPackage {
                 String[] actionKeys = {
                     "actionCo2", "actionNh3", "actionTemp", "actionTempLow",
                     "actionHum", "actionPowerCut", "actionBattery", "actionGeneric",
-                    "alertLabel", "checkNowLabel", "whatToDoLabel",
+                    "alertLabel", "checkNowLabel", "whatToDoLabel", "clearedLabel",
                 };
                 for (String key : actionKeys) {
                     if (config.hasKey(key) && !config.isNull(key)) {
@@ -446,6 +446,12 @@ public class SmsPackage implements ReactPackage {
                                 sensorJson.put("warn", sensor.getDouble("warn"));
                             if (sensor.hasKey("danger"))
                                 sensorJson.put("danger", sensor.getDouble("danger"));
+                            // Low-side (too cold / too dry) — so the background
+                            // receiver can detect cold snaps, not just high breaches.
+                            if (sensor.hasKey("warnLow"))
+                                sensorJson.put("warnLow", sensor.getDouble("warnLow"));
+                            if (sensor.hasKey("dangerLow"))
+                                sensorJson.put("dangerLow", sensor.getDouble("dangerLow"));
                             json.put(key, sensorJson);
                         }
                     }

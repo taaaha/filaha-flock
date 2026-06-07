@@ -791,7 +791,11 @@ export function heatStressTHI(tempC, humidityPct) {
   try {
     if (tempC == null || typeof tempC !== 'number' || isNaN(tempC)) return null;
     const rh = (humidityPct == null || isNaN(humidityPct)) ? 60 : humidityPct;
-    const thi = tempC - (0.55 - 0.0055 * rh) * (tempC - 14.5);
+    // Poultry THI is defined in FAHRENHEIT. Convert first — feeding Celsius into
+    // it (the old bug) compressed every value below ~35 so heat stress NEVER
+    // fired. tiers: alert≥70, danger≥75, emergency≥83.
+    const tf = 1.8 * tempC + 32;
+    const thi = tf - (0.55 - 0.0055 * rh) * (tf - 58);
     if (isNaN(thi)) return null;
     let tier = 'safe';
     if (thi >= 83) tier = 'emergency';

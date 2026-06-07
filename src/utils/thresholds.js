@@ -26,7 +26,9 @@ export const OFFLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 export function thiTier(tempC, humidityPct) {
   if (tempC == null || typeof tempC !== 'number' || isNaN(tempC)) return 'safe';
   const rh = (humidityPct == null || isNaN(humidityPct)) ? 60 : humidityPct;
-  const thi = tempC - (0.55 - 0.0055 * rh) * (tempC - 14.5);
+  // Poultry THI is in FAHRENHEIT — convert first (matches poultryData.heatStressTHI).
+  const tf = 1.8 * tempC + 32;
+  const thi = tf - (0.55 - 0.0055 * rh) * (tf - 58);
   if (isNaN(thi)) return 'safe';
   if (thi >= 83) return 'emergency';
   if (thi >= 75) return 'danger';

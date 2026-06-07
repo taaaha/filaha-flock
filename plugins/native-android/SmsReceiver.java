@@ -156,6 +156,7 @@ public class SmsReceiver extends BroadcastReceiver {
 
             Map<String, Double> values = parseSensorValues(message);
             ArrayList<String> dangerLines = new ArrayList<>();
+            String primaryActionKey = null;
             try {
                 JSONObject thresholds = new JSONObject(thresholdsJson);
                 String[] keys = {"co2", "nh3", "temp", "hum"};
@@ -167,10 +168,17 @@ public class SmsReceiver extends BroadcastReceiver {
                     JSONObject t = thresholds.optJSONObject(key);
                     if (t == null) continue;
                     double dangerLimit = t.optDouble("danger", Double.MAX_VALUE);
-                    if (v >= dangerLimit) {
+                    double dangerLow = t.optDouble("dangerLow", -Double.MAX_VALUE);
+                    boolean high = v >= dangerLimit;
+                    boolean low = v <= dangerLow;
+                    if (high || low) {
                         if (cooldownPassed(prefs, deviceId + "-" + key)) {
-                            dangerLines.add(label(key) + " " + formatNum(v) + units[i]
-                                    + " (≥" + formatNum(dangerLimit) + ")");
+                            String cmp = high ? ("≥" + formatNum(dangerLimit)) : ("≤" + formatNum(dangerLow));
+                            dangerLines.add(label(key) + " " + formatNum(v) + units[i] + " (" + cmp + ")");
+                            if (primaryActionKey == null) {
+                                // Cold/dry breaches need the "too low" guidance, not the "too hot" one.
+                                primaryActionKey = (low && key.equals("temp")) ? "temp_low" : key;
+                            }
                         }
                     }
                 }
@@ -183,11 +191,7 @@ public class SmsReceiver extends BroadcastReceiver {
                 String whatToDo = prefs.getString("i18n_whatToDoLabel", "What to do");
                 String checkNow = prefs.getString("i18n_checkNowLabel", "Check the coop NOW");
 
-                // Build action steps based on which sensor breached first
-                String primarySensor = dangerLines.size() > 0
-                        ? extractFirstSensor(dangerLines.get(0))
-                        : "generic";
-                String action = actionFor(prefs, primarySensor);
+                String action = actionFor(prefs, primaryActionKey != null ? primaryActionKey : "generic");
 
                 String body = join(dangerLines, "\n")
                         + "\n\n▶ " + whatToDo + ":\n" + action;
@@ -242,13 +246,22 @@ public class SmsReceiver extends BroadcastReceiver {
         return "generic";
     }
 
+    // The firmware sends sensor alerts as `...|ALERT|NH3:52.0ppm danger`, NOT
+    // pipe-wrapped tokens. Mirror the JS parser: inspect the payload after ALERT.
+    private static String alertPayloadUpper(String message) {
+        String up = message.toUpperCase();
+        int idx = up.indexOf("ALERT");
+        return idx >= 0 ? up.substring(idx + 5) : up;
+    }
+
     private static String parseAlertSensorKey(String message) {
-        if (message.contains("|NH3|")) return "nh3";
-        if (message.contains("|CO2|")) return "co2";
-        if (message.contains("|TEMP|")) return "temp";
-        if (message.contains("|HUM|")) return "hum";
-        if (message.contains("|POWER_CUT|")) return "power_cut";
-        if (message.contains("|BATTERY|")) return "battery";
+        String p = alertPayloadUpper(message);
+        if (p.contains("POWER CUT") || p.contains("POWER_CUT")) return "power_cut";
+        if (p.contains("NH3")) return "nh3";
+        if (p.contains("CO2")) return "co2";
+        if (p.contains("TEMP") || p.contains("T:")) return "temp";
+        if (p.contains("HUM") || p.contains("H:")) return "hum";
+        if (p.contains("BAT")) return "battery";
         return "generic";
     }
 
@@ -435,7 +448,14 @@ public class SmsReceiver extends BroadcastReceiver {
             int colon = part.indexOf(':');
             if (colon > 0 && colon < part.length() - 1) {
                 String key = part.substring(0, colon).toLowerCase().trim();
-                String val = part.substring(colon + 1).trim();
+                // Normalize firmware short keys to the canonical sensor keys
+                // (the threshold loop uses temp/hum, the wire uses T/H). Without
+                // this, native temp/hum danger detection silently never matched.
+                if (key.equals("t") || key.equals("temperature")) key = "temp";
+                else if (key.equals("h") || key.equals("humidity")) key = "hum";
+                else if (key.equals("bat")) key = "battery";
+                // Keep only the leading number (strip any unit suffix e.g. 28.4°C).
+                String val = part.substring(colon + 1).trim().replaceAll("[^0-9.\\-].*$", "");
                 try {
                     result.put(key, Double.parseDouble(val));
                 } catch (NumberFormatException ignored) {}
@@ -460,13 +480,15 @@ public class SmsReceiver extends BroadcastReceiver {
     }
 
     private static String parseAlertSubtype(String message) {
-        if (message.contains("|NH3|")) return "Ammonia critical";
-        if (message.contains("|CO2|")) return "CO2 critical";
-        if (message.contains("|TEMP|")) return "Temperature critical";
-        if (message.contains("|HUM|")) return "Humidity critical";
-        if (message.contains("|POWER_CUT|")) return "Power cut";
-        if (message.contains("|BATTERY|")) return "Battery low";
-        return "Sensor alert";
+        switch (parseAlertSensorKey(message)) {
+            case "nh3":       return "Ammonia critical";
+            case "co2":       return "CO2 critical";
+            case "temp":      return "Temperature critical";
+            case "hum":       return "Humidity critical";
+            case "power_cut": return "Power cut";
+            case "battery":   return "Battery low";
+            default:          return "Sensor alert";
+        }
     }
 
     private static String label(String key) {

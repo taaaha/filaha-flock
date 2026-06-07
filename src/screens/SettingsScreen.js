@@ -7,6 +7,7 @@ import { useApp } from '../contexts/AppContext';
 import { colors, useTheme, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import Icon from '../components/Icon';
+import CoopMascot from '../components/CoopMascot';
 import { WilayaPicker } from '../components/GuideExtras';
 import HelpButton from '../components/HelpButton';
 import { LANGS } from '../translations';
@@ -234,9 +235,16 @@ export default function SettingsScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <View style={styles.brandRow}>
             <View style={styles.logoSm}>
-              <Icon name="feather" size={20} color={colors.accent} strokeWidth={2.3} />
+              <CoopMascot status="ok" size={34} />
             </View>
-            <Text style={[styles.screenTitle, { marginBottom: 0 }]}>{t('settings')}</Text>
+            <View>
+              <Text style={[styles.screenTitle, { marginBottom: 0 }]}>{t('settings')}</Text>
+              {(settings.farmName || settings.farmerName) ? (
+                <Text style={styles.brandSub} numberOfLines={1}>
+                  {settings.farmName || settings.farmerName}
+                </Text>
+              ) : null}
+            </View>
           </View>
           <HelpButton t={t} screen="settings" />
         </View>
@@ -638,14 +646,19 @@ const makeStyles = () => ({
     fontWeight: '800',
     marginBottom: 18,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11, flex: 1 },
   logoSm: {
-    width: 36, height: 36, borderRadius: 13,
-    backgroundColor: colors.card,
-    borderWidth: 1, borderColor: colors.border,
+    width: 44, height: 44, borderRadius: 15,
+    backgroundColor: colors.accent + '1f',
+    alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
-  logoSmImg: { width: 36, height: 36 },
+  brandSub: {
+    color: colors.textSecondary,
+    fontSize: 12.5,
+    fontWeight: '600',
+    marginTop: 1,
+  },
   sectionTitle: {
     color: colors.accent,
     fontSize: 14,
