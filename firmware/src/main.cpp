@@ -1,18 +1,24 @@
 // ════════════════════════════════════════════════════════════════
-//  Filaha Flock — firmware entry point
+//  Filaha Flock — firmware entry point  (data + hybrid-SMS architecture)
 //
 //  Loop:
 //   1. read STCC4 (+ MiCS when flagged) + battery
-//   2. compose "FILAHA|DEV01|CO2:..|T:..|H:..|BAT:..|OK"
-//   3. send SMS to the farmer's phone running the app
-//   4. evaluate local danger thresholds (debounced) → explicit ALERT
-//   5. watch USB → battery transitions → POWER_CUT / CLEAR
+//   2. pack 5 metrics into 8 bytes, PUBLISH over MQTT (2G data) every 60 s
+//   3. on confirmed danger → human-readable emergency SMS + ring the farmer
+//   4. once a day (HEARTBEAT_HOUR) → one plain-text report SMS
+//   5. watch USB → battery transitions → POWER_CUT SMS
+//
+//  SMS/calls originate from the DEVICE and are read by the farmer directly.
+//  The app no longer reads SMS (Google Play forbids it) — it pulls data from
+//  the cloud REST API instead.
 // ════════════════════════════════════════════════════════════════
 #include <Arduino.h>
 extern "C" { #include "esp_sleep.h" }
 #include "config.h"
 #include "format.h"
 #include "modem.h"
+#include "net.h"
+#include "pack.h"
 #include "sensors.h"
 #include "feedback.h"
 
@@ -20,6 +26,8 @@ extern "C" { #include "esp_sleep.h" }
 static unsigned long s_last_send_ms        = 0;
 static unsigned long s_last_power_check_ms = 0;
 static unsigned long s_last_alert_ms       = 0;
+static unsigned long s_last_clock_ms       = 0;
+static long          s_last_heartbeat_day  = -1;
 static bool          s_was_on_usb          = true;
 static int           s_streak_co2          = 0;
 static int           s_streak_nh3          = 0;
@@ -32,12 +40,14 @@ static void log_banner() {
   Serial.println(F("──────────────────────────────────────────────"));
   Serial.printf (  "  Filaha Flock firmware v%s\n", FILAHA_FIRMWARE_VERSION);
   Serial.printf (  "  Device ID :  %s\n", FILAHA_DEVICE_ID);
-  Serial.printf (  "  Target    :  %s\n", FILAHA_FARMER_NUMBER);
-  Serial.printf (  "  Cadence   :  %lu s\n", DATA_INTERVAL_MS / 1000UL);
+  Serial.printf (  "  MQTT      :  %s:%d  topic filaha/%s/telemetry\n",
+                   FILAHA_MQTT_HOST, FILAHA_MQTT_PORT, FILAHA_DEVICE_ID);
+  Serial.printf (  "  Farmer SMS:  %s\n", FILAHA_FARMER_NUMBER);
+  Serial.printf (  "  Cadence   :  %lu s\n", TELEMETRY_INTERVAL_MS / 1000UL);
 #if FILAHA_HAS_NH3
-  Serial.println(  "  NH₃ sensor:  ENABLED");
+  Serial.println(  "  NH3 sensor:  ENABLED");
 #else
-  Serial.println(  "  NH₃ sensor:  disabled (flip FILAHA_HAS_NH3 when MiCS arrives)");
+  Serial.println(  "  NH3 sensor:  disabled (flip FILAHA_HAS_NH3 when MiCS arrives)");
 #endif
   Serial.println(F("──────────────────────────────────────────────"));
 }
@@ -47,7 +57,6 @@ void setup() {
   delay(300);
   log_banner();
 
-  // Tell us if we came back from deep sleep (power button woke us up).
   const esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
   if (cause == ESP_SLEEP_WAKEUP_EXT0) {
     Serial.println("[boot] woke from deep sleep via POWER button");
@@ -61,68 +70,89 @@ void setup() {
   if (!modem_begin()) {
     Serial.println("[boot] modem_begin failed — will retry network attach inside modem_loop()");
   }
+  if (!net_begin()) {
+    Serial.println("[boot] net_begin (GPRS+MQTT) not up yet — net_loop() will retry");
+  }
 
-  delay(SENSOR_WARMUP_MS);                 // let the STCC4 settle
+  delay(SENSOR_WARMUP_MS);                  // let the STCC4 settle
 }
 
-// Sustained-danger debouncer. Bumps the relevant streak; fires an ALERT
-// once the streak reaches DANGER_CONFIRM_SAMPLES, and not more often than
-// ALERT_REFIRE_MS. The app does its own dedup — this layer just stops a
-// single noisy spike from costing an SMS.
-static void evaluate_local_danger(const SensorReading& r) {
-  String payload;
-  bool   fire = false;
+// Sustained-danger debouncer. Bumps the relevant streak; once a streak reaches
+// DANGER_CONFIRM_SAMPLES (and not more often than ALERT_REFIRE_MS) it fires the
+// emergency: a human-readable SMS to the farmer AND a voice call (the lifeline,
+// works with no internet/server). A single noisy spike never triggers it.
+static void evaluate_critical(const SensorReading& r) {
+  const char* what = nullptr;
+  float       value = 0;
+  const char* unit  = "";
 
   if (r.has_co2 && r.co2_ppm >= CO2_DANGER_PPM) {
-    if (++s_streak_co2 >= DANGER_CONFIRM_SAMPLES) {
-      fire = true; payload = alert_payload_sensor("CO2", r.co2_ppm, "ppm");
-    }
+    if (++s_streak_co2 >= DANGER_CONFIRM_SAMPLES) { what = "CO2 eleve";      value = r.co2_ppm; unit = " ppm"; }
   } else { s_streak_co2 = 0; }
 
   if (r.has_nh3 && r.nh3_ppm >= NH3_DANGER_PPM) {
-    if (++s_streak_nh3 >= DANGER_CONFIRM_SAMPLES) {
-      fire = true; payload = alert_payload_sensor("NH3", r.nh3_ppm, "ppm");
-    }
+    if (++s_streak_nh3 >= DANGER_CONFIRM_SAMPLES) { what = "Ammoniac eleve"; value = r.nh3_ppm; unit = " ppm"; }
   } else { s_streak_nh3 = 0; }
 
   if (r.has_temp && (r.temp_c >= TEMP_HIGH_C || r.temp_c <= TEMP_LOW_C)) {
     if (++s_streak_temp >= DANGER_CONFIRM_SAMPLES) {
-      fire = true; payload = alert_payload_sensor("TEMP", r.temp_c, "C");
+      what  = (r.temp_c >= TEMP_HIGH_C) ? "Temperature haute" : "Temperature basse";
+      value = r.temp_c; unit = " C";
     }
   } else { s_streak_temp = 0; }
 
   if (r.has_hum && (r.hum_pct >= HUM_HIGH_PCT || r.hum_pct <= HUM_LOW_PCT)) {
     if (++s_streak_hum >= DANGER_CONFIRM_SAMPLES) {
-      fire = true; payload = alert_payload_sensor("HUM", r.hum_pct, "%");
+      what  = (r.hum_pct >= HUM_HIGH_PCT) ? "Humidite haute" : "Humidite basse";
+      value = r.hum_pct; unit = " %";
     }
   } else { s_streak_hum = 0; }
 
-  if (!fire) return;
+  if (!what) return;
 
   const unsigned long now = millis();
   if (now - s_last_alert_ms < ALERT_REFIRE_MS) return;
   s_last_alert_ms = now;
 
-  String sms = filaha_alert_sms(FILAHA_DEVICE_ID, payload);
-  modem_send_sms(FILAHA_FARMER_NUMBER, sms);
-  buzzer_pulse(LOCAL_BUZZER_MS);              // audible local cue, respects mute
+  buzzer_pulse(LOCAL_BUZZER_MS);                       // local audible cue, respects mute
+#if CRITICAL_SMS_ENABLED
+  modem_send_sms(FILAHA_FARMER_NUMBER, filaha_critical_sms(FILAHA_DEVICE_ID, what, value, unit));
+#endif
+#if CRITICAL_CALL_ENABLED
+  modem_place_call(FILAHA_FARMER_NUMBER, CRITICAL_RING_MS);
+#endif
+}
+
+// One plain-text report a day, at HEARTBEAT_HOUR local time. Uses the network
+// clock; if the modem hasn't synced time yet we simply skip until it has.
+static void maybe_send_heartbeat(const SensorReading& r) {
+#if HEARTBEAT_ENABLED
+  const unsigned long now = millis();
+  if (now - s_last_clock_ms < 60000UL) return;        // poll the clock at most once a minute
+  s_last_clock_ms = now;
+
+  int hour; long day;
+  if (!net_get_clock(hour, day)) return;
+  if (hour == HEARTBEAT_HOUR && day != s_last_heartbeat_day) {
+    s_last_heartbeat_day = day;
+    Serial.println("[hb] sending daily report SMS");
+    modem_send_sms(FILAHA_FARMER_NUMBER, filaha_heartbeat_sms(FILAHA_DEVICE_ID, r));
+  }
+#endif
 }
 
 static void check_power_transition() {
   const unsigned long now = millis();
-  if (now - s_last_power_check_ms < 5000UL) return;     // 5 s poll is plenty
+  if (now - s_last_power_check_ms < 5000UL) return;
   s_last_power_check_ms = now;
 
   const bool on_usb = power_is_on_usb();
   if (s_was_on_usb && !on_usb) {
-    Serial.println("[power] USB LOST — sending POWER_CUT");
-    String sms = filaha_alert_sms(FILAHA_DEVICE_ID, alert_payload_power_cut());
-    modem_send_sms(FILAHA_FARMER_NUMBER, sms);
+    Serial.println("[power] USB LOST — sending POWER_CUT SMS");
+    modem_send_sms(FILAHA_FARMER_NUMBER,
+                   filaha_critical_sms(FILAHA_DEVICE_ID, "Coupure de courant", power_battery_pct(), " % batt"));
   } else if (!s_was_on_usb && on_usb) {
-    Serial.println("[power] USB restored — sending CLEAR");
-    String sms = filaha_clear_sms(FILAHA_DEVICE_ID,
-                                  String("POWER_RESTORED|on AC"));
-    modem_send_sms(FILAHA_FARMER_NUMBER, sms);
+    Serial.println("[power] USB restored");
   }
   s_was_on_usb = on_usb;
 }
@@ -134,19 +164,16 @@ static void handle_button_events() {
 
   switch (ev) {
     case BTN_TEST_ALARM: {
-      Serial.println("[btn] TEST ALARM — sending test ALERT");
+      Serial.println("[btn] TEST ALARM — sending test SMS");
       buzzer_pulse(400);
-      String sms = filaha_alert_sms(FILAHA_DEVICE_ID,
-                                    String("TEST|farmer pressed test button"));
-      modem_send_sms(FILAHA_FARMER_NUMBER, sms);
+      modem_send_sms(FILAHA_FARMER_NUMBER,
+                     filaha_critical_sms(FILAHA_DEVICE_ID, "Test du dispositif", 0, ""));
       break;
     }
     case BTN_POWER_LONG:
       Serial.println("[btn] POWER long-press — powering down");
-      // Politely tell the app we're going dark.
       modem_send_sms(FILAHA_FARMER_NUMBER,
-                     filaha_alert_sms(FILAHA_DEVICE_ID,
-                                      String("POWER_CUT|manual shutdown")));
+                     filaha_critical_sms(FILAHA_DEVICE_ID, "Arret manuel du dispositif", 0, ""));
       delay(200);
       enter_deep_sleep();                       // never returns
       break;
@@ -166,21 +193,24 @@ void loop() {
   feedback_loop();
   handle_button_events();
   modem_loop();
+  net_loop();                                   // keep MQTT alive / reconnect
   check_power_transition();
 
   const unsigned long now = millis();
-  if (now - s_last_send_ms >= DATA_INTERVAL_MS) {
+  if (now - s_last_send_ms >= TELEMETRY_INTERVAL_MS) {
     s_last_send_ms = now;
 
     SensorReading r;
     if (sensors_read(r)) {
-      const String sms = filaha_data_sms(FILAHA_DEVICE_ID, r);
-      modem_send_sms(FILAHA_FARMER_NUMBER, sms);
-      evaluate_local_danger(r);
+      uint8_t pkt[8];
+      const size_t n = pack_telemetry(r, pkt);
+      net_publish(pkt, n);                      // routine data over 2G — no SMS
+      evaluate_critical(r);                     // emergency lifeline (SMS + call)
+      maybe_send_heartbeat(r);                  // once-a-day report
     } else {
       Serial.println("[loop] no usable sensor reading this cycle");
     }
   }
 
-  delay(50);   // minimal idle yield; real power-saving sleep is a v0.2 item
+  delay(50);
 }

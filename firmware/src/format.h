@@ -27,3 +27,10 @@ String filaha_clear_sms(const char* device_id, const String& payload);
 // Common payload builders:
 String alert_payload_sensor(const char* key, float value, const char* unit);
 String alert_payload_power_cut();          // assembles "POWER_CUT|running on battery"
+
+// ── Human-readable SMS (NEW path) — the farmer reads these with their eyes;
+//    the app never parses SMS anymore (Google Play forbids READ_SMS). ASCII
+//    only, so they encode cleanly in the GSM 7-bit charset.
+String filaha_critical_sms(const char* device_id, const char* what,
+                           float value, const char* unit);
+String filaha_heartbeat_sms(const char* device_id, const SensorReading& r);

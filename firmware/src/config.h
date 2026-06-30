@@ -9,11 +9,35 @@
 #define FILAHA_DEVICE_ID         "DEV01"
 
 // The Djezzy / farmer SIM running the Filaha Flock app (intl. format).
-#define FILAHA_FARMER_NUMBER     "+213000000000"
+#define FILAHA_FARMER_NUMBER     "+213541787699"
+
+// SIM PIN — leave empty "" if your SIM has no PIN, or you've already
+// removed it via a normal phone. If Djezzy gave you a PIN, put it here.
+#define FILAHA_SIM_PIN           ""
 
 // ── Cadence ────────────────────────────────────────────────────────
-#define DATA_INTERVAL_MS         (30UL * 1000UL)      // data SMS every 30 s
+#define TELEMETRY_INTERVAL_MS    (60UL * 1000UL)      // MQTT telemetry every 60 s
 #define SENSOR_WARMUP_MS         (5UL  * 1000UL)      // settle time after boot
+
+// ── Cloud / data path (2G GPRS + MQTT) ─────────────────────────────
+// APN for the device SIM. Algeria: Djezzy "djezzy" / Mobilis "internet" /
+// Ooredoo "internet" (confirm with your operator). User/pass usually empty.
+#define FILAHA_APN               "internet"
+#define FILAHA_APN_USER          ""
+#define FILAHA_APN_PASS          ""
+// Your cloud server (the VPS running docker compose) + MQTT credentials from
+// setup.sh.  MQTT_USER MUST equal FILAHA_DEVICE_ID.
+#define FILAHA_MQTT_HOST         "YOUR_SERVER_IP_OR_DOMAIN"
+#define FILAHA_MQTT_PORT         1883
+#define FILAHA_MQTT_USER         FILAHA_DEVICE_ID
+#define FILAHA_MQTT_PASS         "device-password-from-setup.sh"
+
+// ── Hybrid SMS fallback (device-originated, human-readable) ─────────
+#define HEARTBEAT_HOUR           20      // local hour (0-23) for the daily report SMS
+#define HEARTBEAT_ENABLED        1
+#define CRITICAL_SMS_ENABLED     1       // emergency text straight to the farmer
+#define CRITICAL_CALL_ENABLED    1       // also ring the farmer (0 if module is data-only)
+#define CRITICAL_RING_MS         20000   // how long to ring before hanging up
 
 // ── Local danger thresholds (mirror the app defaults) ──────────────
 // Used ONLY for the optional explicit ALERT/CLEAR SMS path. The app
@@ -70,6 +94,19 @@
 // Flip to 1 when the MiCS-4514 NH₃ sensor (SEN0377) arrives in July.
 // Until then NH₃ is simply omitted from the SMS — the parser handles that.
 #define FILAHA_HAS_NH3           0
+
+// ── TEST MODE ─────────────────────────────────────────────────────
+// 1 → no real sensors needed. The firmware boots, attaches to LTE, and
+//     sends gently-varying synthetic CO₂/T/H values every 30 s so you can
+//     verify the modem → SMS → app pipeline end-to-end with just the
+//     LilyGO + a SIM. The battery field stays real (from the on-board ADC).
+//
+// 0 → production. STCC4 must be wired; if it fails to init, the firmware
+//     keeps sending heartbeat SMS (battery only) so you know the device is
+//     alive — but no synthetic readings, ever.
+//
+// Flip to 0 the moment your real STCC4 is connected.
+#define FILAHA_TEST_MODE         1
 
 // Pipe every modem AT command through Serial for debugging.
 // Set to 0 for a slightly tighter production loop once the unit is happy.

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Filaha Flock",
     "slug": "filaha-monitor",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "runtimeVersion": { "policy": "appVersion" },
     "updates": {
       "url": "https://u.expo.dev/19541610-9acc-4823-b1b6-69108e461fca",
@@ -22,16 +22,13 @@
     },
     "android": {
       "package": "com.filaha",
-      "versionCode": 2,
+      "versionCode": 3,
       "userInterfaceStyle": "automatic",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0a0f1e"
       },
       "permissions": [
-        "android.permission.RECEIVE_SMS",
-        "android.permission.READ_SMS",
-        "android.permission.SEND_SMS",
         "android.permission.CALL_PHONE",
         "android.permission.VIBRATE",
         "android.permission.POST_NOTIFICATIONS",

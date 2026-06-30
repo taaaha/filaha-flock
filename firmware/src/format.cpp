@@ -48,6 +48,35 @@ String alert_payload_sensor(const char* key, float value, const char* unit) {
   return p;
 }
 
+// ── Human-readable SMS (read by the farmer, not the app) ───────────
+String filaha_critical_sms(const char* device_id, const char* what,
+                           float value, const char* unit) {
+  String s; s.reserve(120);
+  s  = "FILAHA ALERTE [";
+  s += device_id;
+  s += "] ";
+  s += what;                       // e.g. "Ammoniac eleve"
+  s += ' ';
+  s += String(value, 1);
+  s += unit;                       // e.g. " ppm"
+  s += ". Verifiez le poulailler immediatement.";
+  return s;
+}
+
+String filaha_heartbeat_sms(const char* device_id, const SensorReading& r) {
+  String s; s.reserve(140);
+  s  = "FILAHA rapport [";
+  s += device_id;
+  s += "] : ";
+  if (r.has_temp) { s += "Temp ";  s += String(r.temp_c, 1); s += "C "; }
+  if (r.has_hum)  { s += "Hum ";   s += String(r.hum_pct, 0); s += "% "; }
+  if (r.has_co2)  { s += "CO2 ";   s += String(r.co2_ppm, 0); s += "ppm "; }
+  if (r.has_nh3)  { s += "NH3 ";   s += String(r.nh3_ppm, 1); s += "ppm "; }
+  if (r.has_bat)  { s += "Batt ";  s += r.bat_pct;            s += "% "; }
+  s += "- dispositif actif.";
+  return s;
+}
+
 String alert_payload_power_cut() {
   // Final assembled SMS becomes:
   //   FILAHA|DEV01|ALERT|POWER_CUT|running on battery

@@ -9,13 +9,21 @@
         "buildType": "apk"
       },
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://8.229.107.64:8080",
+        "EXPO_PUBLIC_API_TOKEN": "48382592e46e201f252d0728d8e5987e2a87b259093207a6"
+      }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
       },
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://8.229.107.64:8080",
+        "EXPO_PUBLIC_API_TOKEN": "48382592e46e201f252d0728d8e5987e2a87b259093207a6"
+      }
     },
     "production-apk": {
       "extends": "production",
@@ -29,6 +37,10 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://8.229.107.64:8080",
+        "EXPO_PUBLIC_API_TOKEN": "48382592e46e201f252d0728d8e5987e2a87b259093207a6"
       }
     }
   },

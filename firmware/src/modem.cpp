@@ -58,6 +58,14 @@ bool modem_begin() {
 
   Serial.print("[modem] info: "); Serial.println(modem.getModemInfo());
 
+  // Unlock the SIM if a PIN is configured.
+  if (sizeof(FILAHA_SIM_PIN) > 1) {
+    Serial.println("[modem] unlocking SIM…");
+    if (!modem.simUnlock(FILAHA_SIM_PIN)) {
+      Serial.println("[modem] SIM unlock FAILED — wrong PIN?");
+    }
+  }
+
   // SMS text mode + GSM 7-bit charset (our payload is ASCII).
   modem.sendAT(GF("+CMGF=1"));   modem.waitResponse();
   modem.sendAT(GF("+CSCS=\"GSM\""));   modem.waitResponse();
@@ -74,6 +82,26 @@ bool modem_begin() {
 }
 
 bool modem_is_network_attached() { return s_attached; }
+
+TinyGsm& modem_instance() { return modem; }
+
+bool modem_place_call(const char* number, unsigned long ring_ms) {
+  if (!s_attached) {
+    s_attached = modem.isNetworkConnected();
+    if (!s_attached) { Serial.println("[call] skipped — not attached"); return false; }
+  }
+  // ATD<number>;  — the trailing ';' requests a VOICE call (not data).
+  Serial.printf("[call] dialing %s …\n", number);
+  modem.sendAT(String("D") + number + ";");
+  const bool ok = (modem.waitResponse(15000UL) == 1);
+  Serial.printf("[call] dial %s\n", ok ? "accepted" : "REJECTED (module may be data-only)");
+  if (ok) {
+    delay(ring_ms);                 // let it ring so the farmer notices
+    modem.sendAT("H");              // ATH — hang up; the missed call is the alert
+    modem.waitResponse(5000UL);
+  }
+  return ok;
+}
 
 bool modem_send_sms(const char* number, const String& body) {
   if (!s_attached) {

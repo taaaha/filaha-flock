@@ -1,0 +1,57 @@
+# ════════════════════════════════════════════════════════════════
+#  Filaha Flock — cloud backend
+#  MQTT broker (Mosquitto)  →  ingest+API (Node)  →  TimescaleDB
+#  Host-agnostic: `docker compose up -d` on any Linux VPS (or locally).
+# ════════════════════════════════════════════════════════════════
+services:
+  db:
+    image: timescale/timescaledb:2.17.2-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-filaha}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:-filaha}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-filaha} -d ${DB_NAME:-filaha}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Not exposed to the internet — only the api talks to it.
+
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    restart: unless-stopped
+    ports:
+      - "1883:1883"      # devices connect here (put TLS in front in prod, see README)
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mqtt/passwd:/mosquitto/config/passwd:ro
+      - mqtt_data:/mosquitto/data
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-filaha}:${DB_PASSWORD}@db:5432/${DB_NAME:-filaha}
+      MQTT_URL: mqtt://mqtt:1883
+      MQTT_USER: ${MQTT_API_USER:-server}
+      MQTT_PASS: ${MQTT_API_PASS:?set MQTT_API_PASS in .env}
+      API_TOKEN: ${API_TOKEN:?set API_TOKEN in .env}
+      PORT: 8080
+      OFFLINE_AFTER_MIN: ${OFFLINE_AFTER_MIN:-15}
+      # Optional: Expo push for in-app (NOT SMS) alerts when the server sees a critical reading.
+      EXPO_PUSH_ENABLED: ${EXPO_PUSH_ENABLED:-false}
+    ports:
+      - "8080:8080"      # the mobile app calls this REST API
+
+volumes:
+  db_data:
+  mqtt_data:

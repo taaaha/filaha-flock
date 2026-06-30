@@ -9,9 +9,9 @@ const path = require('path');
 const PACKAGE_NAME = 'com.filaha';
 
 const REQUIRED_PERMISSIONS = [
-  'android.permission.RECEIVE_SMS',
-  'android.permission.READ_SMS',
-  'android.permission.SEND_SMS',
+  // NOTE: SMS permissions (RECEIVE_SMS/READ_SMS/SEND_SMS) intentionally removed —
+  // Google Play forbids them for non-default-SMS apps. The DEVICE now owns all
+  // SMS + calls; the app reads telemetry from the cloud REST API instead.
   'android.permission.CALL_PHONE',
   'android.permission.VIBRATE',
   'android.permission.POST_NOTIFICATIONS',
@@ -61,26 +61,8 @@ function ensureTelQuery(manifest) {
 
 function ensureSmsReceiver(application) {
   if (!application.receiver) application.receiver = [];
-  const receiverExists = application.receiver.some(
-    (r) => r && r.$ && r.$['android:name'] === '.SmsReceiver'
-  );
-  if (!receiverExists) {
-    application.receiver.push({
-      $: {
-        'android:name': '.SmsReceiver',
-        'android:exported': 'true',
-        'android:permission': 'android.permission.BROADCAST_SMS',
-      },
-      'intent-filter': [
-        {
-          $: { 'android:priority': '999' },
-          action: [
-            { $: { 'android:name': 'android.provider.Telephony.SMS_RECEIVED' } },
-          ],
-        },
-      ],
-    });
-  }
+  // The SMS_RECEIVED BroadcastReceiver was removed — the app no longer reads SMS
+  // (Google Play policy). Only the reminder + boot receivers remain.
   // Daily reminder receiver
   const reminderExists = application.receiver.some(
     (r) => r && r.$ && r.$['android:name'] === '.ReminderReceiver'
@@ -202,6 +184,9 @@ function withFilahaManifest(config) {
     ensureTelQuery(manifest);
 
     if (manifest.application && manifest.application[0]) {
+      // Allow plain http:// to the cloud API until it's behind TLS (https).
+      // Remove this once the server has a domain + certificate.
+      manifest.application[0].$['android:usesCleartextTraffic'] = 'true';
       ensureSmsReceiver(manifest.application[0]);
       ensureForegroundService(manifest.application[0]);
       ensureDynamicIcons(manifest.application[0]);

@@ -16,7 +16,6 @@ import {
   saveEmergencyContact,
   setAlertConfig,
   showAlertNotification,
-  sendSms,
   startMonitoring,
   scheduleDailyReminder,
   cancelDailyReminder,
@@ -29,6 +28,7 @@ import { startRemoteContentRefresh } from '../services/RemoteContent';
 import { makePhoneCall, makeDirectCall } from '../services/CallService';
 import { vibrateDanger, vibrateWarn } from '../services/AlertService';
 import { parseSms } from '../utils/smsParser';
+import { apiEnabled, fetchLatest, rowToParsed } from '../services/ApiService';
 import { DEFAULT_THRESHOLDS, sensorStatus, deviceStatus } from '../utils/thresholds';
 import { heatStressTHI } from '../utils/poultryData';
 import { STATUS } from '../utils/colors';
@@ -115,6 +115,10 @@ export function AppProvider({ children }) {
   // dangerStateRef tracks per-device per-sensor danger state to detect transitions
   // shape: { [deviceId]: { [sensorKey]: { status: 'ok'|'warn'|'danger', firedAt: number } } }
   const dangerStateRef = useRef({});
+
+  // Tracks the newest telemetry timestamp ingested from the cloud API per device,
+  // so polling never re-appends a reading we already have.
+  const apiLastTsRef = useRef({});
 
   const t = useMemo(() => makeT(state.language), [state.language]);
   const tRef = useRef(t);
@@ -438,20 +442,8 @@ export function AppProvider({ children }) {
       if (shouldAutoCall) {
         makeDirectCall(num).catch(() => {});
       }
-      if (num && s.settings.autoSmsOnDanger) {
-        const lang = s.language;
-        const dangerAlerts = newAlerts.filter((a) => a.type === 'ALERT').slice(0, 3);
-        const dangerLines = dangerAlerts.map((a) => `• ${a.message}`).join('\n');
-        const primaryKey = (dangerAlerts[0]?.subType || 'GENERIC').toLowerCase();
-        const action = actionFor(primaryKey, lang);
-        const whatToDo = tRef.current('whatToDo') || 'What to do';
-        const body =
-          `🚨 Filaha Flock\n${device.name} (${device.id}):\n` +
-          dangerLines +
-          `\n\n▶ ${whatToDo}: ${action}` +
-          `\n${new Date().toLocaleTimeString()}`;
-        sendSms(num, body).catch(() => {});
-      }
+      // (Auto-SMS removed — the DEVICE owns emergency SMS now; the app holds no
+      // SMS permission. The auto-call above is skipped anyway when nativeHandled.)
     }
   }, []);
 
@@ -524,16 +516,8 @@ export function AppProvider({ children }) {
           if (num && (shouldAutoCallDanger || shouldAutoCallPower)) {
             makeDirectCall(num).catch(() => {});
           }
-          // Auto-SMS on danger — mirrors the data-path and the native receiver
-          // (was missing here, so injected/simulated alerts never texted).
-          if (num && s.settings.autoSmsOnDanger && !isPowerCut) {
-            const action = actionFor((parsed.subType || 'GENERIC').toLowerCase(), s.language);
-            const whatToDo = tRef.current('whatToDo') || 'What to do';
-            const body =
-              `🚨 Filaha Flock\n${device.name} (${device.id}):\n• ${parsed.message}` +
-              `\n\n▶ ${whatToDo}: ${action}\n${new Date().toLocaleTimeString()}`;
-            sendSms(num, body).catch(() => {});
-          }
+          // (Auto-SMS removed — the DEVICE sends emergency SMS itself now; the app
+          // holds no SMS permission and must not call SmsManager.)
         }
       } else if (!silent && s.settings.vibrate) {
         vibrateWarn();
@@ -570,6 +554,42 @@ export function AppProvider({ children }) {
 
     return () => unsubscribe();
   }, [state.ready, handleSmsEvent, handleParsedMessage]);
+
+  // ---------- Cloud telemetry polling (new data path) ----------
+  // The device pushes 7-byte packets to the server over 2G; we pull the latest
+  // reading per device and feed the SAME pipeline the SMS path used. Dedup by
+  // timestamp so re-polls don't duplicate rows. nativeHandled=true → the app
+  // never auto-calls/SMS (the DEVICE owns emergency SMS+call); we still show the
+  // in-app danger notification + red card.
+  useEffect(() => {
+    if (!state.ready || !apiEnabled()) return;
+    let cancelled = false;
+
+    const poll = async () => {
+      const devices = stateRef.current.devices;
+      for (const device of devices) {
+        try {
+          const row = await fetchLatest(device.id);
+          if (cancelled || !row) continue;
+          const parsed = rowToParsed(device.id, row);
+          if (!parsed) continue;
+          const lastTs = apiLastTsRef.current[device.id] || 0;
+          if (parsed.timestamp <= lastTs) continue;   // already have it
+          apiLastTsRef.current[device.id] = parsed.timestamp;
+          const firstSync = lastTs === 0;
+          // On the very first sync after open, ingest silently so a backlog
+          // doesn't burst a stale notification; live updates notify normally.
+          await handleParsedMessage(parsed, true, firstSync);
+        } catch (e) {
+          // network blips are expected on mobile — stay quiet, retry next tick
+        }
+      }
+    };
+
+    poll();
+    const id = setInterval(poll, 30000);   // every 30 s, matched to the device cadence
+    return () => { cancelled = true; clearInterval(id); };
+  }, [state.ready, handleParsedMessage]);
 
   // ---------- Re-evaluate when thresholds change ----------
   // silent=true: editing a threshold updates the alert/danger state but must

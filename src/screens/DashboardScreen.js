@@ -39,13 +39,9 @@ import { generateInsights } from '../services/Insights';
 import { Haptics } from '../services/Haptics';
 import { RefreshControl } from 'react-native';
 import {
-  checkSmsPermission,
   checkCallPermission,
-  checkSendSmsPermission,
   checkNotificationsEnabled,
-  requestSmsPermissions,
   requestCallPermission,
-  requestSendSmsPermission,
   requestNotificationPermission,
   getNativeVersion,
   listMissingNativeMethods,
@@ -123,16 +119,12 @@ export default function DashboardScreen({ navigation }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [sms, call, sendSms, notif] = await Promise.all([
-        checkSmsPermission(),
+      const [call, notif] = await Promise.all([
         checkCallPermission(),
-        checkSendSmsPermission(),
         checkNotificationsEnabled(),
       ]);
       if (cancelled) return;
-      if (!sms) setPermIssue({ key: 'sms', label: t('smsPermission'), action: requestSmsPermissions });
-      else if (!call) setPermIssue({ key: 'call', label: t('callPermission'), action: requestCallPermission });
-      else if (!sendSms) setPermIssue({ key: 'sendSms', label: t('sendSmsPermission'), action: requestSendSmsPermission });
+      if (!call) setPermIssue({ key: 'call', label: t('callPermission'), action: requestCallPermission });
       else if (!notif) setPermIssue({ key: 'notif', label: t('notificationPermission'), action: requestNotificationPermission });
       else setPermIssue(null);
     })();
@@ -314,7 +306,7 @@ export default function DashboardScreen({ navigation }) {
 
   const onTestAlert = async () => {
     const FS = NativeModules.FilahaSms;
-    const required = ['showAlertNotification', 'sendSms', 'makeDirectCall', 'setAlertConfig'];
+    const required = ['showAlertNotification', 'makeDirectCall', 'setAlertConfig'];
     const missing = required.filter((k) => !FS || typeof FS[k] !== 'function');
     if (missing.length > 0) {
       showToast(`APK out of date — rebuild required (${missing[0]})`, 'error');
@@ -335,16 +327,6 @@ export default function DashboardScreen({ navigation }) {
         showToast('✓ Notification', 'success');
       } catch (e) { showToast(`✗ ${e?.message || 'fail'}`, 'error'); }
     } else { showToast(`✗ ${t('notificationPermission')}`, 'error'); }
-
-    setTimeout(async () => {
-      let smsOk = await checkSendSmsPermission();
-      if (!smsOk) smsOk = await requestSendSmsPermission();
-      if (!smsOk) { showToast(`✗ ${t('sendSmsPermission')}`, 'error'); return; }
-      try {
-        await FS.sendSms(num, `🧪 Filaha Flock test\n${targetName}\n${new Date().toLocaleTimeString()}`);
-        showToast('✓ SMS sent', 'success');
-      } catch (e) { showToast(`✗ SMS: ${e?.message}`, 'error'); }
-    }, 900);
 
     setTimeout(async () => {
       let cOk = await checkCallPermission();

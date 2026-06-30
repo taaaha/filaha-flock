@@ -14,16 +14,11 @@ import { LANGS } from '../translations';
 import {
   isIgnoringBatteryOptimizations,
   requestIgnoreBatteryOptimizations,
-  checkSmsPermission,
-  requestSmsPermissions,
   checkCallPermission,
   requestCallPermission,
-  checkSendSmsPermission,
-  requestSendSmsPermission,
   requestNotificationPermission,
   checkNotificationsEnabled,
   showAlertNotification,
-  sendSms,
 } from '../services/SmsService';
 import { makeDirectCall } from '../services/CallService';
 import { useUpdates } from '../contexts/UpdateContext';
@@ -54,9 +49,7 @@ export default function SettingsScreen() {
   const [farmerName, setFarmerName] = useState(settings.farmerName || '');
   const [farmName, setFarmName] = useState(settings.farmName || '');
   const [emergencyContact, setEmergencyContact] = useState(settings.emergencyContact || '');
-  const [smsGranted, setSmsGranted] = useState(false);
   const [callGranted, setCallGranted] = useState(false);
-  const [sendSmsGranted, setSendSmsGranted] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [batteryOk, setBatteryOk] = useState(true);
   const [editProfile, setEditProfile] = useState(false);
@@ -70,16 +63,12 @@ export default function SettingsScreen() {
   useEffect(() => { refreshPermissions(); }, []);
 
   const refreshPermissions = async () => {
-    const [sms, call, send, notif, batt] = await Promise.all([
-      checkSmsPermission(),
+    const [call, notif, batt] = await Promise.all([
       checkCallPermission(),
-      checkSendSmsPermission(),
       checkNotificationsEnabled(),
       isIgnoringBatteryOptimizations(),
     ]);
-    setSmsGranted(sms);
     setCallGranted(call);
-    setSendSmsGranted(send);
     setNotifEnabled(notif);
     setBatteryOk(batt);
   };
@@ -167,23 +156,7 @@ export default function SettingsScreen() {
       notifResult ? 'success' : 'error'
     );
 
-    // 2) Send SMS
-    setTimeout(async () => {
-      let smsOk = await checkSendSmsPermission();
-      if (!smsOk) smsOk = await requestSendSmsPermission();
-      if (smsOk) {
-        const sent = await sendSms(num,
-          `🧪 Filaha Flock test SMS\n${new Date().toLocaleString()}`);
-        showToast(
-          sent ? `✓ SMS` : `✗ SMS`,
-          sent ? 'success' : 'error'
-        );
-      } else {
-        showToast(`✗ SMS — ${t('permissionDenied')}`, 'error');
-      }
-    }, 800);
-
-    // 3) Place call
+    // 2) Place call (the device sends SMS itself now — nothing for the app to test)
     setTimeout(async () => {
       let cOk = await checkCallPermission();
       if (!cOk) cOk = await requestCallPermission();
@@ -196,18 +169,8 @@ export default function SettingsScreen() {
     }, 2200);
   };
 
-  const onRequestSms = async () => {
-    const ok = await requestSmsPermissions();
-    refreshPermissions();
-    showToast(ok ? t('permissionGranted') : t('permissionDenied'), ok ? 'success' : 'error');
-  };
   const onRequestCall = async () => {
     const ok = await requestCallPermission();
-    refreshPermissions();
-    showToast(ok ? t('permissionGranted') : t('permissionDenied'), ok ? 'success' : 'error');
-  };
-  const onRequestSendSms = async () => {
-    const ok = await requestSendSmsPermission();
     refreshPermissions();
     showToast(ok ? t('permissionGranted') : t('permissionDenied'), ok ? 'success' : 'error');
   };
@@ -512,11 +475,6 @@ export default function SettingsScreen() {
           onValueChange={(v) => updateSettings({ autoCallOnDanger: v, autoCall: v })}
         />
         <ToggleRow
-          label={t('autoSms')}
-          value={!!settings.autoSmsOnDanger}
-          onValueChange={(v) => updateSettings({ autoSmsOnDanger: v })}
-        />
-        <ToggleRow
           label={t('autoCallPowerCut')}
           value={!!settings.autoCallOnPowerCut}
           onValueChange={(v) => updateSettings({ autoCallOnPowerCut: v })}
@@ -546,20 +504,6 @@ export default function SettingsScreen() {
 
         {/* Permissions */}
         <Text style={styles.sectionTitle}>{t('permissions')}</Text>
-        <PermissionRow
-          label={t('smsPermission')}
-          granted={smsGranted}
-          grantedLabel={t('granted')}
-          deniedLabel={t('enable')}
-          onPress={onRequestSms}
-        />
-        <PermissionRow
-          label={t('sendSmsPermission')}
-          granted={sendSmsGranted}
-          grantedLabel={t('granted')}
-          deniedLabel={t('enable')}
-          onPress={onRequestSendSms}
-        />
         <PermissionRow
           label={t('callPermission')}
           granted={callGranted}
