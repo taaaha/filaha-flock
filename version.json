@@ -1,14 +1,14 @@
 {
-  "versionCode": 2,
-  "versionName": "1.0.1",
-  "apkUrl": "https://github.com/taaaha/filaha-flock/releases/download/v1.0.1/filaha-flock-1.0.1.apk",
+  "versionCode": 3,
+  "versionName": "1.1.0",
+  "apkUrl": "https://github.com/taaaha/filaha-flock/releases/download/v1.1.0/filaha-flock-1.1.0.apk",
   "mandatory": false,
   "minSupportedVersionCode": 1,
-  "sizeBytes": 65421589,
-  "publishedAt": "2026-05-29",
+  "sizeBytes": 65441060,
+  "publishedAt": "2026-06-30",
   "notes": {
-    "ar": "•   أول إصدار رسمي لتطبيق  filaha flock \r\n• تحديثات داخل التطبيق بدون إعادة تثبيت",
-    "fr": "•   أول إصدار رسمي لتطبيق  filaha flock \r\n• تحديثات داخل التطبيق بدون إعادة تثبيت",
-    "en": "•   أول إصدار رسمي لتطبيق  filaha flock \r\n• تحديثات داخل التطبيق بدون إعادة تثبيت"
+    "ar": "• Performance and stability improvements",
+    "fr": "• Performance and stability improvements",
+    "en": "• Performance and stability improvements"
   }
 }
