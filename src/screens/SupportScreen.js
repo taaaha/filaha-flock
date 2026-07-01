@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, TextInput, Linking, StatusBar,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../contexts/AppContext';
@@ -12,18 +13,18 @@ import { FAQ, SUPPORT_CONTACT, matchFaq } from '../utils/faqContent';
 const T = {
   title:    { ar: 'الدعم والمساعدة', fr: 'Aide & Support', en: 'Help & Support' },
   greeting: {
-    ar: 'مرحبًا! أنا مساعد فلاحة فلوك. اسألني عن أي مشكلة تقنية أو اختر سؤالًا بالأسفل:',
-    fr: "Bonjour ! Je suis l'assistant Filaha Flock. Posez votre question ou choisissez ci-dessous :",
-    en: "Hi! I'm the Filaha Flock assistant. Ask me anything, or pick a question below:",
+    ar: 'مرحبًا! أنا مساعد فلاحة فلوك 🐥 اسألني عن أي مشكلة، أو اختر سؤالًا من الأسفل.',
+    fr: "Bonjour ! Je suis l'assistant Filaha Flock 🐥 Posez votre question, ou choisissez ci-dessous.",
+    en: "Hi! I'm the Filaha Flock assistant 🐥 Ask me anything, or pick a question below.",
   },
   fallback: {
-    ar: 'لم أفهم سؤالك تمامًا. جرّب صياغة أخرى، أو اختر من الأسئلة الشائعة، أو تواصل معنا مباشرة بالأسفل.',
-    fr: "Je n'ai pas bien compris. Reformulez, choisissez une question fréquente, ou contactez-nous directement en bas.",
-    en: "I didn't quite get that. Try rephrasing, pick a common question, or contact us directly below.",
+    ar: 'لم أفهم سؤالك تمامًا. جرّب صياغة أخرى، أو اختر سؤالًا شائعًا، أو تواصل معنا مباشرة بالأعلى.',
+    fr: "Je n'ai pas bien compris. Reformulez, choisissez une question fréquente, ou contactez-nous en haut.",
+    en: "I didn't quite get that. Try rephrasing, pick a common question, or contact us at the top.",
   },
-  common:   { ar: 'أسئلة شائعة', fr: 'Questions fréquentes', en: 'Common questions' },
-  contact:  { ar: 'تواصل معنا', fr: 'Contactez-nous', en: 'Contact us' },
   ph:       { ar: 'اكتب سؤالك…', fr: 'Écrivez votre question…', en: 'Type your question…' },
+  call:     { ar: 'اتصال', fr: 'Appeler', en: 'Call' },
+  email:    { ar: 'إيميل', fr: 'Email', en: 'Email' },
 };
 
 export default function SupportScreen({ navigation }) {
@@ -35,7 +36,8 @@ export default function SupportScreen({ navigation }) {
   const [messages, setMessages] = useState([{ from: 'bot', text: T.greeting[lang] }]);
   const [input, setInput] = useState('');
   const scrollRef = useRef(null);
-  const scrollDown = () => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+  const toEnd = () => requestAnimationFrame(() =>
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 30));
 
   const ask = useCallback((text) => {
     const q = (text || '').trim();
@@ -44,7 +46,7 @@ export default function SupportScreen({ navigation }) {
     const answer = entry ? (entry.a[lang] || entry.a.en) : T.fallback[lang];
     setMessages((m) => [...m, { from: 'user', text: q }, { from: 'bot', text: answer }]);
     setInput('');
-    scrollDown();
+    toEnd();
   }, [lang]);
 
   const open = (url) => Linking.openURL(url).catch(() => {});
@@ -53,35 +55,69 @@ export default function SupportScreen({ navigation }) {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
       <StatusBar barStyle={barStyle()} backgroundColor={colors.bg} />
 
+      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation?.goBack?.()} hitSlop={12} style={styles.back}>
           <Icon name="arrowLeft" size={24} color={colors.textPrimary} />
         </Pressable>
         <View style={styles.headTitle}>
-          <View style={styles.headAvatar}><CoopMascot status="ok" size={28} /></View>
+          <View style={styles.headAvatar}><CoopMascot status="ok" size={26} /></View>
           <Text style={styles.title}>{T.title[lang]}</Text>
         </View>
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {messages.map((m, i) => (
-          <View key={i} style={[styles.row, m.from === 'user' ? styles.rowUser : styles.rowBot]}>
-            {m.from === 'bot' && (
-              <View style={styles.botDot}><CoopMascot status="ok" size={20} /></View>
-            )}
-            <View style={[styles.bubble, m.from === 'user' ? styles.userBubble : styles.botBubble]}>
-              <Text style={m.from === 'user' ? styles.userText : styles.botText}>{m.text}</Text>
-            </View>
-          </View>
-        ))}
+      {/* Contact strip — always visible so a human is one tap away */}
+      <View style={styles.contactStrip}>
+        <Pressable style={styles.cPill} android_ripple={{ color: colors.accent + '22' }}
+          onPress={() => open(`tel:${SUPPORT_CONTACT.phone}`)}>
+          <Icon name="phone" size={15} color={colors.accent} />
+          <Text style={styles.cPillTxt}>{T.call[lang]}</Text>
+        </Pressable>
+        <Pressable style={styles.cPill} android_ripple={{ color: colors.accent + '22' }}
+          onPress={() => open(`https://wa.me/${SUPPORT_CONTACT.whatsapp}`)}>
+          <Icon name="messageSquare" size={15} color={colors.accent} />
+          <Text style={styles.cPillTxt}>WhatsApp</Text>
+        </Pressable>
+        <Pressable style={styles.cPill} android_ripple={{ color: colors.accent + '22' }}
+          onPress={() => open(`mailto:${SUPPORT_CONTACT.email}`)}>
+          <Icon name="mail" size={15} color={colors.accent} />
+          <Text style={styles.cPillTxt}>{T.email[lang]}</Text>
+        </Pressable>
+      </View>
 
-        <Text style={styles.section}>{T.common[lang]}</Text>
-        <View style={styles.chips}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {/* Chat — its OWN scroll view, so new replies always scroll into view */}
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+        >
+          {messages.map((m, i) => (
+            <View key={i} style={[styles.row, m.from === 'user' ? styles.rowUser : styles.rowBot]}>
+              {m.from === 'bot' && (
+                <View style={styles.botDot}><CoopMascot status="ok" size={18} /></View>
+              )}
+              <View style={[styles.bubble, m.from === 'user' ? styles.userBubble : styles.botBubble]}>
+                <Text style={m.from === 'user' ? styles.userText : styles.botText}>{m.text}</Text>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* Quick questions — horizontal, right above the input */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.chipsRow}
+          style={styles.chipsWrap}
+        >
           {FAQ.map((f) => (
             <Pressable
               key={f.id}
@@ -89,52 +125,29 @@ export default function SupportScreen({ navigation }) {
               android_ripple={{ color: colors.accent + '22' }}
               style={styles.chip}
             >
-              <Text style={styles.chipText} numberOfLines={2}>{f.q[lang] || f.q.en}</Text>
+              <Text style={styles.chipText} numberOfLines={1}>{f.q[lang] || f.q.en}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
 
-        <Text style={styles.section}>{T.contact[lang]}</Text>
-        <View style={styles.card}>
-          <Pressable style={styles.crow} android_ripple={{ color: colors.accent + '18' }}
-            onPress={() => open(`tel:${SUPPORT_CONTACT.phone}`)}>
-            <View style={styles.cIcon}><Icon name="phone" size={18} color={colors.accent} /></View>
-            <Text style={styles.cLabel}>{SUPPORT_CONTACT.phone}</Text>
-            <Icon name="chevronRight" size={18} color={colors.textTertiary} />
-          </Pressable>
-          <View style={styles.sep} />
-          <Pressable style={styles.crow} android_ripple={{ color: colors.accent + '18' }}
-            onPress={() => open(`https://wa.me/${SUPPORT_CONTACT.whatsapp}`)}>
-            <View style={styles.cIcon}><Icon name="messageSquare" size={18} color={colors.accent} /></View>
-            <Text style={styles.cLabel}>WhatsApp</Text>
-            <Icon name="chevronRight" size={18} color={colors.textTertiary} />
-          </Pressable>
-          <View style={styles.sep} />
-          <Pressable style={styles.crow} android_ripple={{ color: colors.accent + '18' }}
-            onPress={() => open(`mailto:${SUPPORT_CONTACT.email}`)}>
-            <View style={styles.cIcon}><Icon name="mail" size={18} color={colors.accent} /></View>
-            <Text style={styles.cLabel}>{SUPPORT_CONTACT.email}</Text>
-            <Icon name="chevronRight" size={18} color={colors.textTertiary} />
+        {/* Input */}
+        <View style={styles.inputBar}>
+          <TextInput
+            value={input}
+            onChangeText={setInput}
+            placeholder={T.ph[lang]}
+            placeholderTextColor={colors.textTertiary}
+            style={styles.input}
+            onSubmitEditing={() => ask(input)}
+            returnKeyType="send"
+            blurOnSubmit={false}
+          />
+          <Pressable onPress={() => ask(input)} style={styles.send}
+            android_ripple={{ color: '#ffffff33', borderless: true }}>
+            <Icon name="send" size={20} color="#fffdf7" />
           </Pressable>
         </View>
-      </ScrollView>
-
-      <View style={styles.inputBar}>
-        <TextInput
-          value={input}
-          onChangeText={setInput}
-          placeholder={T.ph[lang]}
-          placeholderTextColor={colors.textTertiary}
-          style={styles.input}
-          onSubmitEditing={() => ask(input)}
-          returnKeyType="send"
-          blurOnSubmit={false}
-        />
-        <Pressable onPress={() => ask(input)} style={styles.send}
-          android_ripple={{ color: '#ffffff33', borderless: true }}>
-          <Icon name="send" size={20} color="#fffdf7" />
-        </Pressable>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -145,47 +158,48 @@ function makeStyles() {
     header: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: 14, paddingVertical: 12,
-      borderBottomWidth: 1, borderBottomColor: colors.border,
     },
     back: { padding: 2 },
     headTitle: { flexDirection: 'row', alignItems: 'center' },
     headAvatar: {
-      width: 38, height: 38, borderRadius: 12, marginEnd: 10,
+      width: 36, height: 36, borderRadius: 12, marginEnd: 10,
       alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card,
       borderWidth: 1, borderColor: colors.border,
     },
     title: { color: colors.textPrimary, fontSize: 18, fontWeight: '800' },
 
-    row: { flexDirection: 'row', marginBottom: 10, alignItems: 'flex-end' },
+    contactStrip: {
+      flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 12,
+      borderBottomWidth: 1, borderBottomColor: colors.border,
+    },
+    cPill: {
+      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+      backgroundColor: colors.accent + '14', borderRadius: 12, paddingVertical: 10,
+      borderWidth: 1, borderColor: colors.accent + '33',
+    },
+    cPillTxt: { color: colors.accent, fontSize: 12.5, fontWeight: '700' },
+
+    row: { flexDirection: 'row', marginBottom: 12, alignItems: 'flex-end' },
     rowBot: { justifyContent: 'flex-start' },
     rowUser: { justifyContent: 'flex-end' },
     botDot: {
-      width: 30, height: 30, borderRadius: 15, marginEnd: 8,
+      width: 28, height: 28, borderRadius: 14, marginEnd: 8,
       alignItems: 'center', justifyContent: 'center',
       backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
     },
-    bubble: { maxWidth: '82%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
+    bubble: { maxWidth: '80%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
     botBubble: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderBottomStartRadius: 6 },
     userBubble: { backgroundColor: colors.accent, borderBottomEndRadius: 6 },
-    botText: { color: colors.textPrimary, fontSize: 14.5, lineHeight: 21 },
-    userText: { color: '#fffdf7', fontSize: 14.5, lineHeight: 21, fontWeight: '600' },
+    botText: { color: colors.textPrimary, fontSize: 14.5, lineHeight: 22 },
+    userText: { color: '#fffdf7', fontSize: 14.5, lineHeight: 22, fontWeight: '600' },
 
-    section: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginTop: 18, marginBottom: 10, textTransform: 'uppercase' },
-    chips: { flexDirection: 'row', flexWrap: 'wrap' },
+    chipsWrap: { maxHeight: 52, borderTopWidth: 1, borderTopColor: colors.border },
+    chipsRow: { paddingHorizontal: 12, paddingVertical: 9, gap: 8, alignItems: 'center' },
     chip: {
       backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderLight,
-      borderRadius: 14, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 8, marginEnd: 8, maxWidth: '100%',
+      borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, marginEnd: 8, maxWidth: 240,
     },
     chipText: { color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
-
-    card: { backgroundColor: colors.card, borderRadius: 18, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-    crow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14 },
-    cIcon: {
-      width: 34, height: 34, borderRadius: 10, marginEnd: 12,
-      alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent + '18',
-    },
-    cLabel: { flex: 1, color: colors.textPrimary, fontSize: 14.5, fontWeight: '600' },
-    sep: { height: 1, backgroundColor: colors.border, marginStart: 60 },
 
     inputBar: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10,
@@ -194,7 +208,7 @@ function makeStyles() {
     input: {
       flex: 1, backgroundColor: colors.card, borderRadius: 22, borderWidth: 1, borderColor: colors.borderLight,
       paddingHorizontal: 16, paddingVertical: 10, color: colors.textPrimary, fontSize: 14.5, marginEnd: 8,
-      textAlign: 'auto',
+      textAlign: 'auto', maxHeight: 100,
     },
     send: {
       width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent,

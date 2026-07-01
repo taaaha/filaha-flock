@@ -629,6 +629,29 @@ export const WILAYAS = [
 // Disease quick-reference (Algeria-specific)
 // ─────────────────────────────────────────────────────────────────────
 
+// Arabic wilaya names — shown when the app language is Arabic (the Latin `name`
+// leaked into the Arabic UI otherwise).
+const WILAYA_AR = {
+  adrar: 'أدرار', chlef: 'الشلف', laghouat: 'الأغواط', oeb: 'أم البواقي', batna: 'باتنة',
+  bejaia: 'بجاية', biskra: 'بسكرة', bechar: 'بشار', blida: 'البليدة', bouira: 'البويرة',
+  tamanrasset: 'تمنراست', tebessa: 'تبسة', tlemcen: 'تلمسان', tiaret: 'تيارت', tiziouzou: 'تيزي وزو',
+  algiers: 'الجزائر', djelfa: 'الجلفة', jijel: 'جيجل', setif: 'سطيف', saida: 'سعيدة',
+  skikda: 'سكيكدة', sba: 'سيدي بلعباس', annaba: 'عنابة', guelma: 'قالمة', constantine: 'قسنطينة',
+  medea: 'المدية', mostaganem: 'مستغانم', msila: 'المسيلة', mascara: 'معسكر', ouargla: 'ورقلة',
+  oran: 'وهران', elbayadh: 'البيض', illizi: 'إليزي', bba: 'برج بوعريريج', boumerdes: 'بومرداس',
+  eltarf: 'الطارف', tindouf: 'تندوف', tissemsilt: 'تيسمسيلت', eloued: 'الوادي', khenchela: 'خنشلة',
+  soukahras: 'سوق أهراس', tipaza: 'تيبازة', mila: 'ميلة', ain_defla: 'عين الدفلى', naama: 'النعامة',
+  ain_temouchent: 'عين تموشنت', ghardaia: 'غرداية', relizane: 'غليزان', timimoun: 'تيميمون',
+  borj_bm: 'برج باجي مختار', ouled_djellal: 'أولاد جلال', beni_abbes: 'بني عباس', insalah: 'عين صالح',
+  inguezzam: 'عين قزام', touggourt: 'تقرت', djanet: 'جانت', elmghair: 'المغير', elmeniaa: 'المنيعة',
+};
+
+// Localized wilaya display name.
+export function wilayaName(w, lang) {
+  if (!w) return '';
+  return lang === 'ar' ? (WILAYA_AR[w.id] || w.name) : w.name;
+}
+
 export const DISEASES = [
   {
     id: 'heat_stress',

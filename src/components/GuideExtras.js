@@ -4,10 +4,11 @@ import Svg, { Path, Line, Circle, Text as SvgText, G } from 'react-native-svg';
 import { colors, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import Icon from './Icon';
+import { useApp } from '../contexts/AppContext';
 import {
   STRAINS, STRAINS_BY_BREED, targetWeightAt, targetFCRAt,
   DISEASES, MARKET_REF, WILAYAS, heatStressTHI, FEED_PROFILE, strainLabel,
-  localizeDisease,
+  localizeDisease, wilayaName,
 } from '../utils/poultryData';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -221,6 +222,7 @@ import { Modal as RNModal } from 'react-native';
 
 export function WilayaPicker({ t, current, onPick }) {
   const styles = useStyles(makeStyles);
+  const { language } = useApp();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -228,7 +230,9 @@ export function WilayaPicker({ t, current, onPick }) {
   const list = WILAYAS.filter((w) => {
     if (!query.trim()) return true;
     const q = query.trim().toLowerCase();
-    return w.name.toLowerCase().includes(q) || String(w.code).startsWith(q);
+    return w.name.toLowerCase().includes(q)
+      || wilayaName(w, 'ar').includes(q)
+      || String(w.code).startsWith(q);
   });
 
   return (
@@ -240,7 +244,7 @@ export function WilayaPicker({ t, current, onPick }) {
       >
         <Icon name="mapPin" size={16} color={colors.accent} />
         <Text style={[styles.wilayaDropdownText, !currentWilaya && { color: colors.textTertiary }]}>
-          {currentWilaya ? `${currentWilaya.code}. ${currentWilaya.name}` : t('pickWilaya')}
+          {currentWilaya ? `${currentWilaya.code}. ${wilayaName(currentWilaya, language)}` : t('pickWilaya')}
         </Text>
         <Icon name="chevronDown" size={16} color={colors.textTertiary} />
       </Pressable>
@@ -291,7 +295,7 @@ export function WilayaPicker({ t, current, onPick }) {
                     <Text style={[
                       styles.wilayaItemName,
                       current === w.id && { color: colors.accent },
-                    ]}>{w.name}</Text>
+                    ]}>{wilayaName(w, language)}</Text>
                     <Text style={styles.wilayaItemMeta}>
                       {w.region} • {w.climate}
                     </Text>
