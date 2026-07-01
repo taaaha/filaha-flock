@@ -13,7 +13,9 @@ const KEYS = {
 };
 
 const READING_PREFIX = '@filaha:readings:';
-const MAX_READINGS_PER_DEVICE = 100;
+// Holds enough recent points for a meaningful trend/chart. At the 60 s device
+// cadence this is ~8 h of history; the cloud API holds the long-term record.
+const MAX_READINGS_PER_DEVICE = 500;
 
 async function safeGet(key, fallback) {
   try {
@@ -111,6 +113,13 @@ export const Storage = {
     while (list.length > MAX_READINGS_PER_DEVICE) list.shift();
     await safeSet(READING_PREFIX + deviceId, list);
     return list;
+  },
+  // Bulk-replace a device's readings (used to seed history from the cloud API).
+  async setReadings(deviceId, list) {
+    if (!deviceId) return [];
+    const capped = Array.isArray(list) ? list.slice(-MAX_READINGS_PER_DEVICE) : [];
+    await safeSet(READING_PREFIX + deviceId, capped);
+    return capped;
   },
   async clearReadings(deviceId) {
     if (!deviceId) return;

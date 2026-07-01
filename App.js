@@ -7,8 +7,9 @@ import {
   Text,
   StyleSheet,
   AppState,
+  Pressable,
 } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   NavigationContainer,
@@ -26,6 +27,7 @@ import AlertsScreen from './src/screens/AlertsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import InsightsScreen from './src/screens/InsightsScreen';
 import InsightDetailScreen from './src/screens/InsightDetailScreen';
+import SupportScreen from './src/screens/SupportScreen';
 import ToastHost from './src/components/Toast';
 import UpdateHost from './src/components/UpdateHost';
 import { UpdateProvider } from './src/contexts/UpdateContext';
@@ -49,9 +51,7 @@ function consumePendingRoute() {
   }).catch(() => {});
 }
 import {
-  requestSmsPermissions,
   requestCallPermission,
-  requestSendSmsPermission,
   requestNotificationPermission,
   isIgnoringBatteryOptimizations,
   requestIgnoreBatteryOptimizations,
@@ -106,126 +106,142 @@ function InsightsStack() {
   );
 }
 
-function TabBarLabel({ focused, color, label }) {
+function SettingsStack() {
+  useTheme();
   return (
-    <Text style={{
-      color: focused ? colors.accent : colors.textSecondary,
-      fontSize: 11,
-      fontWeight: focused ? '800' : '600',
-      marginTop: 2,
-    }}>{label}</Text>
-  );
-}
-
-function TabBarIcon({ name, focused }) {
-  // Active tab: icon sits in a soft rounded "pill" so the selection reads
-  // clearly and warmly — a small friendly touch that matches the cards.
-  return (
-    <View
-      style={{
-        width: 46,
-        height: 30,
-        borderRadius: 15,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: focused ? colors.accent + '22' : 'transparent',
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+        contentStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Icon
-        name={name}
-        size={focused ? 23 : 22}
-        color={focused ? colors.accent : colors.textSecondary}
-        strokeWidth={focused ? 2.5 : 2}
-      />
-    </View>
+      <Stack.Screen name="SettingsHome" component={SettingsScreen} />
+      <Stack.Screen name="Support" component={SupportScreen} />
+    </Stack.Navigator>
   );
 }
 
-function MainTabs() {
+// ── Brand bottom nav ──────────────────────────────────────────────────────
+// A floating warm "card" bar. The active tab expands into a filled leaf-green
+// pill carrying the icon + label together; inactive tabs are quiet icons. The
+// rounding + shadow + palette match the coop cards, so the whole app reads as
+// one crafted product rather than a stock template.
+const NAV_ONACC = '#fffdf7';
+const TAB_META = {
+  Dashboard: { icon: 'home',     key: 'dashboard' },
+  Insights:  { icon: 'target',   key: 'insightsTab' },
+  Alerts:    { icon: 'bell',     key: 'alerts' },
+  Settings:  { icon: 'settings', key: 'settings' },
+};
+
+function BrandTabBar({ state, navigation }) {
+  useTheme(); // re-render on theme switch
   const { t, alerts } = useApp();
+  const insets = useSafeAreaInsets();
   const unack = useMemo(
     () => alerts.filter((a) => !a.acknowledged && a.type === 'ALERT').length,
     [alerts]
   );
 
   return (
+    <View style={{
+      paddingHorizontal: 14,
+      paddingTop: 6,
+      paddingBottom: Math.max(insets.bottom, 10),
+      backgroundColor: colors.bg,
+    }}>
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.bgElevated,
+        borderRadius: 26,
+        borderWidth: 1,
+        borderColor: colors.border,
+        paddingVertical: 9,
+        paddingHorizontal: 8,
+        shadowColor: '#3a2c1a',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.10,
+        shadowRadius: 14,
+        elevation: 6,
+      }}>
+        {state.routes.map((route, index) => {
+          const focused = state.index === index;
+          const meta = TAB_META[route.name] || { icon: 'home', key: route.name };
+          const label = t(meta.key) || route.name;
+          const showBadge = route.name === 'Alerts' && unack > 0;
+          const onPress = () => {
+            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+          };
+          return (
+            <Pressable
+              key={route.key}
+              onPress={onPress}
+              android_ripple={{ color: colors.accent + '22', borderless: true, radius: 44 }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: focused }}
+              accessibilityLabel={label}
+              style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: focused ? 15 : 12,
+                paddingVertical: 9,
+                borderRadius: 999,
+                backgroundColor: focused ? colors.accent : 'transparent',
+              }}>
+                <View>
+                  <Icon
+                    name={meta.icon}
+                    size={22}
+                    color={focused ? NAV_ONACC : colors.textSecondary}
+                    strokeWidth={focused ? 2.6 : 2}
+                  />
+                  {showBadge ? (
+                    <View style={{
+                      position: 'absolute', top: -6, right: -9,
+                      minWidth: 16, height: 16, borderRadius: 8,
+                      backgroundColor: colors.danger,
+                      alignItems: 'center', justifyContent: 'center',
+                      paddingHorizontal: 3,
+                      borderWidth: 1.5, borderColor: colors.bgElevated,
+                    }}>
+                      <Text style={{ color: '#fff', fontSize: 9.5, fontWeight: '800' }}>
+                        {unack > 9 ? '9+' : unack}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                {focused ? (
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: NAV_ONACC, fontWeight: '800', fontSize: 12.5, marginStart: 7 }}
+                  >
+                    {label}
+                  </Text>
+                ) : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function MainTabs() {
+  return (
     <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.bgElevated,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          height: 76,
-          paddingBottom: 12,
-          paddingTop: 8,
-          // soft warm lift (iOS); Android relies on the border for definition
-          shadowColor: '#3a2c1a',
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
-          elevation: 0,             // no Android elevation → no ghost line
-        },
-        tabBarItemStyle: { paddingTop: 2 },
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textSecondary,
-      }}
+      tabBar={(props) => <BrandTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen
-        name="Dashboard"
-        component={DashboardStack}
-        options={{
-          tabBarLabel: ({ focused }) => (
-            <TabBarLabel focused={focused} label={t('dashboard')} />
-          ),
-          tabBarIcon: ({ focused }) => (
-            <TabBarIcon name="home" focused={focused} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Insights"
-        component={InsightsStack}
-        options={{
-          tabBarLabel: ({ focused }) => (
-            <TabBarLabel focused={focused} label={t('insightsTab')} />
-          ),
-          tabBarIcon: ({ focused }) => (
-            <TabBarIcon name="target" focused={focused} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Alerts"
-        component={AlertsScreen}
-        options={{
-          tabBarBadge: unack > 0 ? unack : undefined,
-          tabBarBadgeStyle: {
-            backgroundColor: colors.danger,
-            color: '#fff',
-            fontSize: 11,
-            fontWeight: '800',
-          },
-          tabBarLabel: ({ focused }) => (
-            <TabBarLabel focused={focused} label={t('alerts')} />
-          ),
-          tabBarIcon: ({ focused }) => (
-            <TabBarIcon name="bell" focused={focused} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          tabBarLabel: ({ focused }) => (
-            <TabBarLabel focused={focused} label={t('settings')} />
-          ),
-          tabBarIcon: ({ focused }) => (
-            <TabBarIcon name="settings" focused={focused} />
-          ),
-        }}
-      />
+      <Tab.Screen name="Dashboard" component={DashboardStack} />
+      <Tab.Screen name="Insights" component={InsightsStack} />
+      <Tab.Screen name="Alerts" component={AlertsScreen} />
+      <Tab.Screen name="Settings" component={SettingsStack} />
     </Tab.Navigator>
   );
 }
@@ -237,11 +253,9 @@ function StartupPermissions() {
     let cancelled = false;
     (async () => {
       try {
-        // Request all critical permissions in sequence so the user
-        // sees one prompt after another rather than missing one.
+        // Request the permissions the app actually uses now (SMS permissions
+        // were removed for Google Play compliance — the device owns SMS/calls).
         await requestNotificationPermission();
-        await requestSmsPermissions();
-        await requestSendSmsPermission();
         await requestCallPermission();
         const ok = await isIgnoringBatteryOptimizations();
         if (cancelled) return;

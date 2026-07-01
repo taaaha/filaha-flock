@@ -28,8 +28,8 @@ import { startRemoteContentRefresh } from '../services/RemoteContent';
 import { makePhoneCall, makeDirectCall } from '../services/CallService';
 import { vibrateDanger, vibrateWarn } from '../services/AlertService';
 import { parseSms } from '../utils/smsParser';
-import { apiEnabled, fetchLatest, rowToParsed } from '../services/ApiService';
-import { DEFAULT_THRESHOLDS, sensorStatus, deviceStatus } from '../utils/thresholds';
+import { apiEnabled, fetchLatest, fetchReadings, rowToParsed, rowToReading } from '../services/ApiService';
+import { DEFAULT_THRESHOLDS, sensorStatus, deviceStatus, OFFLINE_THRESHOLD_MS } from '../utils/thresholds';
 import { heatStressTHI } from '../utils/poultryData';
 import { STATUS } from '../utils/colors';
 import { uid } from '../utils/ids';
@@ -119,6 +119,11 @@ export function AppProvider({ children }) {
   // Tracks the newest telemetry timestamp ingested from the cloud API per device,
   // so polling never re-appends a reading we already have.
   const apiLastTsRef = useRef({});
+  // Tracks which devices we've already notified as offline, so the "inactive
+  // device" heads-up fires once per outage, not every poll.
+  const offlineNotifiedRef = useRef({});
+  // Tracks which devices have had their history seeded from the cloud this run.
+  const historySeededRef = useRef({});
 
   const t = useMemo(() => makeT(state.language), [state.language]);
   const tRef = useRef(t);
@@ -275,9 +280,10 @@ export function AppProvider({ children }) {
           });
           devState[key] = { status: STATUS.DANGER, firedAt: now };
 
-          // Only fire notification from JS when native didn't already handle
-          // (real SMS are handled by SmsReceiver) and not in silent mode.
-          if (!nativeHandled && !silent) {
+          // Always fire the system notification from JS (the old native SMS
+          // receiver that used to fire it is gone — data now comes from the
+          // cloud API). Only silent mode (a settings re-eval) suppresses it.
+          if (!silent) {
             const action = actionFor(key, s.language);
             const whatToDo = tRef.current('whatToDo') || 'What to do';
             const body = `${sensorMessages[key]}\n${value.toFixed(1)} ${sensorUnits[key]} (${tRef.current('maxLevel') || 'max'} ${thresholds[key].danger})\n\n▶ ${whatToDo}:\n${action}`;
@@ -291,9 +297,8 @@ export function AppProvider({ children }) {
           devState[key] = { ...prev, status: STATUS.DANGER };
         }
       } else if (status === STATUS.WARN) {
-        // Track warn but don't fire heavy notifications
         if (prev.status === STATUS.DANGER) {
-          // Recovered from danger
+          // Recovered from danger → CLEAR (no warn heads-up on the way down)
           const farm = s.farms.find((f) => f.id === device.farmId);
           const farmName = farm ? farm.name : (s.settings.farmName || '');
           newAlerts.push({
@@ -307,8 +312,24 @@ export function AppProvider({ children }) {
             timestamp: now,
             acknowledged: false,
           });
+          devState[key] = { status: STATUS.WARN, firedAt: 0 };
+        } else {
+          // Entering WARN from OK → a lighter heads-up (no call action),
+          // deduped to once per refire window so it can't spam.
+          const isNewWarn = prev.status !== STATUS.WARN;
+          const cooled = now - (prev.firedAt || 0) > DANGER_REFIRE_MS;
+          if ((isNewWarn || cooled) && !silent) {
+            if (s.settings.vibrate) vibrateWarn();
+            showAlertNotification(
+              `⚠️ ${device.name} — ${sensorLabels[key]}`,
+              `${value.toFixed(1)} ${sensorUnits[key]}`,
+              false
+            ).catch(() => {});
+            devState[key] = { status: STATUS.WARN, firedAt: now };
+          } else {
+            devState[key] = { status: STATUS.WARN, firedAt: prev.firedAt || 0 };
+          }
         }
-        devState[key] = { status: STATUS.WARN, firedAt: 0 };
       } else {
         // OK
         if (prev.status === STATUS.DANGER) {
@@ -555,6 +576,35 @@ export function AppProvider({ children }) {
     return () => unsubscribe();
   }, [state.ready, handleSmsEvent, handleParsedMessage]);
 
+  // ---------- Seed history from the cloud (once per device per run) ----------
+  // The cloud DB holds the long-term record; local storage only kept ~50 min,
+  // so charts opened nearly empty. On launch (and when a coop is added) pull the
+  // recent history so the dashboard trend + charts have real data immediately.
+  useEffect(() => {
+    if (!state.ready || !apiEnabled()) return;
+    let cancelled = false;
+    (async () => {
+      for (const device of stateRef.current.devices) {
+        if (historySeededRef.current[device.id]) continue;
+        historySeededRef.current[device.id] = true;
+        try {
+          const rows = await fetchReadings(device.id, 12);   // last 12 h
+          if (cancelled || !Array.isArray(rows) || rows.length === 0) continue;
+          const readings = rows.map((r) => rowToReading(device.id, r)).filter(Boolean);
+          if (readings.length === 0) continue;
+          const stored = await Storage.setReadings(device.id, readings);
+          dispatch({ type: 'SET_DEVICE_READINGS', deviceId: device.id, payload: stored });
+          const last = stored[stored.length - 1];
+          if (last) {
+            apiLastTsRef.current[device.id] =
+              Math.max(apiLastTsRef.current[device.id] || 0, last.timestamp);
+          }
+        } catch (e) { historySeededRef.current[device.id] = false; }   // retry next time
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [state.ready, state.devices]);
+
   // ---------- Cloud telemetry polling (new data path) ----------
   // The device pushes 7-byte packets to the server over 2G; we pull the latest
   // reading per device and feed the SAME pipeline the SMS path used. Dedup by
@@ -566,6 +616,7 @@ export function AppProvider({ children }) {
     let cancelled = false;
 
     const poll = async () => {
+      const now = Date.now();
       const devices = stateRef.current.devices;
       for (const device of devices) {
         try {
@@ -573,6 +624,22 @@ export function AppProvider({ children }) {
           if (cancelled || !row) continue;
           const parsed = rowToParsed(device.id, row);
           if (!parsed) continue;
+
+          // Inactive/offline device: the latest reading has gone stale (lost
+          // signal or power). Notify once per outage; clear on recovery.
+          const stale = (now - parsed.timestamp) > OFFLINE_THRESHOLD_MS;
+          const wasOffline = !!offlineNotifiedRef.current[device.id];
+          if (stale && !wasOffline) {
+            offlineNotifiedRef.current[device.id] = true;
+            showAlertNotification(
+              `📡 ${device.name} — ${tRef.current('offline') || 'Hors ligne'}`,
+              tRef.current('deviceOfflineBody') || 'Aucune donnee recente. Verifiez le courant et le signal.',
+              false
+            ).catch(() => {});
+          } else if (!stale && wasOffline) {
+            offlineNotifiedRef.current[device.id] = false;   // back online
+          }
+
           const lastTs = apiLastTsRef.current[device.id] || 0;
           if (parsed.timestamp <= lastTs) continue;   // already have it
           apiLastTsRef.current[device.id] = parsed.timestamp;
@@ -743,6 +810,20 @@ export function AppProvider({ children }) {
     state.ready, state.devices, state.readings,
     state.thresholds, state.powerCut, state.language, t,
   ]);
+
+  // ---------- Daily mission reminders (morning + evening alarms) ----------
+  // Standing Android alarm notifications that remind the farmer to do the day's
+  // flock tasks. Independent of the health digest; armed once and re-armed only
+  // when the language changes. reqCodes 2 (morning) & 3 (evening) — 1 is the
+  // health digest above.
+  useEffect(() => {
+    if (!state.ready) return;
+    const title = t('dailyTasksReminderTitle') || 'Tâches du jour';
+    const body = t('dailyTasksReminderBody')
+      || "N'oubliez pas les tâches quotidiennes du poulailler.";
+    scheduleDailyReminder({ hour: 7,  minute: 0, title, body, reqCode: 2 }).catch(() => {});
+    scheduleDailyReminder({ hour: 18, minute: 0, title, body, reqCode: 3 }).catch(() => {});
+  }, [state.ready, state.language, t]);
 
   // ---------- Dynamic launcher icon (Duolingo-style) ----------
   // Switch the home-screen chick to match the WORST coop status. Deduped via a

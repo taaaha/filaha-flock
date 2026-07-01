@@ -29,7 +29,7 @@ import PrimaryButton from '../components/PrimaryButton';
 import SmsMuteGuide from '../components/SmsMuteGuide';
 import { showToast } from '../components/Toast';
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
   const {
     t, language, theme, settings, thresholds,
     setLanguage, setTheme, updateSettings, updateThresholds, resetThresholds,
@@ -211,6 +211,33 @@ export default function SettingsScreen() {
           </View>
           <HelpButton t={t} screen="settings" />
         </View>
+
+        {/* Help & Support */}
+        <Pressable
+          onPress={() => navigation?.navigate?.('Support')}
+          android_ripple={{ color: colors.accent + '18' }}
+          style={{
+            flexDirection: 'row', alignItems: 'center',
+            backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border,
+            paddingHorizontal: 14, paddingVertical: 14, marginBottom: 18,
+          }}
+        >
+          <View style={{
+            width: 36, height: 36, borderRadius: 11, marginEnd: 12,
+            alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent + '18',
+          }}>
+            <Icon name="messageSquare" size={18} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700' }}>
+              {t('helpSupport')}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12.5, marginTop: 2 }}>
+              {t('helpSupportSub')}
+            </Text>
+          </View>
+          <Icon name="chevronRight" size={18} color={colors.textTertiary} />
+        </Pressable>
 
         {/* Profile */}
         <View style={styles.sectionHead}>
