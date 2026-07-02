@@ -320,9 +320,13 @@ public class SmsReceiver extends BroadcastReceiver {
                 return;
             }
 
+            int smallIcon = context.getResources().getIdentifier(
+                    "ic_stat_filaha", "drawable", context.getPackageName());
+            if (smallIcon == 0) smallIcon = android.R.drawable.ic_dialog_alert;
+
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setSmallIcon(android.R.drawable.ic_dialog_alert)
-                    .setColor(Color.parseColor("#ef4444"))
+                    .setSmallIcon(smallIcon)
+                    .setColor(Color.parseColor("#c0533a"))
                     .setContentTitle(title == null ? "Filaha Flock Alert" : title)
                     .setContentText(body == null ? "" : body)
                     .setStyle(new NotificationCompat.BigTextStyle().bigText(body == null ? "" : body))

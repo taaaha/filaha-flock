@@ -474,38 +474,9 @@ export default function DashboardScreen({ navigation }) {
         }}
       />
 
-      {/* ── Actionable danger list ── */}
-      {dangerDetails.length > 0 ? (
-        <View style={styles.dangerList}>
-          {dangerDetails.slice(0, 4).map((d, i) => (
-            <Pressable
-              key={d.device.id + d.sensorKey}
-              onPress={() => navigation.navigate('CoopDetail', { deviceId: d.device.id })}
-              android_ripple={{ color: colors.danger + '22' }}
-              style={[styles.dangerItem, i === 0 && styles.dangerItemFirst]}
-            >
-              <View style={styles.dangerItemHead}>
-                <View style={styles.dangerItemHeadLeft}>
-                  <Icon name="alertTriangle" size={18} color={colors.danger} strokeWidth={2.4} />
-                  <Text style={styles.dangerItemTitle} numberOfLines={1}>
-                    {d.device.name} — {d.sensorLabel}
-                    {d.valueText ? `  ${d.valueText}` : ''}
-                  </Text>
-                </View>
-                <Icon name="chevronRight" size={18} color={colors.danger} />
-              </View>
-              <Text style={styles.dangerItemAction} numberOfLines={2}>
-                ▶ {d.action}
-              </Text>
-            </Pressable>
-          ))}
-          {dangerDetails.length > 4 ? (
-            <Text style={styles.dangerMore}>
-              +{dangerDetails.length - 4} {t('danger').toLowerCase()}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
+      {/* Danger details live on the red coop card + CoopDetail + notification —
+          the old red "danger list" box here read as an alarming wall and was
+          removed on user request. */}
 
       {/* ── Filter chips + search ── */}
       {devices.length > 0 ? (

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Filaha Flock",
     "slug": "filaha-monitor",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "runtimeVersion": { "policy": "appVersion" },
     "updates": {
       "url": "https://u.expo.dev/19541610-9acc-4823-b1b6-69108e461fca",
@@ -14,6 +14,8 @@
     "newArchEnabled": false,
     "icon": "./assets/icon.png",
     "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
       "backgroundColor": "#faf7f0"
     },
     "androidNavigationBar": {
@@ -22,11 +24,11 @@
     },
     "android": {
       "package": "com.filaha",
-      "versionCode": 4,
+      "versionCode": 5,
       "userInterfaceStyle": "automatic",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0a0f1e"
+        "backgroundColor": "#46915a"
       },
       "permissions": [
         "android.permission.CALL_PHONE",
@@ -40,6 +42,8 @@
       ],
       "softwareKeyboardLayoutMode": "pan",
       "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
         "backgroundColor": "#faf7f0"
       }
     },

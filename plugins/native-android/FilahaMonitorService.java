@@ -73,9 +73,13 @@ public class FilahaMonitorService extends Service {
             openPending = PendingIntent.getActivity(this, 0, openIntent, piFlags);
         }
 
+        int smallIcon = getResources().getIdentifier(
+                "ic_stat_filaha", "drawable", getPackageName());
+        if (smallIcon == 0) smallIcon = android.R.drawable.ic_menu_view;
+
         NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_menu_view)
-                .setColor(Color.parseColor("#3b82f6"))
+                .setSmallIcon(smallIcon)
+                .setColor(Color.parseColor("#3f7d4f"))
                 .setContentTitle(title == null ? "Filaha Flock" : title)
                 .setContentText(body == null ? "Monitoring is active" : body)
                 .setPriority(NotificationCompat.PRIORITY_MIN)
