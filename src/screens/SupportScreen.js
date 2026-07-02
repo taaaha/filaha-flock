@@ -9,6 +9,7 @@ import { colors, useTheme, barStyle } from '../utils/colors';
 import Icon from '../components/Icon';
 import CoopMascot from '../components/CoopMascot';
 import { FAQ, SUPPORT_CONTACT, matchFaq, detectLang } from '../utils/faqContent';
+import { answerLive } from '../utils/botBrain';
 
 const T = {
   title:    { ar: 'الدعم والمساعدة', fr: 'Aide & Support', en: 'Help & Support' },
@@ -29,7 +30,7 @@ const T = {
 
 export default function SupportScreen({ navigation }) {
   useTheme();
-  const { language } = useApp();
+  const { language, devices, lastReadingFor } = useApp();
   const lang = ['ar', 'fr', 'en'].includes(language) ? language : 'ar';
   const styles = makeStyles();
 
@@ -44,8 +45,13 @@ export default function SupportScreen({ navigation }) {
     if (!q) return;
     // Answer in the language the farmer TYPED, not just the app language.
     const qLang = detectLang(q, lang);
-    const { entry, suggestions } = matchFaq(q);
-    const reply = entry
+    // 1) Live answers from THEIR farm data (temp, battery, age, status…),
+    // 2) then the FAQ knowledge base, 3) then suggestions.
+    const live = answerLive(q, { devices, lastReadingFor }, qLang);
+    const { entry, suggestions } = live ? { entry: null, suggestions: [] } : matchFaq(q);
+    const reply = live
+      ? { from: 'bot', text: live }
+      : entry
       ? { from: 'bot', text: entry.a[qLang] || entry.a.en }
       : {
           from: 'bot',
@@ -56,7 +62,7 @@ export default function SupportScreen({ navigation }) {
     setMessages((m) => [...m, { from: 'user', text: q }, reply]);
     setInput('');
     toEnd();
-  }, [lang]);
+  }, [lang, devices, lastReadingFor]);
 
   const open = (url) => Linking.openURL(url).catch(() => {});
 

@@ -415,6 +415,8 @@ export default {
   dailyTasksReminderTitle: 'Tâches du jour',
   dailyTasksReminderBody: "N'oubliez pas les tâches quotidiennes du poulailler — nourriture, eau, litière et une vérification rapide.",
   deviceOfflineBody: 'Aucune donnée récente. Vérifiez le courant et le signal au poulailler.',
+  reportsTitle: 'Rapports d’élevage',
+  reportsSub: 'Rapport du jour, de la semaine et du mois pour chaque poulailler selon l’âge',
   helpSupport: 'Aide & Support',
   helpSupportSub: 'FAQ, assistant et contact',
   thiAlert: 'alerte',

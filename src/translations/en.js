@@ -415,6 +415,8 @@ export default {
   dailyTasksReminderTitle: "Today's flock tasks",
   dailyTasksReminderBody: "Don't forget today's coop tasks — feeding, water, litter and a quick check.",
   deviceOfflineBody: 'No recent data. Check the power and signal at the coop.',
+  reportsTitle: 'Flock reports',
+  reportsSub: 'Daily, weekly and monthly reports per coop, tuned to flock age',
   helpSupport: 'Help & Support',
   helpSupportSub: 'FAQ, assistant & contact',
   thiAlert: 'alert',

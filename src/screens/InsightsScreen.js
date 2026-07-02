@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StatusBar, RefreshControl, Image } from 'react-native';
+import { View, Text, ScrollView, StatusBar, RefreshControl, Image, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../components/Icon';
 import SmartInsights from '../components/SmartInsights';
@@ -94,6 +94,36 @@ export default function InsightsScreen({ navigation }) {
             />
           }
         >
+          {/* Reports entry — daily/weekly/monthly per-coop production reports */}
+          <Pressable
+            onPress={() => navigation.navigate('Reports')}
+            android_ripple={{ color: colors.accent + '18' }}
+            style={{
+              flexDirection: 'row', alignItems: 'center',
+              marginHorizontal: 16, marginBottom: 14,
+              backgroundColor: colors.card, borderRadius: 18,
+              borderWidth: 1.5, borderColor: colors.accent + '44',
+              paddingHorizontal: 14, paddingVertical: 14,
+            }}
+          >
+            <View style={{
+              width: 40, height: 40, borderRadius: 13, marginEnd: 12,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: colors.accent + '1c',
+            }}>
+              <Icon name="activity" size={20} color={colors.accent} strokeWidth={2.4} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.textPrimary, fontSize: 15.5, fontWeight: '800' }}>
+                {t('reportsTitle')}
+              </Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 12.5, marginTop: 2 }} numberOfLines={2}>
+                {t('reportsSub')}
+              </Text>
+            </View>
+            <Icon name="chevronRight" size={18} color={colors.textTertiary} />
+          </Pressable>
+
           {insights.length > 0 ? (
             <SmartInsights
               insights={insights}

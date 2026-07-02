@@ -28,6 +28,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import InsightsScreen from './src/screens/InsightsScreen';
 import InsightDetailScreen from './src/screens/InsightDetailScreen';
 import SupportScreen from './src/screens/SupportScreen';
+import ReportsScreen from './src/screens/ReportsScreen';
 import ToastHost from './src/components/Toast';
 import UpdateHost from './src/components/UpdateHost';
 import { UpdateProvider } from './src/contexts/UpdateContext';
@@ -102,6 +103,7 @@ function InsightsStack() {
       <Stack.Screen name="InsightsHome" component={InsightsScreen} />
       <Stack.Screen name="InsightDetail" component={InsightDetailScreen} />
       <Stack.Screen name="CoopDetail" component={CoopDetailScreen} />
+      <Stack.Screen name="Reports" component={ReportsScreen} />
     </Stack.Navigator>
   );
 }

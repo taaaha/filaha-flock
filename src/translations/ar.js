@@ -402,6 +402,8 @@ export default {
   dailyTasksReminderTitle: 'مهام اليوم',
   dailyTasksReminderBody: 'لا تنسَ مهام الحظيرة اليومية — العلف والماء والفرشة وفحص سريع.',
   deviceOfflineBody: 'لا توجد بيانات حديثة. تحقق من الكهرباء والإشارة في الحظيرة.',
+  reportsTitle: 'تقارير الإنتاج',
+  reportsSub: 'تقرير يومي وأسبوعي وشهري لكل حظيرة حسب عمر الكتاكيت',
   helpSupport: 'الدعم والمساعدة',
   helpSupportSub: 'الأسئلة الشائعة، المساعد، والتواصل',
   thiAlert: 'إنذار',
