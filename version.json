@@ -1,10 +1,10 @@
 {
-  "versionCode": 4,
-  "versionName": "1.1.1",
-  "apkUrl": "https://github.com/taaaha/filaha-flock/releases/download/v1.1.1/filaha-flock-1.1.1.apk",
+  "versionCode": 5,
+  "versionName": "1.1.2",
+  "apkUrl": "https://github.com/taaaha/filaha-flock/releases/download/1.1.2/filaha-flock-1.1.2.apk",
   "mandatory": false,
   "minSupportedVersionCode": 1,
-  "sizeBytes": 65466820,
+  "sizeBytes": 65425404,
   "publishedAt": "2026-07-02",
   "notes": {
     "ar": "• Performance and stability improvements",
