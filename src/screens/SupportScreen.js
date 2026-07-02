@@ -8,7 +8,7 @@ import { useApp } from '../contexts/AppContext';
 import { colors, useTheme, barStyle } from '../utils/colors';
 import Icon from '../components/Icon';
 import CoopMascot from '../components/CoopMascot';
-import { FAQ, SUPPORT_CONTACT, matchFaq } from '../utils/faqContent';
+import { FAQ, SUPPORT_CONTACT, matchFaq, detectLang } from '../utils/faqContent';
 
 const T = {
   title:    { ar: 'الدعم والمساعدة', fr: 'Aide & Support', en: 'Help & Support' },
@@ -42,9 +42,18 @@ export default function SupportScreen({ navigation }) {
   const ask = useCallback((text) => {
     const q = (text || '').trim();
     if (!q) return;
-    const entry = matchFaq(q);
-    const answer = entry ? (entry.a[lang] || entry.a.en) : T.fallback[lang];
-    setMessages((m) => [...m, { from: 'user', text: q }, { from: 'bot', text: answer }]);
+    // Answer in the language the farmer TYPED, not just the app language.
+    const qLang = detectLang(q, lang);
+    const { entry, suggestions } = matchFaq(q);
+    const reply = entry
+      ? { from: 'bot', text: entry.a[qLang] || entry.a.en }
+      : {
+          from: 'bot',
+          text: T.fallback[qLang] || T.fallback[lang],
+          suggestions: suggestions.length ? suggestions : FAQ.slice(0, 3),
+          sLang: qLang,
+        };
+    setMessages((m) => [...m, { from: 'user', text: q }, reply]);
     setInput('');
     toEnd();
   }, [lang]);
@@ -99,13 +108,31 @@ export default function SupportScreen({ navigation }) {
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
         >
           {messages.map((m, i) => (
-            <View key={i} style={[styles.row, m.from === 'user' ? styles.rowUser : styles.rowBot]}>
-              {m.from === 'bot' && (
-                <View style={styles.botDot}><CoopMascot status="ok" size={18} /></View>
-              )}
-              <View style={[styles.bubble, m.from === 'user' ? styles.userBubble : styles.botBubble]}>
-                <Text style={m.from === 'user' ? styles.userText : styles.botText}>{m.text}</Text>
+            <View key={i}>
+              <View style={[styles.row, m.from === 'user' ? styles.rowUser : styles.rowBot]}>
+                {m.from === 'bot' && (
+                  <View style={styles.botDot}><CoopMascot status="ok" size={18} /></View>
+                )}
+                <View style={[styles.bubble, m.from === 'user' ? styles.userBubble : styles.botBubble]}>
+                  <Text style={m.from === 'user' ? styles.userText : styles.botText}>{m.text}</Text>
+                </View>
               </View>
+              {m.suggestions ? (
+                <View style={styles.suggestWrap}>
+                  {m.suggestions.map((s) => (
+                    <Pressable
+                      key={s.id}
+                      onPress={() => ask(s.q[m.sLang || lang] || s.q.en)}
+                      android_ripple={{ color: colors.accent + '22' }}
+                      style={styles.suggestBtn}
+                    >
+                      <Text style={styles.suggestTxt} numberOfLines={2}>
+                        {s.q[m.sLang || lang] || s.q.en}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
             </View>
           ))}
         </ScrollView>
@@ -192,6 +219,13 @@ function makeStyles() {
     userBubble: { backgroundColor: colors.accent, borderBottomEndRadius: 6 },
     botText: { color: colors.textPrimary, fontSize: 14.5, lineHeight: 22 },
     userText: { color: '#fffdf7', fontSize: 14.5, lineHeight: 22, fontWeight: '600' },
+
+    suggestWrap: { marginStart: 36, marginBottom: 12, gap: 6 },
+    suggestBtn: {
+      backgroundColor: colors.accent + '12', borderWidth: 1, borderColor: colors.accent + '33',
+      borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, alignSelf: 'flex-start', maxWidth: '85%',
+    },
+    suggestTxt: { color: colors.accent, fontSize: 13, fontWeight: '700' },
 
     chipsWrap: { maxHeight: 52, borderTopWidth: 1, borderTopColor: colors.border },
     chipsRow: { paddingHorizontal: 12, paddingVertical: 9, gap: 8, alignItems: 'center' },

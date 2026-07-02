@@ -44,9 +44,13 @@ public class ReminderReceiver extends BroadcastReceiver {
                 }
             }
 
+            int smallIcon = context.getResources().getIdentifier(
+                    "ic_stat_filaha", "drawable", context.getPackageName());
+            if (smallIcon == 0) smallIcon = android.R.drawable.ic_popup_reminder;
+
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setSmallIcon(android.R.drawable.ic_popup_reminder)
-                    .setColor(Color.parseColor("#3b82f6"))
+                    .setSmallIcon(smallIcon)
+                    .setColor(Color.parseColor("#3f7d4f"))
                     .setContentTitle(title == null ? "Filaha Flock" : title)
                     .setContentText(body == null ? "" : body)
                     .setStyle(new NotificationCompat.BigTextStyle().bigText(body == null ? "" : body))

@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+  <!-- Filaha chick silhouette — white-on-transparent (Android tints status icons).
+       Same geometry family as the launcher chick so the brand reads instantly. -->
+  <!-- comb -->
+  <path android:fillColor="#FFFFFF"
+        android:pathData="M37,26 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0 z M47,20 a7,7 0 1 0 14,0 a7,7 0 1 0 -14,0 z M59,26 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0 z"/>
+  <!-- body -->
+  <path android:fillColor="#FFFFFF"
+        android:pathData="M24,58 a30,28 0 1 0 60,0 a30,28 0 1 0 -60,0 z"/>
+  <!-- legs -->
+  <path android:strokeColor="#FFFFFF" android:strokeWidth="5" android:strokeLineCap="round"
+        android:pathData="M46,86 L46,97 M42,97 L50,97 M62,86 L62,97 M58,97 L66,97"/>
+</vector>

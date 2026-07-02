@@ -207,7 +207,7 @@ function withDynamicIconResources(config) {
       if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
 
       const sourceDir = path.join(projectRoot, 'plugins', 'native-android', 'res', 'drawable');
-      ['ic_launcher_happy.xml', 'ic_launcher_worried.xml', 'ic_launcher_alarmed.xml'].forEach((file) => {
+      ['ic_launcher_happy.xml', 'ic_launcher_worried.xml', 'ic_launcher_alarmed.xml', 'ic_stat_filaha.xml'].forEach((file) => {
         const src = path.join(sourceDir, file);
         if (!fs.existsSync(src)) {
           throw new Error(`[withFilahaSms] Missing icon resource: ${src}`);

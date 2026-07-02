@@ -655,7 +655,10 @@ export function AppProvider({ children }) {
 
     poll();
     const id = setInterval(poll, 30000);   // every 30 s, matched to the device cadence
-    return () => { cancelled = true; clearInterval(id); };
+    // Returning to the foreground → poll NOW (don't make the farmer wait 30 s
+    // staring at stale numbers after opening the app).
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') poll(); });
+    return () => { cancelled = true; clearInterval(id); sub.remove(); };
   }, [state.ready, handleParsedMessage]);
 
   // ---------- Re-evaluate when thresholds change ----------
@@ -830,6 +833,7 @@ export function AppProvider({ children }) {
   // ref so the (relatively expensive) component-enable switch only fires when
   // the face actually changes — never on every reading/tick.
   const lastIconRef = useRef('');
+  const pendingIconRef = useRef('');
   useEffect(() => {
     if (!state.ready) return;
     const s = stateRef.current;
@@ -842,11 +846,25 @@ export function AppProvider({ children }) {
       if (st === STATUS.DANGER || st === STATUS.POWER_CUT) { worst = 'danger'; break; }
       if (st === STATUS.WARN) worst = 'warn';
     }
-    if (lastIconRef.current !== worst) {
-      lastIconRef.current = worst;
-      setAppIcon(worst).catch(() => {});
-    }
+    // NEVER switch the launcher icon while the app is open: Android ignores
+    // DONT_KILL_APP when the currently-active launcher alias is disabled and
+    // force-quits the app (the "danger kicked me out of the app" bug). Queue
+    // the change and apply it only when the app goes to background — the
+    // farmer sees the new face on their home screen, never a crash.
+    pendingIconRef.current = worst;
   }, [state.ready, state.devices, state.readings, state.thresholds, state.powerCut, state.now]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s !== 'background') return;
+      const want = pendingIconRef.current;
+      if (want && lastIconRef.current !== want) {
+        lastIconRef.current = want;
+        setAppIcon(want).catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // ---------- Public actions ----------
   const setLanguage = useCallback(async (lang) => {

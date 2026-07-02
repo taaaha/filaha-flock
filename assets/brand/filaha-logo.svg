@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 108 108">
+  <!-- Filaha Flock — brand mark (chick on leaf-green squircle)
+       Master vector: scales to any size (print, web, app). -->
+  <!-- background squircle -->
+  <path fill="#46915a"
+        d="M0,28 a28,28 0 0 1 28,-28 h52 a28,28 0 0 1 28,28 v52 a28,28 0 0 1 -28,28 h-52 a28,28 0 0 1 -28,-28 z"/>
+  <!-- comb -->
+  <path fill="#d9594a"
+        d="M37,30 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0 z M47,24 a7,7 0 1 0 14,0 a7,7 0 1 0 -14,0 z M59,30 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0 z"/>
+  <!-- legs -->
+  <path stroke="#e8923a" stroke-width="3" stroke-linecap="round" fill="none"
+        d="M47,84 L47,93 M44,93 L50,93 M61,84 L61,93 M58,93 L64,93"/>
+  <!-- body -->
+  <path fill="#fff7ec" stroke="#e6d6ba" stroke-width="2.5"
+        d="M27,62 a27,25 0 1 0 54,0 a27,25 0 1 0 -54,0 z"/>
+  <!-- belly highlight -->
+  <path fill="#ffffff" fill-opacity="0.45"
+        d="M38,70 a16,13 0 1 0 32,0 a16,13 0 1 0 -32,0 z"/>
+  <!-- wing tucks -->
+  <path stroke="#e3d0b0" stroke-width="2" stroke-linecap="round" fill="none"
+        d="M31,60 q6,7 12,3 M77,60 q-6,7 -12,3"/>
+  <!-- beak -->
+  <path fill="#f0a13c" d="M47,66 L61,66 L54,75 z"/>
+  <!-- cheeks -->
+  <path fill="#f3a896" fill-opacity="0.6"
+        d="M32,60 a5,5 0 1 0 10,0 a5,5 0 1 0 -10,0 z M66,60 a5,5 0 1 0 10,0 a5,5 0 1 0 -10,0 z"/>
+  <!-- eyes (happy) -->
+  <path stroke="#3a2c1a" stroke-width="3.4" stroke-linecap="round" fill="none"
+        d="M39,53 Q44,59 49,53 M59,53 Q64,59 69,53"/>
+</svg>
