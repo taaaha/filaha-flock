@@ -11,8 +11,8 @@
       "distribution": "internal",
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://8.229.107.64:8080",
-        "EXPO_PUBLIC_API_TOKEN": "48382592e46e201f252d0728d8e5987e2a87b259093207a6"
+        "EXPO_PUBLIC_API_URL": "http://134.209.242.192:8080",
+        "EXPO_PUBLIC_API_TOKEN": "de94e8a0d571dbeb0cdc1430a95927b95a24c42ad2bda05c"
       }
     },
     "production": {
@@ -21,8 +21,8 @@
       },
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://8.229.107.64:8080",
-        "EXPO_PUBLIC_API_TOKEN": "48382592e46e201f252d0728d8e5987e2a87b259093207a6"
+        "EXPO_PUBLIC_API_URL": "http://134.209.242.192:8080",
+        "EXPO_PUBLIC_API_TOKEN": "de94e8a0d571dbeb0cdc1430a95927b95a24c42ad2bda05c"
       }
     },
     "production-apk": {
@@ -39,8 +39,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://8.229.107.64:8080",
-        "EXPO_PUBLIC_API_TOKEN": "48382592e46e201f252d0728d8e5987e2a87b259093207a6"
+        "EXPO_PUBLIC_API_URL": "http://134.209.242.192:8080",
+        "EXPO_PUBLIC_API_TOKEN": "de94e8a0d571dbeb0cdc1430a95927b95a24c42ad2bda05c"
       }
     }
   },
