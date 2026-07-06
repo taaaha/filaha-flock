@@ -32,6 +32,23 @@
 #define FILAHA_MQTT_USER         FILAHA_DEVICE_ID
 #define FILAHA_MQTT_PASS         "1aa0374c027bacc35fce3139fdc02fefa6c7ec35d44b5dfd"
 
+// ── Production resilience (weak / intermittent rural 2G) ───────────
+// Auto-pick the APN from the detected operator so ONE firmware works on any
+// Algerian SIM (Djezzy → "djezzy.internet"; Mobilis + Ooredoo → "internet").
+// Falls back to FILAHA_APN above if the operator can't be read.
+#define FILAHA_APN_AUTO          1
+// Store-and-forward: readings taken while offline are queued in RAM and flushed
+// (oldest first) the instant the link returns — so a signal blackout never
+// loses data. 60 slots x 8 bytes = ~1 h of history, ~480 bytes RAM.
+#define NET_BUFFER_SLOTS         60
+// Power-cycle/re-init the modem after this many consecutive failed connects —
+// rescues a modem that has wedged on a flaky tower.
+#define NET_RECOVER_AFTER_FAILS  5
+// Hardware watchdog: if the main loop stalls this long (e.g. a blocking AT
+// command hangs on a dying network), the ESP32 reboots itself. Essential for
+// an unattended box in a remote coop.
+#define WATCHDOG_TIMEOUT_S       180
+
 // ── Hybrid SMS fallback (device-originated, human-readable) ─────────
 #define HEARTBEAT_HOUR           20      // local hour (0-23) for the daily report SMS
 #define HEARTBEAT_ENABLED        1
@@ -106,7 +123,7 @@
 //     alive — but no synthetic readings, ever.
 //
 // Flip to 0 the moment your real STCC4 is connected.
-#define FILAHA_TEST_MODE         1
+#define FILAHA_TEST_MODE         0
 
 // Pipe every modem AT command through Serial for debugging.
 // Set to 0 for a slightly tighter production loop once the unit is happy.

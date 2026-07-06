@@ -85,6 +85,26 @@ bool modem_is_network_attached() { return s_attached; }
 
 TinyGsm& modem_instance() { return modem; }
 
+bool modem_recover() {
+  Serial.println("[modem] recover: soft restart…");
+  s_attached = false;
+  if (modem.restart()) {
+    // Re-apply SMS mode after a restart.
+    modem.sendAT(GF("+CMGF=1"));         modem.waitResponse();
+    modem.sendAT(GF("+CSCS=\"GSM\""));   modem.waitResponse();
+    if (modem.waitForNetwork(60000UL)) {
+      s_attached = modem.isNetworkConnected();
+      Serial.printf("[modem] recover OK (soft), attached=%d\n", (int)s_attached);
+      if (s_attached) return true;
+    }
+  }
+  // Soft restart didn't bring the network back — hard power-cycle + full init.
+  Serial.println("[modem] recover: hard power-cycle…");
+  pulse_pwrkey();
+  delay(3000);
+  return modem_begin();
+}
+
 bool modem_place_call(const char* number, unsigned long ring_ms) {
   if (!s_attached) {
     s_attached = modem.isNetworkConnected();
@@ -127,6 +147,10 @@ void modem_loop() {
 
   s_rssi_raw = modem.getSignalQuality();
   s_attached = modem.isNetworkConnected();
+  // Log signal so the installer can judge reception at the coop. On very weak
+  // 2G (rssi worse than about -105 dBm) recommend an external antenna.
+  Serial.printf("[modem] attached=%d  rssi=%ddBm  op=%s\n",
+                (int)s_attached, modem_rssi_dbm(), modem.getOperator().c_str());
 }
 
 int modem_rssi_dbm() {

@@ -14,6 +14,7 @@
 // ════════════════════════════════════════════════════════════════
 #include <Arduino.h>
 extern "C" { #include "esp_sleep.h" }
+#include "esp_task_wdt.h"
 #include "config.h"
 #include "format.h"
 #include "modem.h"
@@ -56,6 +57,11 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   log_banner();
+
+  // Hardware watchdog: if the loop ever stalls (a blocking AT command hanging
+  // on a dying tower), the chip reboots itself and comes back alone.
+  esp_task_wdt_init(WATCHDOG_TIMEOUT_S, true);   // (timeout seconds, panic→reboot)
+  esp_task_wdt_add(NULL);                        // watch this (loop) task
 
   const esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
   if (cause == ESP_SLEEP_WAKEUP_EXT0) {
@@ -190,6 +196,7 @@ static void handle_button_events() {
 }
 
 void loop() {
+  esp_task_wdt_reset();                          // feed the watchdog each pass
   feedback_loop();
   handle_button_events();
   modem_loop();

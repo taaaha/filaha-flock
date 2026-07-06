@@ -18,3 +18,7 @@ TinyGsm& modem_instance();
 // accepted the dial. Some A7670 variants are data-only — check the log on first
 // flash; if dialing fails the critical SMS still goes out as the lifeline.
 bool modem_place_call(const char* number, unsigned long ring_ms);
+
+// Recover a wedged modem: soft restart → re-attach; hard power-cycle if that
+// fails. Called by net.cpp after repeated connect failures. Returns attached.
+bool modem_recover();
