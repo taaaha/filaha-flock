@@ -27,7 +27,7 @@
 #define FILAHA_APN_PASS          ""
 // Your cloud server (the VPS running docker compose) + MQTT credentials from
 // setup.sh.  MQTT_USER MUST equal FILAHA_DEVICE_ID.
-#define FILAHA_MQTT_HOST         "134.209.242.192"   // DigitalOcean Droplet (FRA1)
+#define FILAHA_MQTT_HOST         "api.filahaflock.com"   // stable domain → DO droplet
 #define FILAHA_MQTT_PORT         1883
 #define FILAHA_MQTT_USER         FILAHA_DEVICE_ID
 #define FILAHA_MQTT_PASS         "1aa0374c027bacc35fce3139fdc02fefa6c7ec35d44b5dfd"

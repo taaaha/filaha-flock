@@ -11,7 +11,7 @@
       "distribution": "internal",
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://134.209.242.192:8080",
+        "EXPO_PUBLIC_API_URL": "https://api.filahaflock.com",
         "EXPO_PUBLIC_API_TOKEN": "de94e8a0d571dbeb0cdc1430a95927b95a24c42ad2bda05c"
       }
     },
@@ -21,7 +21,7 @@
       },
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://134.209.242.192:8080",
+        "EXPO_PUBLIC_API_URL": "https://api.filahaflock.com",
         "EXPO_PUBLIC_API_TOKEN": "de94e8a0d571dbeb0cdc1430a95927b95a24c42ad2bda05c"
       }
     },
@@ -39,7 +39,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://134.209.242.192:8080",
+        "EXPO_PUBLIC_API_URL": "https://api.filahaflock.com",
         "EXPO_PUBLIC_API_TOKEN": "de94e8a0d571dbeb0cdc1430a95927b95a24c42ad2bda05c"
       }
     }
