@@ -36,6 +36,10 @@ emergency (works even with no internet). Built for weak rural Algerian 2G.
 - **NH₃ sensor not soldered yet** → firmware already sends NH₃ = 0 and everything
   else works. When the MiCS arrives, wire it to the I²C bus and set
   `FILAHA_HAS_NH3 1` (below) — nothing else changes.
+- **Status LEDs (red/green/orange):** wire them up, but note this firmware
+  version does **not drive them yet** — the LED status feature ships in the next
+  flash (once the module type + pins are finalized). Buttons, buzzer, sensors,
+  data and SMS/calls are all fully working in this version.
 
 ## 3. Set these per unit — `firmware/src/config.h` (top of file)
 ```c
