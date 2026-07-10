@@ -7,8 +7,8 @@
 //    Default I²C address per Sensirion: 0x64. Skipped entirely in TEST_MODE.
 #if !FILAHA_TEST_MODE
   #include "DFRobot_STCC4.h"
-  static DFRobot_STCC4 stcc4(&Wire);
-  static bool stcc4_ready = false;
+  static DFRobot_STCC4_I2C stcc4(&Wire, 0x64);
+static bool stcc4_ready = false;
 #endif
 
 #if FILAHA_HAS_NH3
@@ -36,23 +36,48 @@ static int vbat_to_pct(float v) {
   return (int)pct;
 }
 
+// Print every device that ACKs on the I²C bus. Invaluable for bring-up:
+// it tells "no wiring/power" (nothing found) apart from "wrong address in
+// code" (something found, but not where we look for it).
+static void i2c_scan() {
+  Serial.println("[i2c] scanning bus (SDA=21 SCL=22)…");
+  int found = 0;
+  for (uint8_t addr = 1; addr < 127; addr++) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() == 0) {
+      Serial.printf("[i2c]   device found at 0x%02X\n", addr);
+      found++;
+    }
+  }
+  if (found == 0)
+    Serial.println("[i2c]   NONE found — check 3V3/GND, SDA/SCL wiring and the I²C HUB");
+  else
+    Serial.printf("[i2c]   %d device(s) on the bus\n", found);
+}
+
 bool sensors_begin() {
   Wire.begin(I2C_SDA, I2C_SCL);
   Wire.setClock(I2C_FREQ_HZ);
   analogReadResolution(12);
 
+  i2c_scan();   // list everything on the bus (debug the STCC4)
+
 #if FILAHA_TEST_MODE
   Serial.println("[sensors] TEST MODE — synthetic CO₂/T/H, real battery only");
 #else
-  Serial.println("[sensors] STCC4 begin…");
-  if (stcc4.begin() != 0) {
-    Serial.println("[sensors] STCC4 NOT found — heartbeat mode (BAT only)");
+ Serial.println("[sensors] STCC4 begin...");
+
+if (!stcc4.begin())
+{
+    Serial.println("[sensors] STCC4 NOT found");
     stcc4_ready = false;
-  } else {
+}
+else
+{
     stcc4_ready = true;
-    // STCC4 produces a sample every ~5 s in periodic mode — fits our 30 s cadence.
-    stcc4.startPeriodicMeasurement();
-  }
+    Serial.println("[sensors] STCC4 detected");
+    stcc4.startMeasurement();
+}
 #endif
 
 #if FILAHA_HAS_NH3
@@ -78,16 +103,29 @@ bool sensors_read(SensorReading& out) {
   out.has_hum  = true; out.hum_pct  = 55.0f  + (float)((s * 3)  % 18);    // 55–72
 #else
   // STCC4 → CO₂, temperature, humidity in one shot (only if present).
-  if (stcc4_ready) {
-    float co2 = NAN, t = NAN, h = NAN;
-    if (stcc4.readMeasurement(&co2, &t, &h) == 0) {
-      if (!isnan(co2)) { out.has_co2  = true; out.co2_ppm  = co2; }
-      if (!isnan(t))   { out.has_temp = true; out.temp_c   = t;   }
-      if (!isnan(h))   { out.has_hum  = true; out.hum_pct  = h;   }
-    } else {
-      Serial.println("[sensors] STCC4 read failed");
+ if (stcc4_ready)
+{
+    uint16_t co2 = 0;
+    float t = NAN;
+    float h = NAN;
+    uint16_t status = 0;
+
+    if (stcc4.measurement(&co2, &t, &h, &status))
+    {
+        out.has_co2 = true;
+        out.co2_ppm = (float)co2;
+
+        out.has_temp = true;
+        out.temp_c = t;
+
+        out.has_hum = true;
+        out.hum_pct = h;
     }
-  }
+    else
+    {
+        Serial.println("[sensors] STCC4 read failed");
+    }
+}
 
   #if FILAHA_HAS_NH3
   if (mics_ready) {

@@ -35,17 +35,24 @@ bool modem_begin() {
   digitalWrite(MODEM_POWER_ON, HIGH);
   delay(500);
 
-  // Optional hard reset (some R2 boards wire RST; harmless if not present).
-  pinMode(MODEM_RST, OUTPUT);
-  digitalWrite(MODEM_RST, LOW);
-  delay(100);
-  digitalWrite(MODEM_RST, HIGH);
-  delay(2500);
-
-  pulse_pwrkey();
-
   MODEM_SERIAL.begin(MODEM_BAUD, SERIAL_8N1, MODEM_RX, MODEM_TX);
-  delay(3000);
+  delay(300);
+
+  // The modem usually survives an ESP32 reset still powered ON. A blind PWRKEY
+  // pulse would then toggle a running modem OFF (→ no AT response, the exact
+  // "init failed" we saw). So probe first and only power-cycle if it's asleep.
+  if (modem.testAT(1500)) {
+    Serial.println("[modem] already awake");
+  } else {
+    Serial.println("[modem] no response — powering on…");
+    pinMode(MODEM_RST, OUTPUT);
+    digitalWrite(MODEM_RST, LOW);  delay(100);
+    digitalWrite(MODEM_RST, HIGH); delay(2500);
+    pulse_pwrkey();
+    bool up = false;
+    for (int i = 0; i < 15 && !up; i++) { delay(1000); up = modem.testAT(1000); }
+    if (!up) Serial.println("[modem] still no AT after power-on — check modem power/USB supply");
+  }
 
   Serial.println("[modem] init…");
   if (!modem.init()) {
@@ -70,10 +77,28 @@ bool modem_begin() {
   modem.sendAT(GF("+CMGF=1"));   modem.waitResponse();
   modem.sendAT(GF("+CSCS=\"GSM\""));   modem.waitResponse();
 
+  // Let the modem use ANY available radio. Some A7670 units boot locked to
+  // LTE-only (CNMP=38); on a 2G/3G-only rural cell that never registers and
+  // gives the "+CGREG: 0,0" (not even searching) symptom. 2 = automatic RAT.
+  modem.sendAT(GF("+CNMP=2"));   modem.waitResponse();
+
+  // Print signal so we can tell "no coverage" from a SIM/band problem.
+  {
+    int q = modem.getSignalQuality();
+    Serial.printf("[modem] signal CSQ=%d  (%d dBm)\n",
+                  q, (q == 99 ? 0 : -113 + 2 * q));
+  }
+
   Serial.println("[modem] waiting for network registration (up to 60 s)…");
   if (!modem.waitForNetwork(60000UL)) {
-    Serial.println("[modem] network attach timed out");
-    return false;
+    // Nothing on auto — force GSM-only (2G) and try once more. 2G is the
+    // product's target network in weak rural coops anyway.
+    Serial.println("[modem] no network on auto — forcing GSM-only (CNMP=13)…");
+    modem.sendAT(GF("+CNMP=13"));   modem.waitResponse();
+    if (!modem.waitForNetwork(60000UL)) {
+      Serial.println("[modem] network attach timed out");
+      return false;
+    }
   }
   s_attached = modem.isNetworkConnected();
   Serial.printf("[modem] attached=%d  operator=%s\n",
@@ -84,6 +109,10 @@ bool modem_begin() {
 bool modem_is_network_attached() { return s_attached; }
 
 TinyGsm& modem_instance() { return modem; }
+
+size_t modem_write_raw(const uint8_t* buf, size_t len) {
+  return MODEM_SERIAL.write(buf, len);
+}
 
 bool modem_recover() {
   Serial.println("[modem] recover: soft restart…");

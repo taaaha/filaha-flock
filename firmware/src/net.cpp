@@ -1,23 +1,24 @@
 #include "config.h"
 #include <TinyGsmClient.h>
-#include <PubSubClient.h>
 #include <string.h>
 #include "modem.h"
 #include "net.h"
 
-// Reuse the one modem owned by modem.cpp.
-static TinyGsmClient s_tcp(modem_instance());
-static PubSubClient  s_mqtt(s_tcp);
+// ════════════════════════════════════════════════════════════════════
+//  MQTT over the A7670's NATIVE engine (AT+CMQTT*).
+//  We deliberately do NOT use TinyGSM's raw TCP socket + PubSubClient:
+//  on this modem the socket read path fails to surface the CONNACK bytes
+//  (the broker accepts the client but the driver never reads the reply,
+//  so PubSubClient times out). The A7670's built-in MQTT stack handles
+//  the CONNECT/CONNACK and keep-alive itself and is rock-solid on 2G.
+// ════════════════════════════════════════════════════════════════════
+
+static bool          s_started    = false;   // AT+CMQTTSTART done (service up)
+static bool          s_conn       = false;   // broker connected
 static unsigned long s_last_try_ms = 0;
 static int           s_fail_count  = 0;
 
 // ── Store-and-forward ring buffer ─────────────────────────────────
-// Every reading is queued here first. When the link is up we flush the whole
-// backlog oldest-first, so a blackout of up to NET_BUFFER_SLOTS minutes loses
-// nothing. When full, the oldest reading is dropped (bounded RAM).
-// NOTE: buffered packets are timestamped by the server at *arrival*, so data
-// held through an outage lands clustered at reconnect — acceptable, and far
-// better than losing it. (A timestamped packet is a later upgrade.)
 static uint8_t s_buf[NET_BUFFER_SLOTS][8];
 static int     s_head  = 0;
 static int     s_count = 0;
@@ -30,19 +31,6 @@ static void buf_push(const uint8_t* d) {
     s_count++;
   }
   memcpy(s_buf[idx], d, 8);
-}
-
-static bool raw_publish(const uint8_t* d) {
-  const String topic = String("filaha/") + FILAHA_DEVICE_ID + "/telemetry";
-  return s_mqtt.publish(topic.c_str(), d, 8, /*retained=*/false);
-}
-
-static void buf_flush() {
-  while (s_count > 0 && s_mqtt.connected()) {
-    if (!raw_publish(s_buf[s_head])) break;     // stop on first failure; retry later
-    s_head = (s_head + 1) % NET_BUFFER_SLOTS;
-    s_count--;
-  }
 }
 
 // ── APN selection — auto-detect the Algerian operator ─────────────
@@ -65,52 +53,106 @@ static bool ensure_gprs() {
   return modem_instance().gprsConnect(apn, FILAHA_APN_USER, FILAHA_APN_PASS);
 }
 
+// ── Native MQTT (AT+CMQTT*) ───────────────────────────────────────
 static bool mqtt_connect() {
   if (!ensure_gprs()) return false;
-  s_mqtt.setServer(FILAHA_MQTT_HOST, FILAHA_MQTT_PORT);
-  s_mqtt.setKeepAlive(90);
-  s_mqtt.setSocketTimeout(20);
+  TinyGsm& m = modem_instance();
   const String cid = String("filaha-") + FILAHA_DEVICE_ID;
-  const bool ok = s_mqtt.connect(cid.c_str(), FILAHA_MQTT_USER, FILAHA_MQTT_PASS);
-  Serial.printf("[net] MQTT %s (state=%d)\n", ok ? "OK" : "FAIL", s_mqtt.state());
-  return ok;
+
+  // Bring the MQTT service up once (survives across reconnects; reset only
+  // when the modem itself is recovered — see net_mark_modem_reset()).
+  if (!s_started) {
+    m.sendAT(GF("+CMQTTSTART"));
+    m.waitResponse(12000UL, GF("+CMQTTSTART: 0"));   // OK or "already started" → continue
+    s_started = true;
+  }
+
+  // Fresh client slot each attempt: disconnect a stale session first (a
+  // half-open connection makes the modem answer "already connected", err 19),
+  // then release the slot.
+  m.sendAT(GF("+CMQTTDISC=0,60")); m.waitResponse(5000UL);
+  m.sendAT(GF("+CMQTTREL=0"));     m.waitResponse(2000UL);
+  m.sendAT(GF("+CMQTTACCQ=0,\""), cid, GF("\",0"));
+  m.waitResponse(3000UL);
+
+  // tcp://host:port , keepalive 90 s, clean session 1, username, password.
+  m.sendAT(GF("+CMQTTCONNECT=0,\"tcp://"), FILAHA_MQTT_HOST, ':',
+           (uint32_t)FILAHA_MQTT_PORT, GF("\",90,1,\""),
+           FILAHA_MQTT_USER, GF("\",\""), FILAHA_MQTT_PASS, GF("\""));
+  const int r = m.waitResponse(25000UL, GF("+CMQTTCONNECT: 0,0"));
+  s_conn = (r == 1);
+  Serial.printf("[net] MQTT %s (CMQTTCONNECT r=%d)\n", s_conn ? "OK" : "FAIL", r);
+  return s_conn;
+}
+
+static bool mqtt_publish(const uint8_t* d) {
+  TinyGsm& m = modem_instance();
+  const String topic = String("filaha/") + FILAHA_DEVICE_ID + "/telemetry";
+
+  m.sendAT(GF("+CMQTTTOPIC=0,"), (uint32_t)topic.length());
+  if (m.waitResponse(5000UL, GF(">")) != 1) { s_conn = false; return false; }
+  modem_write_raw((const uint8_t*)topic.c_str(), topic.length());
+  if (m.waitResponse(5000UL) != 1) { s_conn = false; return false; }
+
+  // Send the 8-byte packet HEX-encoded (16 ASCII chars). This modem rejects a
+  // binary CMQTTPAYLOAD that contains 0x00 bytes (e.g. temperature high-byte);
+  // the server decodes the hex back into the raw packet.
+  char hex[17];
+  for (int i = 0; i < 8; i++) sprintf(hex + i * 2, "%02x", d[i]);
+  m.sendAT(GF("+CMQTTPAYLOAD=0,16"));
+  if (m.waitResponse(5000UL, GF(">")) != 1) { s_conn = false; return false; }
+  modem_write_raw((const uint8_t*)hex, 16);
+  if (m.waitResponse(5000UL) != 1) { s_conn = false; return false; }
+
+  m.sendAT(GF("+CMQTTPUB=0,1,60"));                 // QoS 1, 60 s pub timeout
+  if (m.waitResponse(20000UL, GF("+CMQTTPUB: 0,0")) != 1) { s_conn = false; return false; }
+  return true;
+}
+
+static void buf_flush() {
+  while (s_count > 0 && s_conn) {
+    if (!mqtt_publish(s_buf[s_head])) break;        // stop on first failure; retry later
+    s_head = (s_head + 1) % NET_BUFFER_SLOTS;
+    s_count--;
+  }
 }
 
 // (Re)establish the link. On repeated failure, recover the modem itself.
 static bool ensure_link() {
-  if (s_mqtt.connected()) { s_fail_count = 0; return true; }
-  if (mqtt_connect())     { s_fail_count = 0; return true; }
+  if (s_conn) { s_fail_count = 0; return true; }
+  if (mqtt_connect()) { s_fail_count = 0; return true; }
   if (++s_fail_count >= NET_RECOVER_AFTER_FAILS) {
     Serial.println("[net] repeated failures — recovering modem…");
     modem_recover();
+    s_started = false;                              // CMQTT service is gone after a modem reset
+    s_conn    = false;
     s_fail_count = 0;
   }
   return false;
 }
 
 bool net_begin()     { return ensure_link(); }
-bool net_connected() { return s_mqtt.connected(); }
+bool net_connected() { return s_conn; }
 
 void net_loop() {
-  if (s_mqtt.connected()) {
-    s_mqtt.loop();
-    if (s_count > 0) buf_flush();               // opportunistically drain backlog
+  if (s_conn) {
+    if (s_count > 0) buf_flush();                   // opportunistically drain backlog
     return;
   }
   const unsigned long now = millis();
-  if (now - s_last_try_ms < 10000UL) return;    // back off reconnect storms
+  if (now - s_last_try_ms < 10000UL) return;        // back off reconnect storms
   s_last_try_ms = now;
   if (ensure_link()) buf_flush();
 }
 
 bool net_publish(const uint8_t* data, size_t len) {
-  (void) len;                                    // always 8 bytes
-  buf_push(data);                                // queue first — never lose a reading
-  if (!s_mqtt.connected() && !ensure_link()) {
+  (void) len;                                        // always 8 bytes
+  buf_push(data);                                    // queue first — never lose a reading
+  if (!s_conn && !ensure_link()) {
     Serial.printf("[net] offline — buffered  (queue %d/%d)\n", s_count, NET_BUFFER_SLOTS);
     return false;
   }
-  buf_flush();                                   // this packet + any backlog, oldest first
+  buf_flush();                                       // this packet + any backlog, oldest first
   const bool clear = (s_count == 0);
   Serial.printf("[net] publish %s  (queue %d)\n", clear ? "OK" : "PARTIAL", s_count);
   return clear;
@@ -120,7 +162,7 @@ bool net_get_clock(int& hour_out, long& day_key_out) {
   int year = 0, month = 0, day = 0, hr = 0, mn = 0, sec = 0;
   float tz = 0;
   if (!modem_instance().getNetworkTime(&year, &month, &day, &hr, &mn, &sec, &tz)) return false;
-  if (year < 2024) return false;                 // not yet synced by the network
+  if (year < 2024) return false;                     // not yet synced by the network
   hour_out    = hr;
   day_key_out = (long)year * 10000L + (long)month * 100L + (long)day;
   return true;

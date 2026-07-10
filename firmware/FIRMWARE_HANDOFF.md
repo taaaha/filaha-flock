@@ -43,8 +43,8 @@ emergency (works even with no internet). Built for weak rural Algerian 2G.
 
 ## 3. Set these per unit — `firmware/src/config.h` (top of file)
 ```c
-#define FILAHA_DEVICE_ID      "DEV01"            // unique per box; MUST match the server
-#define FILAHA_FARMER_NUMBER  "+2135XXXXXXXX"    // the farmer's phone (SMS + calls go here)
+#define FILAHA_DEVICE_ID      "DEV011"            // unique per box; MUST match the server
+#define FILAHA_FARMER_NUMBER  "+213781103304"    // the farmer's phone (SMS + calls go here)
 #define FILAHA_SIM_PIN        ""                 // "" if the SIM has no PIN
 ```
 Already set for you (don't change unless the server moves):

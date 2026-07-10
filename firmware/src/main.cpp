@@ -13,7 +13,9 @@
 //  the cloud REST API instead.
 // ════════════════════════════════════════════════════════════════
 #include <Arduino.h>
-extern "C" { #include "esp_sleep.h" }
+extern "C" {
+#include "esp_sleep.h"
+}
 #include "esp_task_wdt.h"
 #include "config.h"
 #include "format.h"
@@ -69,6 +71,9 @@ void setup() {
   }
 
   feedback_begin();                        // buttons + buzzer
+
+  // Power-on chirp: instantly tells you the board booted (no PC needed).
+  buzzer_pulse(120); delay(140); buzzer_off();
 
   if (!sensors_begin()) {
     Serial.println("[boot] sensors_begin reported failure — will keep trying in loop()");
@@ -154,9 +159,17 @@ static void check_power_transition() {
 
   const bool on_usb = power_is_on_usb();
   if (s_was_on_usb && !on_usb) {
-    Serial.println("[power] USB LOST — sending POWER_CUT SMS");
-    modem_send_sms(FILAHA_FARMER_NUMBER,
-                   filaha_critical_sms(FILAHA_DEVICE_ID, "Coupure de courant", power_battery_pct(), " % batt"));
+    // A real power cut only matters if there's a battery keeping the box alive.
+    // If it reads ~0 %, no LiPo is installed (bench/USB testing) — skip the
+    // alarm instead of spamming the farmer on every boot.
+    const int batt = power_battery_pct();
+    if (batt <= 2) {
+      Serial.println("[power] USB lost but no battery installed — alert skipped (bench)");
+    } else {
+      Serial.println("[power] USB LOST — sending POWER_CUT SMS");
+      modem_send_sms(FILAHA_FARMER_NUMBER,
+                     filaha_critical_sms(FILAHA_DEVICE_ID, "Coupure de courant", batt, " % batt"));
+    }
   } else if (!s_was_on_usb && on_usb) {
     Serial.println("[power] USB restored");
   }
@@ -202,6 +215,16 @@ void loop() {
   modem_loop();
   net_loop();                                   // keep MQTT alive / reconnect
   check_power_transition();
+
+  // Double-chirp the FIRST time the cloud link comes up after boot — audible
+  // "we're live" confirmation for demos with no PC attached.
+  static bool s_net_announced = false;
+  if (!s_net_announced && net_connected()) {
+    s_net_announced = true;
+    buzzer_pulse(90); delay(110); buzzer_off(); delay(90);
+    buzzer_pulse(90); delay(110); buzzer_off();
+    Serial.println("[boot] cloud link up — announced");
+  }
 
   const unsigned long now = millis();
   if (now - s_last_send_ms >= TELEMETRY_INTERVAL_MS) {

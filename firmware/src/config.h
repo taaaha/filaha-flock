@@ -9,15 +9,18 @@
 #define FILAHA_DEVICE_ID         "DEV01"
 
 // The Djezzy / farmer SIM running the Filaha Flock app (intl. format).
-#define FILAHA_FARMER_NUMBER     "+213541787699"
+#define FILAHA_FARMER_NUMBER     "+213781103304"
 
 // SIM PIN — leave empty "" if your SIM has no PIN, or you've already
 // removed it via a normal phone. If Djezzy gave you a PIN, put it here.
 #define FILAHA_SIM_PIN           ""
 
 // ── Cadence ────────────────────────────────────────────────────────
-#define TELEMETRY_INTERVAL_MS    (60UL * 1000UL)      // MQTT telemetry every 60 s
-#define SENSOR_WARMUP_MS         (5UL  * 1000UL)      // settle time after boot
+#define TELEMETRY_INTERVAL_MS    (30UL * 1000UL)      // MQTT telemetry every 30 s
+// Sensor settle time. The STCC4 starts measuring at sensors_begin(), and the
+// network attach that follows takes 40-60 s anyway — by then it's warm. A long
+// extra delay here just postpones the first reading.
+#define SENSOR_WARMUP_MS         (1UL  * 1000UL)
 
 // ── Cloud / data path (2G GPRS + MQTT) ─────────────────────────────
 // APN for the device SIM. Algeria: Djezzy "djezzy" / Mobilis "internet" /
@@ -27,7 +30,7 @@
 #define FILAHA_APN_PASS          ""
 // Your cloud server (the VPS running docker compose) + MQTT credentials from
 // setup.sh.  MQTT_USER MUST equal FILAHA_DEVICE_ID.
-#define FILAHA_MQTT_HOST         "api.filahaflock.com"   // stable domain → DO droplet
+#define FILAHA_MQTT_HOST         "134.209.242.192"   // DigitalOcean Droplet (FRA1)
 #define FILAHA_MQTT_PORT         1883
 #define FILAHA_MQTT_USER         FILAHA_DEVICE_ID
 #define FILAHA_MQTT_PASS         "1aa0374c027bacc35fce3139fdc02fefa6c7ec35d44b5dfd"
@@ -99,7 +102,7 @@
 #define BTN_RESET_PIN            25                   // GREEN — quick reboot (re-init modem)
 
 // ── Buzzer (Gravity digital buzzer, DFR0032) ───────────────────────
-#define BUZZER_PIN               17
+#define BUZZER_PIN               19
 
 // ── Button + buzzer timings ────────────────────────────────────────
 #define BTN_DEBOUNCE_MS          40

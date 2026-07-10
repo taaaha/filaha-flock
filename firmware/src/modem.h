@@ -14,6 +14,10 @@ int  modem_rssi_dbm();                                    // signal strength (0 
 // Shared modem instance — net.cpp layers GPRS + MQTT on top of this.
 TinyGsm& modem_instance();
 
+// Write raw bytes straight to the modem UART — used to feed a binary MQTT
+// payload after the A7670 returns its '>' prompt (AT+CMQTTPAYLOAD).
+size_t modem_write_raw(const uint8_t* buf, size_t len);
+
 // Emergency voice call (rings the farmer's phone). Returns true if the modem
 // accepted the dial. Some A7670 variants are data-only — check the log on first
 // flash; if dialing fails the critical SMS still goes out as the lifeline.

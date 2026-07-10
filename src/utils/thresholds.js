@@ -16,7 +16,9 @@ export const SENSOR_LIMITS = {
   hum: { min: 0, max: 100 },
 };
 
-export const OFFLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+// The device reports every 30 s — four missed cycles means it's genuinely dark
+// (power cut or dead signal), so flag it fast instead of waiting 5 minutes.
+export const OFFLINE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
 
 // Temperature-Humidity Index tier. Heat stress is a COMBINED danger that the
 // temperature threshold alone misses (28°C at 85% humidity can be lethal to
