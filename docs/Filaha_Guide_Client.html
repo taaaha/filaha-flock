@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Filaha Flock — Guide client : comportement du système</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#0d2b29;--cream:#faf7f0;--paper:#fffdf8;--green:#3f7d4f;--green2:#2f9d5a;--amber:#d8a23d;--terra:#c2603f;--text:#22302b;--muted:#6c7d73;--line:#e6e0d3;}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body{background:#33373b;font-family:"Inter","Segoe UI",Arial,sans-serif;color:var(--text);padding:26px;}
+  .page{width:940px;margin:0 auto 22px;background:var(--cream);border-radius:8px;box-shadow:0 16px 44px rgba(0,0,0,.4);padding:44px 52px;}
+  @page{size:A4 portrait;margin:13mm;}
+  @media print{body{background:#fff;padding:0;}.page{box-shadow:none;border-radius:0;width:auto;padding:0;margin:0;}}
+  h1,h2,h3{font-family:"Poppins",sans-serif;}
+  .head{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--green);padding-bottom:16px;margin-bottom:18px;}
+  .kick{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--green);}
+  h1{font-size:25px;color:var(--ink);font-weight:800;margin-top:5px;}
+  .meta{font-size:12.5px;color:var(--muted);margin-top:6px;}
+  .chick{width:52px;height:52px;}
+  h2{font-size:16.5px;color:var(--ink);font-weight:700;margin:24px 0 10px;display:flex;align-items:center;gap:9px;}
+  h2::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--green);transform:rotate(45deg);flex:none;}
+  h3{font-size:13.5px;color:var(--ink);margin:14px 0 6px;}
+  p,li{font-size:13px;line-height:1.62;}
+  ul,ol{margin:6px 0 6px 20px;} li{margin:3px 0;}
+  b{color:var(--ink);}
+  table{width:100%;border-collapse:collapse;margin:8px 0;}
+  th,td{text-align:left;padding:8px 10px;font-size:12.5px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:#efeada;}
+  td.v{font-family:"Poppins";font-weight:700;color:var(--ink);white-space:nowrap;}
+  .ok{background:#eef4ec;border:1px solid #cfe3d0;border-left:4px solid var(--green2);border-radius:8px;padding:12px 16px;margin:12px 0;}
+  .warn{background:#fff5e6;border:1px solid var(--amber);border-left:4px solid var(--amber);border-radius:8px;padding:12px 16px;margin:12px 0;}
+  .warn b{color:#9a6a16;}
+  .foot{margin-top:24px;border-top:1px solid var(--line);padding-top:12px;font-size:11px;color:var(--muted);}
+  .steps td:first-child{font-family:"Poppins";font-weight:800;color:var(--green);white-space:nowrap;}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="chick" viewBox="0 0 100 100"><path d="M50 84c-15 0-26-10-26-26 0-20 12-34 26-34s26 14 26 34c0 16-11 26-26 26z" fill="#f4c542"/><path d="M50 30c-9 0-15 7-15 16h30c0-9-6-16-15-16z" fill="#f7d56b"/><circle cx="41" cy="46" r="4.4" fill="#2a2118"/><circle cx="59" cy="46" r="4.4" fill="#2a2118"/><path d="M50 52l7 5-7 5-7-5z" fill="#e8902f"/><path d="M50 16c2 5 1 9-2 11-2-5-1-9 2-11z" fill="#3f7d4f"/></symbol>
+</defs></svg>
+
+<div class="page">
+  <div class="head">
+    <div><div class="kick">Filaha Flock · Document client</div><h1>Guide du comportement du système</h1><div class="meta">Ce que fait votre boîtier, ce que montre l'application, et ce qui est normal · Version 1.0 · Juillet 2026</div></div>
+    <svg class="chick"><use href="#chick"/></svg>
+  </div>
+
+  <p>Filaha Flock se compose de trois éléments : le <b>boîtier</b> installé dans le poulailler, l'<b>application</b> sur votre téléphone, et le <b>service cloud</b> qui les relie. Ce guide décrit le comportement normal de chacun, pour que vous sachiez toujours si votre système fonctionne comme prévu.</p>
+
+  <h2>1. Ce que le boîtier surveille</h2>
+  <table>
+    <thead><tr><th>Mesure</th><th>Capteur</th><th>Fréquence</th></tr></thead>
+    <tbody>
+      <tr><td>CO₂ (dioxyde de carbone)</td><td>Sensirion, qualité industrielle</td><td rowspan="4" class="v">toutes les 30 s</td></tr>
+      <tr><td>Température</td><td>même capteur</td></tr>
+      <tr><td>Humidité</td><td>même capteur</td></tr>
+      <tr><td>Batterie &amp; alimentation</td><td>circuit interne</td></tr>
+      <tr><td>Ammoniac (NH₃)</td><td>module optionnel</td><td class="v">30 s (si équipé)</td></tr>
+    </tbody>
+  </table>
+  <p class="meta">Si votre unité n'a pas encore le module NH₃, la valeur ammoniac affiche 0 — c'est normal, le module s'ajoute sans changer le reste.</p>
+
+  <h2>2. Démarrage : ce que vous entendez</h2>
+  <table class="steps">
+    <thead><tr><th>Quand</th><th>Signal</th><th>Signification</th></tr></thead>
+    <tbody>
+      <tr><td>~2 s après branchement</td><td><b>1 bip</b></td><td>Le boîtier est allumé et démarre.</td></tr>
+      <tr><td>1 à 2 minutes</td><td><b>2 bips</b></td><td>Connecté au réseau mobile et au cloud — les données arrivent dans l'application.</td></tr>
+    </tbody>
+  </table>
+  <div class="ok"><b>Normal :</b> la connexion au réseau prend 1 à 2 minutes après chaque mise sous tension — comme un téléphone qui sort du mode avion. Branchez le boîtier quelques minutes avant d'en avoir besoin. Ensuite, il reste connecté en continu.</div>
+  <div class="warn"><b>Si vous n'entendez jamais le 2ᵉ bip :</b> signal faible à cet endroit (déplacez l'antenne, rapprochez-vous d'une fenêtre) ou SIM sans crédit/données. Le boîtier réessaie tout seul, sans limite.</div>
+
+  <h2>3. Fonctionnement normal</h2>
+  <ul>
+    <li>L'application affiche une <b>nouvelle lecture toutes les 30 secondes</b> pour chaque poulailler.</li>
+    <li>Des <b>rapports quotidiens, hebdomadaires et mensuels</b> sont générés dans l'application, adaptés à l'âge et à la souche du cheptel.</li>
+    <li>Un <b>SMS de rapport quotidien</b> est envoyé au numéro de l'éleveur chaque jour vers 20 h.</li>
+    <li>Si le réseau coupe, le boîtier <b>garde en mémoire jusqu'à ~30 minutes de lectures</b> et les envoie dès le retour du signal — une microcoupure ne perd rien.</li>
+  </ul>
+
+  <h2>4. Alertes d'urgence : SMS + appel automatique</h2>
+  <p>Quand une valeur dépasse un seuil dangereux sur <b>deux lectures consécutives</b> (≈ 1 minute — pour éliminer les fausses alertes d'un pic isolé), le boîtier <b>appelle votre téléphone et envoie un SMS</b>, directement par le réseau mobile. <b>Cela fonctionne même si internet est coupé</b> : c'est la bouée de secours du système.</p>
+  <table>
+    <thead><tr><th>Danger</th><th>Seuil d'alerte du boîtier</th></tr></thead>
+    <tbody>
+      <tr><td>CO₂ élevé</td><td class="v">≥ 2 500 ppm</td></tr>
+      <tr><td>Ammoniac élevé (si module NH₃)</td><td class="v">≥ 35 ppm</td></tr>
+      <tr><td>Température</td><td class="v">≥ 38 °C ou ≤ 12 °C</td></tr>
+      <tr><td>Humidité</td><td class="v">≥ 85 % ou ≤ 25 %</td></tr>
+      <tr><td>Coupure de courant</td><td class="v">immédiat</td></tr>
+    </tbody>
+  </table>
+  <p class="meta">Anti-spam : une même alerte ne se répète pas plus d'une fois toutes les 10 minutes. Les seuils sont réglés à l'installation selon votre souche et votre région.</p>
+
+  <h2>5. Alimentation et batterie — à lire attentivement</h2>
+  <h3>Le chargeur</h3>
+  <div class="warn"><b>Utilisez un chargeur USB-A classique (5 V / 2 A) avec un câble USB-A vers USB-C.</b> Les chargeurs récents « tout USB-C » (câble C vers C) utilisent un protocole de négociation que le boîtier ne parle pas : ils ne lui délivrent <b>aucun courant</b>. Ce n'est pas une panne — changez simplement de chargeur/câble.</div>
+  <h3>La batterie de secours</h3>
+  <ul>
+    <li>La batterie n'est pas un accessoire : elle <b>alimente les pics d'émission du modem</b> et fait tourner le boîtier pendant les coupures. <b>Laissez-la toujours branchée.</b></li>
+    <li>Sur secteur, la batterie se recharge automatiquement.</li>
+    <li>En cas de coupure de courant : le boîtier <b>continue de fonctionner sur batterie</b> et vous envoie immédiatement un SMS « Coupure de courant » avec le niveau de batterie. Au retour du courant, il continue sans intervention.</li>
+    <li>Alerte <b>batterie faible</b> dans l'application dès que le niveau passe sous 20 %.</li>
+  </ul>
+  <h3>Le pourcentage de batterie affiché</h3>
+  <div class="ok"><b>Comportement normal à connaître :</b> le circuit de mesure ne peut lire la batterie que lorsqu'elle alimente le boîtier. <b>Branché au secteur, le pourcentage affiché est la dernière valeur mesurée sur batterie</b> (il ne bouge pas) ; il redevient une mesure en direct dès que le boîtier passe sur batterie. Un boîtier qui n'a encore jamais tourné sur batterie affiche « — » (inconnu) au lieu d'un pourcentage.</div>
+
+  <h2>6. Détection de panne : qui vous prévient, et en combien de temps</h2>
+  <table>
+    <thead><tr><th>Événement</th><th>Vous êtes prévenu par</th><th>Délai</th></tr></thead>
+    <tbody>
+      <tr><td>Coupure de courant (boîtier sur batterie)</td><td>SMS du boîtier</td><td class="v">immédiat</td></tr>
+      <tr><td>Danger air/température</td><td>Appel + SMS du boîtier, notification app</td><td class="v">~1 min</td></tr>
+      <tr><td>Boîtier muet (plus aucune donnée)</td><td>Badge « hors ligne » dans l'application</td><td class="v">~2 min</td></tr>
+      <tr><td>Boîtier muet — confirmation serveur</td><td>Alerte + notification « Capteur hors ligne »</td><td class="v">~3 min</td></tr>
+      <tr><td>Retour du boîtier</td><td>Alerte « de nouveau en ligne »</td><td class="v">≤ 30 s</td></tr>
+    </tbody>
+  </table>
+  <p class="meta">« Boîtier muet » = plus de courant ET batterie vide, ou perte totale du signal. Tant que la batterie tient, le boîtier vous a déjà prévenu lui-même par SMS.</p>
+
+  <h2>7. Boutons et signaux du boîtier</h2>
+  <table>
+    <thead><tr><th>Commande</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td class="v">Bouton ROUGE</td><td>Envoie un SMS de test au numéro de l'éleveur — pour vérifier la chaîne d'alerte à tout moment.</td></tr>
+      <tr><td class="v">Bouton BLEU</td><td>Coupe le buzzer local pendant 10 minutes (les SMS/appels continuent).</td></tr>
+      <tr><td class="v">Bouton BLANC (appui long 3 s)</td><td>Éteint le boîtier. Appui court pour le réveiller.</td></tr>
+      <tr><td class="v">Bouton VERT</td><td>Redémarre le boîtier (se reconnecte tout seul).</td></tr>
+      <tr><td class="v">Buzzer</td><td>Sonne sur place lors d'un danger local, en plus du SMS et de l'appel.</td></tr>
+    </tbody>
+  </table>
+  <div class="warn"><b>Voyants lumineux :</b> les LED d'état ne sont pas encore actives sur cette version — elles seront activées par une future mise à jour. Pour vérifier que tout fonctionne : les bips au démarrage et les données dans l'application.</div>
+
+  <h2>8. Ce dont le système a besoin</h2>
+  <ul>
+    <li>Une <b>carte SIM</b> (Mobilis, Ooredoo ou Djezzy — détection automatique) avec un petit forfait données et du crédit SMS. Sans code PIN.</li>
+    <li>De la <b>couverture mobile</b> dans le poulailler. Signal faible ? Une antenne externe déportée règle la quasi-totalité des cas.</li>
+    <li>Une prise secteur + le chargeur recommandé (section 5).</li>
+    <li>Pour consulter les données en direct dans l'application : internet sur <b>votre téléphone</b>. Les SMS et appels d'urgence, eux, arrivent même sans internet.</li>
+  </ul>
+
+  <h2>9. Limites connues (transparence)</h2>
+  <ul>
+    <li>Les lectures mises en mémoire pendant une coupure réseau sont datées à leur <b>arrivée au serveur</b>, pas à la seconde exacte de la mesure.</li>
+    <li>Le pourcentage de batterie est figé pendant la charge (voir section 5) — c'est une caractéristique du circuit, pas un défaut.</li>
+    <li>Chaque mise sous tension nécessite 1 à 2 minutes de reconnexion au réseau.</li>
+    <li>Sans aucune couverture mobile, ni les données ni les SMS ne peuvent sortir — le buzzer local reste le dernier recours sur place.</li>
+  </ul>
+
+  <div class="foot">
+    Filaha Flock — Support : +213 541 78 76 99 · support@filahaflock.com · filahaflock.com<br>
+    Garantie matérielle et assistance WhatsApp incluses. Ce document décrit la version firmware 0.1.x / application 1.1.x.
+  </div>
+</div>
+</body>
+</html>
