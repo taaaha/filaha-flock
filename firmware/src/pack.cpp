@@ -10,7 +10,11 @@ size_t pack_telemetry(const SensorReading& r, uint8_t out[8]) {
   const uint8_t  hum  = r.has_hum ? clamp_pct(r.hum_pct) : 0;
   const uint16_t co2  = clamp_u16(lroundf(r.has_co2 ? r.co2_ppm : 0.0f));
   const uint16_t nh3  = clamp_u16(lroundf((r.has_nh3 ? r.nh3_ppm : 0.0f) * 100.0f));
-  const uint8_t  bat  = r.has_bat ? (r.bat_pct < 0 ? 0 : (r.bat_pct > 100 ? 100 : (uint8_t)r.bat_pct)) : 0;
+  // 255 is the "unknown" sentinel (on USB the sense circuit is dark and no
+  // battery reading exists yet) — pass it through; clamp real values to 0-100.
+  const uint8_t  bat  = !r.has_bat ? 0
+                        : (r.bat_pct == 255 ? 255
+                        : (r.bat_pct < 0 ? 0 : (r.bat_pct > 100 ? 100 : (uint8_t)r.bat_pct)));
 
   out[0] = (uint8_t)(temp >> 8); out[1] = (uint8_t)(temp & 0xFF);   // temp int16 BE
   out[2] = hum;                                                      // hum  uint8

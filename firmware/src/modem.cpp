@@ -3,6 +3,8 @@
 // TINY_GSM_MODEM_SIM7600 is defined in platformio.ini build_flags.
 #include <TinyGsmClient.h>
 #include <StreamDebugger.h>
+#include "esp_task_wdt.h"
+#include "esp_system.h"
 
 #include "modem.h"
 
@@ -19,6 +21,40 @@ static bool          s_attached      = false;
 static unsigned long s_last_check_ms = 0;
 static int           s_rssi_raw      = 0;
 
+static const char* reset_reason_str(esp_reset_reason_t r) {
+  switch (r) {
+    case ESP_RST_POWERON:  return "power-on";
+    case ESP_RST_BROWNOUT: return "BROWNOUT (weak power supply — check charger/battery)";
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_INT_WDT:
+    case ESP_RST_WDT:      return "watchdog (loop stalled, e.g. modem stuck)";
+    case ESP_RST_PANIC:    return "software panic/crash";
+    case ESP_RST_SW:       return "software restart (ESP.restart())";
+    case ESP_RST_DEEPSLEEP: return "woke from deep sleep";
+    default:                return "other";
+  }
+}
+
+// Loop that waits for network registration without ever blocking the hardware
+// watchdog: it polls isNetworkConnected() itself (rather than one opaque
+// library call) so we can feed the watchdog and log progress every few
+// seconds. Returns true once registered, false if `budget_ms` runs out.
+static bool wait_registered(unsigned long budget_ms) {
+  const unsigned long start = millis();
+  unsigned long last_log = 0;
+  while (millis() - start < budget_ms) {
+    esp_task_wdt_reset();
+    if (modem.isNetworkConnected()) return true;
+    if (millis() - last_log > 8000UL) {
+      last_log = millis();
+      const int q = modem.getSignalQuality();
+      Serial.printf("[modem] still registering… CSQ=%d op=%s\n", q, modem.getOperator().c_str());
+    }
+    delay(600);
+  }
+  return false;
+}
+
 static void pulse_pwrkey() {
   // SIMCom A7670G: hold PWRKEY low for ~1 s to power on/off.
   pinMode(MODEM_PWRKEY, OUTPUT);
@@ -30,6 +66,7 @@ static void pulse_pwrkey() {
 }
 
 bool modem_begin() {
+  Serial.printf("[boot] reset reason: %s\n", reset_reason_str(esp_reset_reason()));
   Serial.println("[modem] enabling power rail…");
   pinMode(MODEM_POWER_ON, OUTPUT);
   digitalWrite(MODEM_POWER_ON, HIGH);
@@ -77,10 +114,17 @@ bool modem_begin() {
   modem.sendAT(GF("+CMGF=1"));   modem.waitResponse();
   modem.sendAT(GF("+CSCS=\"GSM\""));   modem.waitResponse();
 
-  // Let the modem use ANY available radio. Some A7670 units boot locked to
-  // LTE-only (CNMP=38); on a 2G/3G-only rural cell that never registers and
-  // gives the "+CGREG: 0,0" (not even searching) symptom. 2 = automatic RAT.
+  // Let the modem use ANY available radio (2G/3G/4G) and auto-pick the best.
+  // 2 = automatic RAT. We deliberately never force a single RAT (e.g.
+  // GSM-only): some Algerian SIMs/plans have 2G DATA disabled by the carrier
+  // even though 2G voice/SMS still works, so forcing 2G-only can turn a SIM
+  // that would have registered fine on auto into one that NEVER gets data —
+  // this was traced as the cause of a real field failure on a Mobilis SIM.
   modem.sendAT(GF("+CNMP=2"));   modem.waitResponse();
+  // Report the operator numerically (MCC-MNC) so APN auto-detection (net.cpp)
+  // gets a reliable value instead of depending on whichever format the tower
+  // happened to hand back.
+  modem.sendAT(GF("+COPS=3,2")); modem.waitResponse();
 
   // Print signal so we can tell "no coverage" from a SIM/band problem.
   {
@@ -89,18 +133,29 @@ bool modem_begin() {
                   q, (q == 99 ? 0 : -113 + 2 * q));
   }
 
-  Serial.println("[modem] waiting for network registration (up to 60 s)…");
-  if (!modem.waitForNetwork(60000UL)) {
-    // Nothing on auto — force GSM-only (2G) and try once more. 2G is the
-    // product's target network in weak rural coops anyway.
-    Serial.println("[modem] no network on auto — forcing GSM-only (CNMP=13)…");
-    modem.sendAT(GF("+CNMP=13"));   modem.waitResponse();
-    if (!modem.waitForNetwork(60000UL)) {
-      Serial.println("[modem] network attach timed out");
-      return false;
-    }
+  Serial.println("[modem] waiting for network registration (up to 90 s)…");
+  bool registered = wait_registered(90000UL);
+  if (!registered) {
+    // Auto RAT didn't camp in time — a soft radio restart (fresh cell scan)
+    // clears a surprising number of "stuck" registrations, and costs far
+    // less than jumping to a different network mode we haven't verified the
+    // SIM supports.
+    Serial.println("[modem] registration timed out — soft radio restart, retrying once…");
+    modem.sendAT(GF("+CFUN=1,1"));                    // full module reset (per 3GPP TS 27.007)
+    delay(3000);
+    for (int i = 0; i < 20 && !modem.testAT(1000); i++) { esp_task_wdt_reset(); delay(500); }
+    // CFUN=1,1 resets the module, so re-apply everything modem_begin() had
+    // already configured — not just the radio mode.
+    modem.sendAT(GF("+CMGF=1"));        modem.waitResponse();
+    modem.sendAT(GF("+CSCS=\"GSM\""));  modem.waitResponse();
+    modem.sendAT(GF("+CNMP=2"));        modem.waitResponse();
+    modem.sendAT(GF("+COPS=3,2"));      modem.waitResponse();
+    registered = wait_registered(90000UL);
   }
-  s_attached = modem.isNetworkConnected();
+  if (!registered) {
+    Serial.println("[modem] network attach failed after retry — will keep trying in modem_loop()");
+  }
+  s_attached = registered && modem.isNetworkConnected();
   Serial.printf("[modem] attached=%d  operator=%s\n",
                 (int)s_attached, modem.getOperator().c_str());
   return s_attached;
@@ -118,10 +173,13 @@ bool modem_recover() {
   Serial.println("[modem] recover: soft restart…");
   s_attached = false;
   if (modem.restart()) {
-    // Re-apply SMS mode after a restart.
+    // Re-apply SMS mode + radio mode after a restart (some of these are
+    // volatile across a soft restart on this module).
     modem.sendAT(GF("+CMGF=1"));         modem.waitResponse();
     modem.sendAT(GF("+CSCS=\"GSM\""));   modem.waitResponse();
-    if (modem.waitForNetwork(60000UL)) {
+    modem.sendAT(GF("+CNMP=2"));         modem.waitResponse();
+    modem.sendAT(GF("+COPS=3,2"));       modem.waitResponse();
+    if (wait_registered(60000UL)) {
       s_attached = modem.isNetworkConnected();
       Serial.printf("[modem] recover OK (soft), attached=%d\n", (int)s_attached);
       if (s_attached) return true;

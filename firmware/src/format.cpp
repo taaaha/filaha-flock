@@ -77,6 +77,16 @@ String filaha_heartbeat_sms(const char* device_id, const SensorReading& r) {
   return s;
 }
 
+String filaha_power_restored_sms(const char* device_id, int bat_pct) {
+  String s; s.reserve(80);
+  s  = "FILAHA [";
+  s += device_id;
+  s += "] Courant retabli. Batterie ";
+  s += bat_pct;
+  s += "%.";
+  return s;
+}
+
 String alert_payload_power_cut() {
   // Final assembled SMS becomes:
   //   FILAHA|DEV01|ALERT|POWER_CUT|running on battery

@@ -34,3 +34,7 @@ String alert_payload_power_cut();          // assembles "POWER_CUT|running on ba
 String filaha_critical_sms(const char* device_id, const char* what,
                            float value, const char* unit);
 String filaha_heartbeat_sms(const char* device_id, const SensorReading& r);
+
+// "FILAHA [DEV01] Courant retabli. Batterie 82%." — sent once when mains
+// power comes back after a cut, so the farmer knows the outage is over.
+String filaha_power_restored_sms(const char* device_id, int bat_pct);

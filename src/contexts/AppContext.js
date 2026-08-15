@@ -28,7 +28,7 @@ import { startRemoteContentRefresh } from '../services/RemoteContent';
 import { makePhoneCall, makeDirectCall } from '../services/CallService';
 import { vibrateDanger, vibrateWarn } from '../services/AlertService';
 import { parseSms } from '../utils/smsParser';
-import { apiEnabled, fetchLatest, fetchReadings, rowToParsed, rowToReading } from '../services/ApiService';
+import { apiEnabled, fetchDevices, fetchReadings, rowToParsed, rowToReading } from '../services/ApiService';
 import { DEFAULT_THRESHOLDS, sensorStatus, deviceStatus, OFFLINE_THRESHOLD_MS } from '../utils/thresholds';
 import { heatStressTHI } from '../utils/poultryData';
 import { STATUS } from '../utils/colors';
@@ -606,56 +606,103 @@ export function AppProvider({ children }) {
   }, [state.ready, state.devices]);
 
   // ---------- Cloud telemetry polling (new data path) ----------
-  // The device pushes 7-byte packets to the server over 2G; we pull the latest
-  // reading per device and feed the SAME pipeline the SMS path used. Dedup by
-  // timestamp so re-polls don't duplicate rows. nativeHandled=true → the app
-  // never auto-calls/SMS (the DEVICE owns emergency SMS+call); we still show the
-  // in-app danger notification + red card.
+  // The device pushes packets to the server over 2G; we pull one bulk snapshot
+  // (all devices + their server-computed `status`) per tick and feed the SAME
+  // pipeline the SMS path used. Dedup by timestamp so re-polls don't duplicate
+  // rows. nativeHandled=true → the app never auto-calls/SMS (the DEVICE owns
+  // emergency SMS+call); we still show the in-app danger notification + red card.
+  //
+  // `status` is server-authoritative and includes 'power_cut' — set the instant
+  // the device's own out-of-band event reaches the server (net_publish_event in
+  // firmware), independent of the telemetry cadence — so a power cut shows up
+  // in the app within one poll tick instead of waiting for a staleness timeout.
   useEffect(() => {
     if (!state.ready || !apiEnabled()) return;
     let cancelled = false;
 
     const poll = async () => {
       const now = Date.now();
+      let rows;
+      try {
+        rows = await fetchDevices();
+      } catch (e) {
+        return;   // network blip — stay quiet, retry next tick
+      }
+      if (cancelled || !Array.isArray(rows)) return;
+      const byId = {};
+      for (const row of rows) byId[row.device_id] = row;
+
       const devices = stateRef.current.devices;
       for (const device of devices) {
-        try {
-          const row = await fetchLatest(device.id);
-          if (cancelled || !row) continue;
-          const parsed = rowToParsed(device.id, row);
-          if (!parsed) continue;
+        const row = byId[device.id];
+        if (!row) continue;
 
-          // Inactive/offline device: the latest reading has gone stale (lost
-          // signal or power). Notify once per outage; clear on recovery.
-          const stale = (now - parsed.timestamp) > OFFLINE_THRESHOLD_MS;
-          const wasOffline = !!offlineNotifiedRef.current[device.id];
-          if (stale && !wasOffline) {
-            offlineNotifiedRef.current[device.id] = true;
-            showAlertNotification(
-              `📡 ${device.name} — ${tRef.current('offline') || 'Hors ligne'}`,
-              tRef.current('deviceOfflineBody') || 'Aucune donnee recente. Verifiez le courant et le signal.',
-              false
-            ).catch(() => {});
-          } else if (!stale && wasOffline) {
-            offlineNotifiedRef.current[device.id] = false;   // back online
-          }
+        // ── Power-cut state, sourced straight from the server ──
+        const serverPowerCut = row.status === 'power_cut';
+        const wasPowerCut = !!stateRef.current.powerCut[device.id];
+        if (serverPowerCut !== wasPowerCut) {
+          const next = { ...stateRef.current.powerCut, [device.id]: serverPowerCut };
+          await Storage.setPowerCut(next);
+          dispatch({ type: 'SET_POWER_CUT', payload: next });
 
-          const lastTs = apiLastTsRef.current[device.id] || 0;
-          if (parsed.timestamp <= lastTs) continue;   // already have it
-          apiLastTsRef.current[device.id] = parsed.timestamp;
-          const firstSync = lastTs === 0;
-          // On the very first sync after open, ingest silently so a backlog
-          // doesn't burst a stale notification; live updates notify normally.
-          await handleParsedMessage(parsed, true, firstSync);
-        } catch (e) {
-          // network blips are expected on mobile — stay quiet, retry next tick
+          const alert = {
+            id: uid('a_'),
+            deviceId: device.id,
+            deviceName: device.name,
+            farmName: (stateRef.current.farms.find((f) => f.id === device.farmId) || {}).name || '',
+            type: serverPowerCut ? 'ALERT' : 'CLEAR',
+            subType: 'POWER_CUT',
+            message: serverPowerCut
+              ? (tRef.current('powerCutBody') || 'Coupure de courant — fonctionne sur batterie')
+              : (tRef.current('powerRestoredBody') || 'Courant retabli'),
+            timestamp: now,
+            acknowledged: false,
+          };
+          const nextAlerts = [alert, ...stateRef.current.alerts].slice(0, 500);
+          await Storage.setAlerts(nextAlerts);
+          dispatch({ type: 'SET_ALERTS', payload: nextAlerts });
+
+          showAlertNotification(
+            serverPowerCut
+              ? `🔋 ${device.name} — ${tRef.current('powerCut') || 'Coupure de courant'}`
+              : `✅ ${device.name} — ${tRef.current('powerRestored') || 'Courant retabli'}`,
+            alert.message,
+            false
+          ).catch(() => {});
         }
+
+        // ── Offline: trust the server's status (fast, clock-drift-free) OR a
+        // local staleness check on the last reading timestamp — whichever
+        // notices first. ──
+        const parsed = rowToParsed(device.id, row);
+        const localStale = parsed ? (now - parsed.timestamp) > OFFLINE_THRESHOLD_MS : true;
+        const offlineNow = row.status === 'offline' || localStale;
+        const wasOffline = !!offlineNotifiedRef.current[device.id];
+        if (offlineNow && !wasOffline && !serverPowerCut) {
+          offlineNotifiedRef.current[device.id] = true;
+          showAlertNotification(
+            `📡 ${device.name} — ${tRef.current('offline') || 'Hors ligne'}`,
+            tRef.current('deviceOfflineBody') || 'Aucune donnee recente. Verifiez le courant et le signal.',
+            false
+          ).catch(() => {});
+        } else if (!offlineNow && wasOffline) {
+          offlineNotifiedRef.current[device.id] = false;   // back online
+        }
+
+        if (!parsed) continue;
+        const lastTs = apiLastTsRef.current[device.id] || 0;
+        if (parsed.timestamp <= lastTs) continue;   // already have it
+        apiLastTsRef.current[device.id] = parsed.timestamp;
+        const firstSync = lastTs === 0;
+        // On the very first sync after open, ingest silently so a backlog
+        // doesn't burst a stale notification; live updates notify normally.
+        await handleParsedMessage(parsed, true, firstSync);
       }
     };
 
     poll();
-    const id = setInterval(poll, 30000);   // every 30 s, matched to the device cadence
-    // Returning to the foreground → poll NOW (don't make the farmer wait 30 s
+    const id = setInterval(poll, 15000);   // every 15 s, matched to the device cadence
+    // Returning to the foreground → poll NOW (don't make the farmer wait
     // staring at stale numbers after opening the app).
     const sub = AppState.addEventListener('change', (s) => { if (s === 'active') poll(); });
     return () => { cancelled = true; clearInterval(id); sub.remove(); };

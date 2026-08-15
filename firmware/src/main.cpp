@@ -78,6 +78,11 @@ void setup() {
   if (!sensors_begin()) {
     Serial.println("[boot] sensors_begin reported failure — will keep trying in loop()");
   }
+
+  // Seed the power state from the actual hardware so booting on battery isn't
+  // mistaken for a fresh power cut (the static default assumed USB).
+  s_was_on_usb = power_is_on_usb();
+  Serial.printf("[power] boot state: %s\n", s_was_on_usb ? "on USB/charger" : "on battery");
   if (!modem_begin()) {
     Serial.println("[boot] modem_begin failed — will retry network attach inside modem_loop()");
   }
@@ -154,7 +159,7 @@ static void maybe_send_heartbeat(const SensorReading& r) {
 
 static void check_power_transition() {
   const unsigned long now = millis();
-  if (now - s_last_power_check_ms < 5000UL) return;
+  if (now - s_last_power_check_ms < 2000UL) return;   // check often — this is the alert client care about most
   s_last_power_check_ms = now;
 
   const bool on_usb = power_is_on_usb();
@@ -166,12 +171,23 @@ static void check_power_transition() {
     if (batt <= 2) {
       Serial.println("[power] USB lost but no battery installed — alert skipped (bench)");
     } else {
-      Serial.println("[power] USB LOST — sending POWER_CUT SMS");
+      Serial.println("[power] USB LOST — buzzer + SMS + call + cloud event");
+      buzzer_pulse(LOCAL_BUZZER_MS);                  // local audible cue, same as any critical event
+      net_publish_event("PWR_OUT");                   // instant cloud/app signal — doesn't wait for internet
+#if CRITICAL_SMS_ENABLED
       modem_send_sms(FILAHA_FARMER_NUMBER,
                      filaha_critical_sms(FILAHA_DEVICE_ID, "Coupure de courant", batt, " % batt"));
+#endif
+#if CRITICAL_CALL_ENABLED
+      modem_place_call(FILAHA_FARMER_NUMBER, CRITICAL_RING_MS);   // this is the lifeline — it works with zero internet
+#endif
     }
   } else if (!s_was_on_usb && on_usb) {
-    Serial.println("[power] USB restored");
+    Serial.println("[power] USB restored — SMS + cloud event");
+    net_publish_event("PWR_IN");
+#if CRITICAL_SMS_ENABLED
+    modem_send_sms(FILAHA_FARMER_NUMBER, filaha_power_restored_sms(FILAHA_DEVICE_ID, power_battery_pct()));
+#endif
   }
   s_was_on_usb = on_usb;
 }

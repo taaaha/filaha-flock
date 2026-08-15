@@ -16,7 +16,7 @@
 #define FILAHA_SIM_PIN           ""
 
 // ── Cadence ────────────────────────────────────────────────────────
-#define TELEMETRY_INTERVAL_MS    (30UL * 1000UL)      // MQTT telemetry every 30 s
+#define TELEMETRY_INTERVAL_MS    (15UL * 1000UL)      // MQTT telemetry every 15 s
 // Sensor settle time. The STCC4 starts measuring at sensors_begin(), and the
 // network attach that follows takes 40-60 s anyway — by then it's warm. A long
 // extra delay here just postpones the first reading.

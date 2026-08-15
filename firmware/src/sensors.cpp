@@ -20,11 +20,17 @@ static bool stcc4_ready = false;
 #endif
 
 // Reads VBAT through the LilyGO voltage divider on BATTERY_ADC_PIN.
-// Returns volts.
+// Returns volts. Averaged over 5 samples — the modem's TX bursts put spikes
+// on the rail that make single ADC reads jumpy.
 static float read_vbat() {
-  const int raw = analogRead(BATTERY_ADC_PIN);
-  // ADC: 0..4095 → 0..3.3 V, divider ×2 → battery V.
-  return (raw / 4095.0f) * 3.3f * 2.0f;
+  float sum = 0;
+  for (int i = 0; i < 5; i++) {
+    const int raw = analogRead(BATTERY_ADC_PIN);
+    // ADC: 0..4095 → 0..3.3 V, divider ×2 → battery V.
+    sum += (raw / 4095.0f) * 3.3f * 2.0f;
+    delay(2);
+  }
+  return sum / 5.0f;
 }
 
 static int vbat_to_pct(float v) {
@@ -138,22 +144,34 @@ bool sensors_read(SensorReading& out) {
   #endif
 #endif
 
-  const float vbat = read_vbat();
+  // On battery → live measurement. On USB the sense circuit is dark, so we
+  // report the last % measured on battery; 255 = "unknown" (never measured
+  // since boot) which the server stores as null instead of a scary 0 %.
+  const int bat = power_battery_pct();
   out.has_bat = true;
-  out.bat_pct = vbat_to_pct(vbat);
+  out.bat_pct = (bat < 0) ? 255 : bat;
 
   // Always succeed — the battery field alone is enough to prove the device
   // is alive. SMS goes out every cycle no matter the sensor state.
   return true;
 }
 
+// Hardware truth (verified on this unit): the battery-sense divider only sees
+// the cell while it is DISCHARGING. With USB/charger plugged in, the sense
+// node reads ~0 V. So the signal is INVERTED but reliable:
+//   vbat ≈ 0 V           → external power is feeding the board (USB in)
+//   vbat in 3.0–4.2 V    → running on the battery
+static int s_last_bat_pct = -1;   // last % measured while on battery (-1 = never)
+
 bool power_is_on_usb() {
-  // On the LilyGO T-A7670G the USB/charger raises the VBAT-sense above the
-  // open-circuit LiPo max (~4.20 V). If we read above ~4.22 V, USB is in.
-  // Crude but reliable; a proper PMIC query is a follow-up.
-  return read_vbat() > 4.22f;
+  return read_vbat() < 0.5f;
 }
 
 int power_battery_pct() {
-  return vbat_to_pct(read_vbat());
+  const float v = read_vbat();
+  if (v >= 2.5f) {                       // discharging → a real measurement
+    s_last_bat_pct = vbat_to_pct(v);
+    return s_last_bat_pct;
+  }
+  return s_last_bat_pct;                 // on USB: sense is dark → last known
 }

@@ -34,23 +34,42 @@ static void buf_push(const uint8_t* d) {
 }
 
 // ── APN selection — auto-detect the Algerian operator ─────────────
+// getOperator() can return EITHER the alpha name ("Djezzy") or the numeric
+// MCC-MNC ("60302") depending on what format the modem last negotiated with
+// the tower — we never controlled that, so a plain alpha substring match
+// (the old code) silently never fired for a numeric reply and every SIM fell
+// through to the same default. Handle both forms explicitly.
+//   Algeria (MCC 603): 60301 Mobilis · 60302 Djezzy · 60303 Ooredoo
 static const char* pick_apn() {
 #if FILAHA_APN_AUTO
   String op = modem_instance().getOperator();
   op.toLowerCase();
-  if (op.indexOf("djezzy") >= 0 || op.indexOf("optimum") >= 0 || op.indexOf("ota") >= 0)
-    return "djezzy.internet";
-  if (op.length() > 0) return "internet";       // Mobilis + Ooredoo both use "internet"
+  const bool isDjezzy =
+    op.indexOf("djezzy") >= 0 || op.indexOf("optimum") >= 0 || op.indexOf("ota") >= 0 ||
+    op.indexOf("60302") >= 0;
+  if (isDjezzy) return "djezzy.internet";
+  if (op.length() > 0) return "internet";       // Mobilis (60301) + Ooredoo (60303)
 #endif
   return FILAHA_APN;                             // configured fallback
 }
 
-static bool ensure_gprs() {
-  if (modem_instance().isGprsConnected()) return true;
-  const char* apn = pick_apn();
-  Serial.printf("[net] GPRS connect  apn=%s  op=%s  rssi=%ddBm\n",
+static bool try_gprs(const char* apn) {
+  Serial.printf("[net] GPRS connect  apn=\"%s\"  op=%s  rssi=%ddBm\n",
                 apn, modem_instance().getOperator().c_str(), modem_rssi_dbm());
   return modem_instance().gprsConnect(apn, FILAHA_APN_USER, FILAHA_APN_PASS);
+}
+
+static bool ensure_gprs() {
+  if (modem_instance().isGprsConnected()) return true;
+  const char* primary = pick_apn();
+  if (try_gprs(primary)) return true;
+  // Some SIMs/carrier configs reject a named APN but accept a blank one
+  // (the network supplies its own default). Cheap to try before giving up.
+  if (strlen(primary) > 0) {
+    Serial.println("[net] primary APN failed — retrying with blank APN…");
+    if (try_gprs("")) return true;
+  }
+  return false;
 }
 
 // ── Native MQTT (AT+CMQTT*) ───────────────────────────────────────
@@ -140,7 +159,7 @@ void net_loop() {
     return;
   }
   const unsigned long now = millis();
-  if (now - s_last_try_ms < 10000UL) return;        // back off reconnect storms
+  if (now - s_last_try_ms < 5000UL) return;         // back off reconnect storms
   s_last_try_ms = now;
   if (ensure_link()) buf_flush();
 }
@@ -156,6 +175,30 @@ bool net_publish(const uint8_t* data, size_t len) {
   const bool clear = (s_count == 0);
   Serial.printf("[net] publish %s  (queue %d)\n", clear ? "OK" : "PARTIAL", s_count);
   return clear;
+}
+
+void net_publish_event(const char* kind) {
+  if (!s_conn) {
+    Serial.printf("[net] event \"%s\" skipped — no link (SMS/call lifeline still fires)\n", kind);
+    return;
+  }
+  TinyGsm& m = modem_instance();
+  const String topic = String("filaha/") + FILAHA_DEVICE_ID + "/event";
+  const size_t klen = strlen(kind);
+
+  m.sendAT(GF("+CMQTTTOPIC=0,"), (uint32_t)topic.length());
+  if (m.waitResponse(4000UL, GF(">")) != 1) { s_conn = false; return; }
+  modem_write_raw((const uint8_t*)topic.c_str(), topic.length());
+  if (m.waitResponse(4000UL) != 1) { s_conn = false; return; }
+
+  m.sendAT(GF("+CMQTTPAYLOAD=0,"), (uint32_t)klen);
+  if (m.waitResponse(4000UL, GF(">")) != 1) { s_conn = false; return; }
+  modem_write_raw((const uint8_t*)kind, klen);
+  if (m.waitResponse(4000UL) != 1) { s_conn = false; return; }
+
+  m.sendAT(GF("+CMQTTPUB=0,1,20"));
+  const int r = m.waitResponse(8000UL, GF("+CMQTTPUB: 0,0"));
+  Serial.printf("[net] event \"%s\" %s\n", kind, r == 1 ? "sent" : "failed");
 }
 
 bool net_get_clock(int& hour_out, long& day_key_out) {

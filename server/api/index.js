@@ -25,7 +25,12 @@ const TH = {
   tempHigh: Number(process.env.TEMP_HIGH_C || 38),
   tempLow: Number(process.env.TEMP_LOW_C || 12),
   co2: Number(process.env.CO2_DANGER_PPM || 2500),
+  batLow: Number(process.env.BAT_LOW_PCT || 20),
 };
+
+// Same-kind alerts are muted for this long so a sustained condition logs one
+// alert per window instead of one per 30-second reading.
+const ALERT_COOLDOWN_MIN = Number(process.env.ALERT_COOLDOWN_MIN || 10);
 
 // Watchdog: if a device that was reporting goes silent this long, flag it offline
 // (lost signal or power). The device can't tell us — it's dark — so the server does.
@@ -46,7 +51,8 @@ function unpack(buf) {
     humidity: buf.readUInt8(2),
     co2_ppm: buf.readUInt16BE(3),
     nh3_ppm: buf.readUInt16BE(5) / 100,
-    battery: buf.length >= 8 ? buf.readUInt8(7) : null,
+    // 255 = firmware sentinel for "battery unknown" (USB power, sense dark).
+    battery: buf.length >= 8 ? (buf.readUInt8(7) === 255 ? null : buf.readUInt8(7)) : null,
   };
 }
 
@@ -55,6 +61,8 @@ function checkThresholds(r) {
   if (r.temp_c >= TH.tempHigh) return { kind: "temp_high", value: r.temp_c, message: `Temp ${r.temp_c.toFixed(1)}C high` };
   if (r.temp_c <= TH.tempLow) return { kind: "temp_low", value: r.temp_c, message: `Temp ${r.temp_c.toFixed(1)}C low` };
   if (r.co2_ppm >= TH.co2) return { kind: "co2", value: r.co2_ppm, message: `CO2 ${r.co2_ppm} ppm` };
+  if (r.battery != null && r.battery > 0 && r.battery <= TH.batLow)
+    return { kind: "bat_low", value: r.battery, message: `Batterie faible ${r.battery}%` };
   return null;
 }
 
@@ -82,7 +90,8 @@ async function ingest(deviceId, buf) {
     const wasOffline = prev.rows[0]?.status === 'offline';
     await pool.query(
       `INSERT INTO devices(device_id,last_seen,status) VALUES($1,now(),'online')
-       ON CONFLICT(device_id) DO UPDATE SET last_seen=now(), status='online'`, [deviceId]);
+       ON CONFLICT(device_id) DO UPDATE SET last_seen=now(),
+         status = CASE WHEN devices.status='power_cut' THEN devices.status ELSE 'online' END`, [deviceId]);
     if (wasOffline) {
       const msg = 'Capteur de nouveau en ligne';
       await pool.query(`INSERT INTO alerts(device_id,kind,value,message) VALUES($1,'recovered',NULL,$2)`, [deviceId, msg]);
@@ -94,12 +103,52 @@ async function ingest(deviceId, buf) {
       [deviceId, r.temp_c, r.humidity, r.co2_ppm, r.nh3_ppm, r.battery]);
     const al = checkThresholds(r);
     if (al) {
-      await pool.query(`INSERT INTO alerts(device_id,kind,value,message) VALUES($1,$2,$3,$4)`,
-        [deviceId, al.kind, al.value, al.message]);
-      maybePush(deviceId, al);
+      // Cooldown: skip if the same kind fired for this device recently.
+      const recent = await pool.query(
+        `SELECT 1 FROM alerts WHERE device_id=$1 AND kind=$2
+           AND ts > now() - ($3 || ' minutes')::interval LIMIT 1`,
+        [deviceId, al.kind, ALERT_COOLDOWN_MIN]);
+      if (!recent.rows.length) {
+        await pool.query(`INSERT INTO alerts(device_id,kind,value,message) VALUES($1,$2,$3,$4)`,
+          [deviceId, al.kind, al.value, al.message]);
+        maybePush(deviceId, al);
+      }
     }
     console.log(`[mqtt] ${deviceId}  T=${r.temp_c} H=${r.humidity} CO2=${r.co2_ppm} NH3=${r.nh3_ppm} BAT=${r.battery}${al ? "  ALERT:" + al.kind : ""}`);
   } catch (e) { console.error(`[ingest] ${deviceId}`, e.message); }
+}
+
+// ── Power events (instant, out-of-band — not the 15s telemetry cadence) ──
+// The device publishes to filaha/<id>/event the moment mains power is lost or
+// restored (it is still alive and reporting normally on the backup battery).
+// This gives the app a near-real-time "power cut" state instead of waiting
+// for the device to go fully silent.
+async function handlePowerEvent(deviceId, kind) {
+  try {
+    if (kind === "PWR_OUT") {
+      const prev = await pool.query(`SELECT status FROM devices WHERE device_id=$1`, [deviceId]);
+      if (prev.rows[0]?.status === "power_cut") return;   // already flagged, avoid duplicate alert
+      await pool.query(
+        `INSERT INTO devices(device_id,last_seen,status) VALUES($1,now(),'power_cut')
+         ON CONFLICT(device_id) DO UPDATE SET last_seen=now(), status='power_cut'`, [deviceId]);
+      const msg = "Coupure de courant — fonctionne sur batterie";
+      await pool.query(`INSERT INTO alerts(device_id,kind,value,message) VALUES($1,'power_cut',NULL,$2)`, [deviceId, msg]);
+      maybePush(deviceId, { kind: "power_cut", message: msg });
+      console.log(`[event] ${deviceId} POWER CUT`);
+    } else if (kind === "PWR_IN") {
+      const prev = await pool.query(`SELECT status FROM devices WHERE device_id=$1`, [deviceId]);
+      const wasCut = prev.rows[0]?.status === "power_cut";
+      await pool.query(
+        `INSERT INTO devices(device_id,last_seen,status) VALUES($1,now(),'online')
+         ON CONFLICT(device_id) DO UPDATE SET last_seen=now(), status='online'`, [deviceId]);
+      if (wasCut) {
+        const msg = "Courant retabli";
+        await pool.query(`INSERT INTO alerts(device_id,kind,value,message) VALUES($1,'power_restored',NULL,$2)`, [deviceId, msg]);
+        maybePush(deviceId, { kind: "power_restored", message: msg });
+        console.log(`[event] ${deviceId} power restored`);
+      }
+    }
+  } catch (e) { console.error(`[event] ${deviceId}`, e.message); }
 }
 
 // ── Watchdog ──────────────────────────────────────────────────────
@@ -111,7 +160,7 @@ async function checkOffline() {
   try {
     const { rows } = await pool.query(
       `UPDATE devices SET status='offline'
-       WHERE status='online' AND last_seen < now() - ($1 || ' minutes')::interval
+       WHERE status IN ('online','power_cut') AND last_seen < now() - ($1 || ' minutes')::interval
        RETURNING device_id`, [OFFLINE_AFTER_MIN]);
     for (const d of rows) {
       const msg = `Capteur hors ligne — aucune donnee depuis ${OFFLINE_AFTER_MIN} min`;
@@ -121,14 +170,26 @@ async function checkOffline() {
     }
   } catch (e) { console.error('[watchdog]', e.message); }
 }
-setInterval(checkOffline, 60000);
+setInterval(checkOffline, 20000);
 
 const client = mqtt.connect(MQTT_URL, { username: MQTT_USER, password: MQTT_PASS, reconnectPeriod: 5000 });
-client.on("connect", () => { console.log("[mqtt] connected"); client.subscribe("filaha/+/telemetry"); });
+client.on("connect", () => {
+  console.log("[mqtt] connected");
+  client.subscribe("filaha/+/telemetry");
+  client.subscribe("filaha/+/event");
+});
 client.on("error", (e) => console.error("[mqtt] error", e.message));
 client.on("message", (topic, payload) => {
+  const evM = topic.match(/^filaha\/([^/]+)\/event$/);
+  if (evM) { handlePowerEvent(evM[1], payload.toString("latin1").trim()); return; }
   const m = topic.match(/^filaha\/([^/]+)\/telemetry$/);
-  if (m) ingest(m[1], payload);
+  if (!m) return;
+  // A7670 firmware hex-encodes the 8-byte packet (16 ASCII chars) because the
+  // modem mangles binary payloads with 0x00. Decode it; raw binary still works.
+  let buf = payload;
+  const s = payload.toString("latin1");
+  if (/^[0-9a-fA-F]{14,16}$/.test(s)) buf = Buffer.from(s, "hex");
+  ingest(m[1], buf);
 });
 
 // ── REST API ──────────────────────────────────────────────────────
