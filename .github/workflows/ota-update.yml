@@ -70,4 +70,15 @@ jobs:
           MSG="${INPUT_MSG:-$HEAD_MSG}"
           MSG="$(printf '%s' "$MSG" | head -n1)"
           if [ -z "$MSG" ]; then MSG="OTA update"; fi
+
+          # EXPO_PUBLIC_* vars are INLINED into the JS bundle at bundle time.
+          # eas.json's `env` block only applies to `eas build`, NOT `eas update`
+          # — so without this, an OTA bundle ships with EXPO_PUBLIC_API_URL
+          # undefined, apiEnabled() returns false, and the app silently shows
+          # no data at all. Read them from eas.json so the production APK and
+          # every OTA share one source of truth and can never drift apart.
+          export EXPO_PUBLIC_API_URL="$(node -p "require('./eas.json').build.production.env.EXPO_PUBLIC_API_URL")"
+          export EXPO_PUBLIC_API_TOKEN="$(node -p "require('./eas.json').build.production.env.EXPO_PUBLIC_API_TOKEN")"
+          echo "OTA will target API: $EXPO_PUBLIC_API_URL"
+
           eas update --branch production --message "$MSG" --non-interactive
