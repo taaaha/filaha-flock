@@ -157,37 +157,101 @@ static void maybe_send_heartbeat(const SensorReading& r) {
 #endif
 }
 
+// ── Guaranteed delivery of power alerts ──────────────────────────
+// A power-cut SMS/call is the most important thing this device ever sends, so
+// it is NEVER fire-and-forget. modem_send_sms() fails immediately when the
+// modem isn't registered (boot-time registration window, a network gap, a
+// tower hiccup) — previously that silently lost the alert forever. Now the
+// alert is queued here and retried until the modem accepts it.
+enum PendingAlert { PENDING_NONE = 0, PENDING_PWR_OUT, PENDING_PWR_IN };
+static PendingAlert  s_pending_kind    = PENDING_NONE;
+static int           s_pending_bat     = -1;
+static unsigned long s_pending_next_ms = 0;
+static int           s_pending_tries   = 0;
+
+static void queue_power_alert(PendingAlert kind, int bat_pct) {
+  s_pending_kind    = kind;
+  s_pending_bat     = bat_pct;
+  s_pending_tries   = 0;
+  s_pending_next_ms = millis();          // attempt immediately
+}
+
+static void service_pending_alert() {
+  if (s_pending_kind == PENDING_NONE) return;
+  const unsigned long now = millis();
+  if ((long)(now - s_pending_next_ms) < 0) return;
+  s_pending_next_ms = now + PENDING_RETRY_MS;
+
+  if (++s_pending_tries > PENDING_MAX_TRIES) {
+    Serial.printf("[power] gave up delivering alert after %d tries\n", s_pending_tries - 1);
+    s_pending_kind = PENDING_NONE;
+    return;
+  }
+
+  const bool is_cut = (s_pending_kind == PENDING_PWR_OUT);
+  // An unknown battery reading (-1) must never block the alert — report 0.
+  const int  bat    = (s_pending_bat < 0) ? 0 : s_pending_bat;
+  Serial.printf("[power] delivering %s alert (attempt %d)…\n",
+                is_cut ? "POWER-CUT" : "POWER-RESTORED", s_pending_tries);
+
+#if CRITICAL_SMS_ENABLED
+  const String body = is_cut
+      ? filaha_critical_sms(FILAHA_DEVICE_ID, "Coupure de courant", bat, " % batt")
+      : filaha_power_restored_sms(FILAHA_DEVICE_ID, bat);
+  if (!modem_send_sms(FILAHA_FARMER_NUMBER, body)) {
+    Serial.println("[power] SMS not accepted (no network yet) — keeping queued, will retry");
+    return;                              // stay queued
+  }
+#endif
+
+#if CRITICAL_CALL_ENABLED
+  if (is_cut) modem_place_call(FILAHA_FARMER_NUMBER, CRITICAL_RING_MS);
+#endif
+
+  // Re-announce to the cloud now that the link is evidently alive. The server
+  // ignores a duplicate (it checks the current status first), so this is safe.
+  net_publish_event(is_cut ? "PWR_OUT" : "PWR_IN");
+
+  Serial.println("[power] alert delivered");
+  s_pending_kind = PENDING_NONE;
+}
+
 static void check_power_transition() {
   const unsigned long now = millis();
-  if (now - s_last_power_check_ms < 2000UL) return;   // check often — this is the alert client care about most
+  if (now - s_last_power_check_ms < POWER_POLL_MS) return;
   s_last_power_check_ms = now;
 
   const bool on_usb = power_is_on_usb();
-  if (s_was_on_usb && !on_usb) {
-    // A real power cut only matters if there's a battery keeping the box alive.
-    // If it reads ~0 %, no LiPo is installed (bench/USB testing) — skip the
-    // alarm instead of spamming the farmer on every boot.
+
+  // Debounce: require N consecutive agreeing samples before committing a
+  // change, so one noisy ADC read can neither raise a false alarm nor (worse)
+  // flip the stored state and mask the real transition that follows.
+  static bool s_candidate   = false;
+  static int  s_streak      = 0;
+  if (on_usb == s_was_on_usb) { s_streak = 0; return; }   // no change pending
+  if (on_usb != s_candidate) { s_candidate = on_usb; s_streak = 1; }
+  else                       { s_streak++; }
+  if (s_streak < POWER_CONFIRM_SAMPLES) return;           // not confirmed yet
+  s_streak = 0;
+
+  if (!on_usb) {
+    // ── MAINS LOST — running on the backup battery ──
+    // Fire the local + cloud signals instantly, then queue the SMS/call for
+    // guaranteed delivery. Note there is deliberately NO "no battery, skip"
+    // suppression any more: with no battery the board simply dies and sends
+    // nothing (so it cannot spam), while a suppressed alert on a real unit
+    // was silently losing the single most important message we send.
+    const int batt = power_battery_pct_settled();
+    Serial.printf("[power] MAINS LOST — on battery (%d%%) — buzzer + cloud + queued SMS/call\n", batt);
+    buzzer_pulse(LOCAL_BUZZER_MS);
+    net_publish_event("PWR_OUT");        // instant, best-effort
+    queue_power_alert(PENDING_PWR_OUT, batt);
+  } else {
+    // ── MAINS RESTORED ──
     const int batt = power_battery_pct();
-    if (batt <= 2) {
-      Serial.println("[power] USB lost but no battery installed — alert skipped (bench)");
-    } else {
-      Serial.println("[power] USB LOST — buzzer + SMS + call + cloud event");
-      buzzer_pulse(LOCAL_BUZZER_MS);                  // local audible cue, same as any critical event
-      net_publish_event("PWR_OUT");                   // instant cloud/app signal — doesn't wait for internet
-#if CRITICAL_SMS_ENABLED
-      modem_send_sms(FILAHA_FARMER_NUMBER,
-                     filaha_critical_sms(FILAHA_DEVICE_ID, "Coupure de courant", batt, " % batt"));
-#endif
-#if CRITICAL_CALL_ENABLED
-      modem_place_call(FILAHA_FARMER_NUMBER, CRITICAL_RING_MS);   // this is the lifeline — it works with zero internet
-#endif
-    }
-  } else if (!s_was_on_usb && on_usb) {
-    Serial.println("[power] USB restored — SMS + cloud event");
-    net_publish_event("PWR_IN");
-#if CRITICAL_SMS_ENABLED
-    modem_send_sms(FILAHA_FARMER_NUMBER, filaha_power_restored_sms(FILAHA_DEVICE_ID, power_battery_pct()));
-#endif
+    Serial.printf("[power] MAINS RESTORED (batt %d%%) — cloud + queued SMS\n", batt);
+    net_publish_event("PWR_IN");         // instant, best-effort
+    queue_power_alert(PENDING_PWR_IN, batt);
   }
   s_was_on_usb = on_usb;
 }
@@ -231,6 +295,7 @@ void loop() {
   modem_loop();
   net_loop();                                   // keep MQTT alive / reconnect
   check_power_transition();
+  service_pending_alert();                      // retry any undelivered power alert
 
   // Double-chirp the FIRST time the cloud link comes up after boot — audible
   // "we're live" confirmation for demos with no PC attached.

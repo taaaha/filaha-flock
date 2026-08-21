@@ -52,6 +52,17 @@
 // an unattended box in a remote coop.
 #define WATCHDOG_TIMEOUT_S       180
 
+// ── Power-cut detection (the most safety-critical alert we have) ────
+// How often the mains/battery state is sampled.
+#define POWER_POLL_MS            1000
+// Consecutive agreeing samples before a change is committed. A single noisy
+// ADC read must never fire a false alarm — nor mask a real one.
+#define POWER_CONFIRM_SAMPLES    2
+// A power alert MUST reach the farmer, so it is queued and retried until the
+// modem accepts it (survives boot-time registration and network gaps).
+#define PENDING_RETRY_MS         (20UL * 1000UL)
+#define PENDING_MAX_TRIES        45          // ≈ 15 minutes of retrying
+
 // ── Hybrid SMS fallback (device-originated, human-readable) ─────────
 #define HEARTBEAT_HOUR           20      // local hour (0-23) for the daily report SMS
 #define HEARTBEAT_ENABLED        1

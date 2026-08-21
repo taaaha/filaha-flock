@@ -175,3 +175,18 @@ int power_battery_pct() {
   }
   return s_last_bat_pct;                 // on USB: sense is dark → last known
 }
+
+int power_battery_pct_settled() {
+  // Right after the charger is pulled the rail takes a beat to stabilise, so
+  // a single read often lands below the "real measurement" floor and returns
+  // -1 (unknown). Retry for ~300 ms before accepting that.
+  for (int i = 0; i < 6; i++) {
+    const float v = read_vbat();
+    if (v >= 2.5f) {
+      s_last_bat_pct = vbat_to_pct(v);
+      return s_last_bat_pct;
+    }
+    delay(50);
+  }
+  return s_last_bat_pct;                 // still unknown → genuinely no battery
+}
