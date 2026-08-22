@@ -274,6 +274,10 @@ export function AppProvider({ children }) {
             farmName,
             type: 'ALERT',
             subType: key.toUpperCase(),
+            // Language-neutral detail. Alert bodies used to be stored as already-
+            // translated text, so an alert raised in Arabic still read in Arabic after
+            // switching language. Numbers are neutral and formatted at render time.
+            detail: { kind: 'value', value: Number(value.toFixed(1)), unit: sensorUnits[key] },
             message: `${sensorMessages[key]} (${value.toFixed(1)} ${sensorUnits[key]})`,
             timestamp: reading.timestamp || now,
             acknowledged: false,
@@ -373,6 +377,10 @@ export function AppProvider({ children }) {
             farmName,
             type: 'ALERT',
             subType: 'HEAT_STRESS',
+            // Language-neutral detail. Alert bodies used to be stored as already-
+            // translated text, so an alert raised in Arabic still read in Arabic after
+            // switching language. Numbers are neutral and formatted at render time.
+            detail: hs ? { kind: 'thi', value: hs.thi } : null,
             message: `${tRef.current('heatStress')} ${thiTxt}`.trim(),
             timestamp: reading.timestamp || now,
             acknowledged: false,
@@ -423,6 +431,10 @@ export function AppProvider({ children }) {
             farmName,
             type: 'ALERT',
             subType: 'BATTERY',
+            // Language-neutral detail. Alert bodies used to be stored as already-
+            // translated text, so an alert raised in Arabic still read in Arabic after
+            // switching language. Numbers are neutral and formatted at render time.
+            detail: { kind: 'pct', value: Math.round(reading.bat) },
             message: `${tRef.current('lowBattery')} (${Math.round(reading.bat)}%)`,
             timestamp: reading.timestamp || now,
             acknowledged: false,

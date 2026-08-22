@@ -383,6 +383,7 @@ export default {
   insightSevSuccess: 'جيّد',
   insightsShowAll: 'عرض الكل',
   insightsShowLess: 'عرض أقل',
+  insightsShowMore: 'عرض المزيد',
   insightsAllClear: 'كل شيء على ما يُرام',
   insightsAllClearBody: 'لا حاجة لأيّ إجراء الآن. واصل فحصك اليومي للحظائر.',
   insightsTab: 'إرشادات',

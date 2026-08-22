@@ -396,6 +396,7 @@ export default {
   insightSevSuccess: 'Bon',
   insightsShowAll: 'Tout afficher',
   insightsShowLess: 'Afficher moins',
+  insightsShowMore: 'Afficher plus',
   insightsAllClear: 'Tout est sous contrôle',
   insightsAllClearBody: 'Aucune action requise pour le moment. Continuez le contrôle quotidien.',
   insightsTab: 'Conseils',

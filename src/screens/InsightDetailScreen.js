@@ -1,13 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, StatusBar, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../components/Icon';
 import { BrooderCalc, DensityCalc, VaccineSchedule } from '../components/Calculators';
 import { useApp } from '../contexts/AppContext';
-import { colors, statusColor, barStyle } from '../utils/colors';
+import { colors, STATUS, statusColor, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import { TOPICS } from '../utils/guideContent';
-import { sensorStatus } from '../utils/thresholds';
+import { sensorStatus, statusPriority } from '../utils/thresholds';
 import { formatNumber } from '../utils/formatters';
 
 const SEV = { danger: 'danger', warn: 'warn', info: 'accent', success: 'ok' };
@@ -38,9 +38,25 @@ export default function InsightDetailScreen({ route, navigation }) {
   const sKey = insight.sensorKey;
   const sVal = sKey && reading ? reading[sKey] : null;
   const hasVal = sVal !== null && sVal !== undefined && !isNaN(sVal);
-  const sStatus = hasVal ? sensorStatus(sKey, sVal, thresholds || {}) : null;
+  // The reading chip must never contradict the insight sitting above it.
+  // 30.6 C alone passes the temperature threshold ("OK"), but at THI 77 with
+  // humidity it is genuinely dangerous for the birds — so a green "OK" next to
+  // a heat-stress warning reads as a bug. Show whichever status is worse.
+  const rawStatus = hasVal ? sensorStatus(sKey, sVal, thresholds || {}) : null;
+  const sevStatus =
+    insight.severity === 'danger' ? STATUS.DANGER
+    : insight.severity === 'warn' ? STATUS.WARN
+    : null;
+  const sStatus =
+    !rawStatus ? null
+    : !sevStatus ? rawStatus
+    : (statusPriority(sevStatus) < statusPriority(rawStatus) ? sevStatus : rawStatus);
 
   const sections = topic ? pickLang(topic.sections, language) : [];
+  // During an active alert the farmer needs what is wrong and what to do now —
+  // not the full guide. Show the first two blocks, fold the background away.
+  const [showAllGuidance, setShowAllGuidance] = useState(false);
+  const visibleSections = showAllGuidance ? sections : sections.slice(0, 2);
 
   return (
     <View style={styles.safe}>
@@ -105,7 +121,7 @@ export default function InsightDetailScreen({ route, navigation }) {
           {sections && sections.length > 0 ? (
             <View style={styles.card}>
               <Text style={styles.sectionLabel}>{t('insightGuidance') || 'What to do'}</Text>
-              {sections.map((s, i) => {
+              {visibleSections.map((s, i) => {
                 const parts = String(s.b || '')
                   .split('•')
                   .map((x) => x.trim())
@@ -130,6 +146,19 @@ export default function InsightDetailScreen({ route, navigation }) {
                   </View>
                 );
               })}
+              {sections.length > 2 ? (
+                <Pressable
+                  onPress={() => setShowAllGuidance((v) => !v)}
+                  style={styles.moreBtn}
+                  android_ripple={{ color: colors.textPrimary + '10' }}
+                >
+                  <Text style={styles.moreBtnText}>
+                    {showAllGuidance
+                      ? (t('insightsShowLess') || 'Show less')
+                      : (t('insightsShowMore') || 'Show more')}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
 
@@ -173,6 +202,21 @@ export default function InsightDetailScreen({ route, navigation }) {
 }
 
 const makeStyles = () => ({
+  moreBtn: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceAlt || colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  moreBtnText: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   safe: { flex: 1, backgroundColor: colors.bg },
   topBar: {
     flexDirection: 'row',
