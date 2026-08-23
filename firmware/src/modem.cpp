@@ -72,10 +72,14 @@ static bool wait_registered(unsigned long budget_ms) {
         continue;
       }
       silent = 0;
+      // Fetch first, print second - these getters each issue AT commands, and
+      // with the modem debugger enabled they would interleave mid-sentence.
+      const int q = modem.getSignalQuality();
+      const String op = modem.getOperator();
       Serial.print("[modem] still registering... CSQ=");
-      Serial.print(modem.getSignalQuality());
+      Serial.print(q);
       Serial.print(" op=");
-      Serial.println(modem.getOperator());
+      Serial.println(op);
     }
     delay(600);
   }
@@ -193,6 +197,15 @@ bool modem_begin() {
   modem.sendAT(GF("+COPS=3,2")); modem.waitResponse();
 
   log_radio_capabilities();
+
+  // Force all-technology scanning BEFORE the survey: CNMP persists across
+
+  // reboots on this module, so a previous GSM-only run would otherwise leave
+
+  // the survey blind to LTE and quietly under-report available networks.
+
+  modem.sendAT(GF("+CNMP=2")); modem.waitResponse(10000UL);
+
 
   // Survey FIRST. One scan answers "is any network on air here at all?" in
   // about a minute, instead of only finding out after five minutes of
