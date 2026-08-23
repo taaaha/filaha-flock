@@ -35,25 +35,53 @@ static const char* reset_reason_str(esp_reset_reason_t r) {
   }
 }
 
-// Loop that waits for network registration without ever blocking the hardware
-// watchdog: it polls isNetworkConnected() itself (rather than one opaque
-// library call) so we can feed the watchdog and log progress every few
-// seconds. Returns true once registered, false if `budget_ms` runs out.
+// True if the modem answers AT at all. Three tries, because one missed
+// reply during a busy scan is normal; three in a row is not.
+static bool modem_responsive() {
+  for (int i = 0; i < 3; i++) {
+    if (modem.testAT(1200)) return true;
+    esp_task_wdt_reset();
+    delay(300);
+  }
+  return false;
+}
+
+// Wait for network registration without ever starving the hardware watchdog,
+// and - critically - notice if the MODEM ITSELF dies. A SIMCom radio draws up
+// to ~2 A in transmit bursts; on a weak supply it browns out and stops
+// answering AT entirely, and every command after that goes into the void.
+// Detecting that is the difference between a one-line diagnosis and a
+// five-minute mystery.
 static bool wait_registered(unsigned long budget_ms) {
   const unsigned long start = millis();
   unsigned long last_log = 0;
+  int silent = 0;
   while (millis() - start < budget_ms) {
     esp_task_wdt_reset();
     if (modem.isNetworkConnected()) return true;
     if (millis() - last_log > 8000UL) {
       last_log = millis();
-      const int q = modem.getSignalQuality();
-      Serial.printf("[modem] still registering… CSQ=%d op=%s\n", q, modem.getOperator().c_str());
+      if (!modem.testAT(1200)) {
+        if (++silent >= 2) {
+          Serial.println("[modem] *** MODEM STOPPED RESPONDING TO AT ***");
+          Serial.println("[modem] almost always power: LiPo connected + charged?");
+          Serial.println("[modem] supply able to deliver 2 A peaks? cable ok?");
+          return false;
+        }
+        Serial.println("[modem] no AT reply - probing again...");
+        continue;
+      }
+      silent = 0;
+      Serial.print("[modem] still registering... CSQ=");
+      Serial.print(modem.getSignalQuality());
+      Serial.print(" op=");
+      Serial.println(modem.getOperator());
     }
     delay(600);
   }
   return false;
 }
+
 
 static void pulse_pwrkey() {
   // SIMCom A7670G: hold PWRKEY low for ~1 s to power on/off.
@@ -161,45 +189,60 @@ bool modem_begin() {
   modem.sendAT(GF("+CSCS=\"GSM\""));   modem.waitResponse();
 
   // Report the operator numerically (MCC-MNC) so APN auto-detection (net.cpp)
-  // gets a reliable value instead of depending on whichever format the tower
-  // happened to hand back.
+  // gets a reliable value regardless of the format the tower hands back.
   modem.sendAT(GF("+COPS=3,2")); modem.waitResponse();
 
   log_radio_capabilities();
 
-  // ── Registration ladder ────────────────────────────────────────────
-  // "Auto" (CNMP=2) is SUPPOSED to find any available network, but in the
-  // field a SIMCom module will sometimes fail to camp on a weak 2G cell
-  // because it keeps re-scanning for LTE. The entire promise of this product
-  // is working on the marginal rural networks where often only 2G reaches, so
-  // we do not rely on auto alone: we try auto, then pin each radio technology
-  // explicitly, so a usable 2G cell can never be skipped.
-  //
-  // (An earlier version REMOVED the GSM-only step on the theory that it broke
-  //  a Mobilis SIM. That was a guess and it was wrong: a 2G-only cell needs an
-  //  explicit 2G attempt, and that is exactly the rural case we exist for.)
-  bool registered = try_rat(2,  "auto (any)",    60000UL);
-  if (!registered) registered = try_rat(13, "GSM only (2G)", 45000UL);
-  if (!registered) registered = try_rat(38, "LTE only (4G)", 45000UL);
+  // Survey FIRST. One scan answers "is any network on air here at all?" in
+  // about a minute, instead of only finding out after five minutes of
+  // laddering. In the field this is also what tells an installer whether the
+  // coop simply has no coverage.
+  scan_visible_networks();
 
-  if (!registered) {
-    // Still nothing: a full module reset clears a wedged radio stack.
-    Serial.println("[modem] no RAT registered - full radio reset, one more pass");
+  // ── Registration ladder ────────────────────────────────────────────
+  // Auto SHOULD find any network, but a SIMCom module will happily keep
+  // re-scanning for LTE and never camp on a weak 2G cell - and weak rural 2G
+  // is exactly the case this product exists for. So try auto, then pin each
+  // radio explicitly. Each step is skipped if the modem has gone silent,
+  // because talking to a dead modem proves nothing.
+  bool registered = try_rat(2, "auto (any)", 45000UL);
+  if (!registered && modem_responsive()) registered = try_rat(13, "GSM only (2G)", 45000UL);
+  if (!registered && modem_responsive()) registered = try_rat(38, "LTE only (4G)", 45000UL);
+
+  if (!registered && !modem_responsive()) {
+    // The modem is wedged, not merely unregistered. CFUN=1,1 cannot help - it
+    // needs the command interpreter alive. Cut the power to it instead.
+    Serial.println("[modem] unresponsive - hard PWRKEY power-cycle");
+    pulse_pwrkey();            // off
+    delay(2000);
+    pulse_pwrkey();            // on
+    for (int i = 0; i < 40 && !modem.testAT(1000); i++) { esp_task_wdt_reset(); delay(500); }
+    if (modem_responsive()) {
+      Serial.println("[modem] modem came back after power-cycle");
+      modem.init();
+      modem.sendAT(GF("+CMGF=1"));        modem.waitResponse();
+      modem.sendAT(GF("+CSCS=\"GSM\""));  modem.waitResponse();
+      modem.sendAT(GF("+COPS=3,2"));      modem.waitResponse();
+      registered = try_rat(2, "auto (after power-cycle)", 60000UL);
+    } else {
+      Serial.println("[modem] *** STILL DEAD after power-cycle ***");
+      Serial.println("[modem] this is a POWER or HARDWARE fault, not a network one");
+    }
+  } else if (!registered) {
+    // Modem alive but nothing camped: a full reset gives it one clean scan.
+    Serial.println("[modem] alive but unregistered - full radio reset, one more pass");
     modem.sendAT(GF("+CFUN=1,1"));
-    delay(3000);
-    for (int i = 0; i < 20 && !modem.testAT(1000); i++) { esp_task_wdt_reset(); delay(500); }
+    delay(5000);
+    for (int i = 0; i < 60 && !modem.testAT(1000); i++) { esp_task_wdt_reset(); delay(500); }
     modem.sendAT(GF("+CMGF=1"));        modem.waitResponse();
     modem.sendAT(GF("+CSCS=\"GSM\""));  modem.waitResponse();
     modem.sendAT(GF("+COPS=3,2"));      modem.waitResponse();
-    registered = try_rat(2,  "auto (after reset)",    60000UL);
-    if (!registered) registered = try_rat(13, "GSM only (after reset)", 45000UL);
+    registered = try_rat(2, "auto (after reset)", 60000UL);
+    if (!registered && modem_responsive()) registered = try_rat(13, "GSM only (after reset)", 45000UL);
   }
 
   if (!registered) {
-    // Prove what is actually on air here before blaming the firmware: this
-    // distinguishes "no coverage" from "coverage exists, but on 3G, which
-    // this module has no radio for".
-    scan_visible_networks();
     log_radio_capabilities();
     modem.sendAT(GF("+CNMP=2")); modem.waitResponse();   // leave it on auto
     Serial.println("[modem] network attach FAILED - modem_loop() keeps retrying");
