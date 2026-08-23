@@ -65,6 +65,52 @@ static void pulse_pwrkey() {
   digitalWrite(MODEM_PWRKEY, LOW);
 }
 
+// Log what this radio can actually DO, and what it sees right now.
+// AT+CNMP=? lists the radio modes this module supports: if 14 (WCDMA) is
+// absent then the module has NO 3G at all, which settles once and for all
+// whether a 3G-only cell is even reachable by this hardware. CSQ is a 2G/3G
+// metric and reads 99 while on LTE, so CESQ (RSRP/RSRQ) is logged too.
+static void log_radio_capabilities() {
+  Serial.println("[modem] --- radio capability / current state ---");
+  modem.sendAT(GF("+CNMP=?"));  modem.waitResponse(8000UL);   // supported modes
+  modem.sendAT(GF("+CPSI?"));   modem.waitResponse(8000UL);   // current cell detail
+  modem.sendAT(GF("+CESQ"));    modem.waitResponse(8000UL);   // LTE-aware signal
+  Serial.println("[modem] -------------------------------------------");
+}
+
+// Pin ONE radio access technology, then wait for registration on it.
+static bool try_rat(int mode, const char* label, unsigned long budget_ms) {
+  Serial.print("[modem] trying radio mode ");
+  Serial.print(mode);
+  Serial.print(" - ");
+  Serial.print(label);
+  Serial.print(" - up to ");
+  Serial.print(budget_ms / 1000UL);
+  Serial.println(" s");
+  modem.sendAT(GF("+CNMP="), mode);
+  modem.waitResponse(10000UL);
+  const bool ok = wait_registered(budget_ms);
+  if (ok) {
+    Serial.print("[modem] REGISTERED on ");
+    Serial.println(label);
+    modem.sendAT(GF("+CPSI?")); modem.waitResponse(5000UL);   // which cell + band won
+  }
+  return ok;
+}
+
+// Full network survey: every operator the radio can see, with its access
+// technology. This is the measurement that settles the only question that
+// matters in the field: is there genuinely no coverage here, or is there
+// coverage on a technology this module cannot speak?
+static void scan_visible_networks() {
+  Serial.println("[modem] surveying ALL visible networks - up to 2 min, please wait");
+  esp_task_wdt_reset();
+  modem.sendAT(GF("+COPS=?"));
+  modem.waitResponse(120000UL);
+  esp_task_wdt_reset();
+  Serial.println("[modem] survey done. AcT: 0=GSM(2G)  2=UTRAN(3G)  7=LTE(4G)");
+}
+
 bool modem_begin() {
   Serial.printf("[boot] reset reason: %s\n", reset_reason_str(esp_reset_reason()));
   Serial.println("[modem] enabling power rail…");
@@ -114,47 +160,51 @@ bool modem_begin() {
   modem.sendAT(GF("+CMGF=1"));   modem.waitResponse();
   modem.sendAT(GF("+CSCS=\"GSM\""));   modem.waitResponse();
 
-  // Let the modem use ANY available radio (2G/3G/4G) and auto-pick the best.
-  // 2 = automatic RAT. We deliberately never force a single RAT (e.g.
-  // GSM-only): some Algerian SIMs/plans have 2G DATA disabled by the carrier
-  // even though 2G voice/SMS still works, so forcing 2G-only can turn a SIM
-  // that would have registered fine on auto into one that NEVER gets data —
-  // this was traced as the cause of a real field failure on a Mobilis SIM.
-  modem.sendAT(GF("+CNMP=2"));   modem.waitResponse();
   // Report the operator numerically (MCC-MNC) so APN auto-detection (net.cpp)
   // gets a reliable value instead of depending on whichever format the tower
   // happened to hand back.
   modem.sendAT(GF("+COPS=3,2")); modem.waitResponse();
 
-  // Print signal so we can tell "no coverage" from a SIM/band problem.
-  {
-    int q = modem.getSignalQuality();
-    Serial.printf("[modem] signal CSQ=%d  (%d dBm)\n",
-                  q, (q == 99 ? 0 : -113 + 2 * q));
-  }
+  log_radio_capabilities();
 
-  Serial.println("[modem] waiting for network registration (up to 90 s)…");
-  bool registered = wait_registered(90000UL);
+  // ── Registration ladder ────────────────────────────────────────────
+  // "Auto" (CNMP=2) is SUPPOSED to find any available network, but in the
+  // field a SIMCom module will sometimes fail to camp on a weak 2G cell
+  // because it keeps re-scanning for LTE. The entire promise of this product
+  // is working on the marginal rural networks where often only 2G reaches, so
+  // we do not rely on auto alone: we try auto, then pin each radio technology
+  // explicitly, so a usable 2G cell can never be skipped.
+  //
+  // (An earlier version REMOVED the GSM-only step on the theory that it broke
+  //  a Mobilis SIM. That was a guess and it was wrong: a 2G-only cell needs an
+  //  explicit 2G attempt, and that is exactly the rural case we exist for.)
+  bool registered = try_rat(2,  "auto (any)",    60000UL);
+  if (!registered) registered = try_rat(13, "GSM only (2G)", 45000UL);
+  if (!registered) registered = try_rat(38, "LTE only (4G)", 45000UL);
+
   if (!registered) {
-    // Auto RAT didn't camp in time — a soft radio restart (fresh cell scan)
-    // clears a surprising number of "stuck" registrations, and costs far
-    // less than jumping to a different network mode we haven't verified the
-    // SIM supports.
-    Serial.println("[modem] registration timed out — soft radio restart, retrying once…");
-    modem.sendAT(GF("+CFUN=1,1"));                    // full module reset (per 3GPP TS 27.007)
+    // Still nothing: a full module reset clears a wedged radio stack.
+    Serial.println("[modem] no RAT registered - full radio reset, one more pass");
+    modem.sendAT(GF("+CFUN=1,1"));
     delay(3000);
     for (int i = 0; i < 20 && !modem.testAT(1000); i++) { esp_task_wdt_reset(); delay(500); }
-    // CFUN=1,1 resets the module, so re-apply everything modem_begin() had
-    // already configured — not just the radio mode.
     modem.sendAT(GF("+CMGF=1"));        modem.waitResponse();
     modem.sendAT(GF("+CSCS=\"GSM\""));  modem.waitResponse();
-    modem.sendAT(GF("+CNMP=2"));        modem.waitResponse();
     modem.sendAT(GF("+COPS=3,2"));      modem.waitResponse();
-    registered = wait_registered(90000UL);
+    registered = try_rat(2,  "auto (after reset)",    60000UL);
+    if (!registered) registered = try_rat(13, "GSM only (after reset)", 45000UL);
   }
+
   if (!registered) {
-    Serial.println("[modem] network attach failed after retry — will keep trying in modem_loop()");
+    // Prove what is actually on air here before blaming the firmware: this
+    // distinguishes "no coverage" from "coverage exists, but on 3G, which
+    // this module has no radio for".
+    scan_visible_networks();
+    log_radio_capabilities();
+    modem.sendAT(GF("+CNMP=2")); modem.waitResponse();   // leave it on auto
+    Serial.println("[modem] network attach FAILED - modem_loop() keeps retrying");
   }
+
   s_attached = registered && modem.isNetworkConnected();
   Serial.printf("[modem] attached=%d  operator=%s\n",
                 (int)s_attached, modem.getOperator().c_str());
