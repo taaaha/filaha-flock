@@ -2,6 +2,11 @@
 #include <math.h>
 #include "config.h"
 #include "sensors.h"
+#include "power_logic.h"
+
+// Defined with the power section further down; declared here so sensors_begin()
+// can initialise the detector and run its self-test at boot.
+static void power_begin();
 
 // ── CO₂ + temp + humidity via Sensirion STCC4 (DFRobot Gravity SEN0678) ─
 //    Default I²C address per Sensirion: 0x64. Skipped entirely in TEST_MODE.
@@ -65,6 +70,7 @@ bool sensors_begin() {
   Wire.begin(I2C_SDA, I2C_SCL);
   Wire.setClock(I2C_FREQ_HZ);
   analogReadResolution(12);
+  power_begin();
 
   i2c_scan();   // list everything on the bus (debug the STCC4)
 
@@ -188,97 +194,130 @@ bool sensors_read(SensorReading& out) {
 // the ADC being accurate — only on it being consistent, which it is.
 
 static int           s_last_bat_pct = -1;    // last real cell % (-1 = no battery)
-static bool          s_mains        = true;  // a device is installed plugged in
-static float         s_mains_ref    = 0.0f;  // highest level seen while on mains
-static float         s_anchor_v     = 0.0f;  // trend anchor
-static unsigned long s_anchor_ms    = 0;
 
+#if FILAHA_VBUS_ADC_PIN >= 0
 static float read_pin_v(int pin, float divider) {
   int raw = 0;
   for (int i = 0; i < 3; i++) { raw += analogRead(pin); delay(2); }
   return (raw / 3.0f / 4095.0f) * 3.3f * divider;
 }
+#endif
+
+static PowerState        s_pwr;
+static const PowerTuning s_pwr_tuning = {
+  POWER_DROP_V, POWER_TREND_V, POWER_TREND_WINDOW_MS, POWER_BOOT_GRACE_MS
+};
 
 bool power_is_on_usb() {
 #if FILAHA_VBUS_ADC_PIN >= 0
   // Dedicated charger-presence sense — unambiguous and instant.
-  s_mains = read_pin_v(FILAHA_VBUS_ADC_PIN, 2.0f) > FILAHA_VBUS_MIN_V;
-  return s_mains;
+  s_pwr.mains = read_pin_v(FILAHA_VBUS_ADC_PIN, 2.0f) > FILAHA_VBUS_MIN_V;
+  return s_pwr.mains;
 #else
-  const float         v   = read_vbat();
-  const unsigned long now = millis();
-
-  // Rail dark → no battery fitted, so the charger must be feeding the board.
-  if (v < 0.5f) { s_mains = true; return true; }
-
-  // A device is always plugged in when it is switched on, so whatever the rail
-  // reads during the first moments IS what "mains present" looks like on this
-  // unit — this ADC, this divider, this battery. Learn it instead of assuming.
-  if (now < POWER_BOOT_GRACE_MS) {
-    if (v > s_mains_ref) s_mains_ref = v;
-    s_anchor_v  = v;
-    s_anchor_ms = now;
-    s_mains     = true;
-    return true;
-  }
-
-  // Fast path — a charged cell unplugged falls off the charging plateau at once.
-  if (s_mains && s_mains_ref > 0.0f && v < s_mains_ref - POWER_DROP_V) {
-    s_mains     = false;
-    s_anchor_v  = v;
-    s_anchor_ms = now;
-    return false;
-  }
-
-  // Trend path — works in both directions and needs no calibration.
-  if (s_anchor_v <= 0.0f) { s_anchor_v = v; s_anchor_ms = now; }
-
-  if (v >= s_anchor_v + POWER_TREND_V) {          // charge going in
-    s_mains     = true;
-    s_anchor_v  = v;
-    s_anchor_ms = now;
-  } else if (v <= s_anchor_v - POWER_TREND_V) {   // charge coming out
-    s_mains     = false;
-    s_anchor_v  = v;
-    s_anchor_ms = now;
-  } else if (now - s_anchor_ms > POWER_TREND_WINDOW_MS) {
-    s_anchor_v  = v;                              // flat — open a fresh window
-    s_anchor_ms = now;
-  }
-
-  // The mains reference follows the rail up only, so a long cut cannot drag it
-  // down and mask the next one.
-  if (s_mains && v > s_mains_ref) s_mains_ref = v;
-
-  return s_mains;
+  return power_decide(s_pwr, s_pwr_tuning, read_vbat(), millis());
 #endif
 }
 
 float power_vbat_volts() { return read_vbat(); }
 
-// Bench aid: dump every spare ADC pin plus the detector's own state, so a
-// plug/unplug on the bench shows exactly what this board does. If one of these
-// pins turns out to carry a charger-presence divider, set FILAHA_VBUS_ADC_PIN
-// to it and the heuristic above is bypassed completely.
+// ── Boot self-test ────────────────────────────────────────────────
+// Drives the REAL decision function (power_logic.h) through scripted voltage
+// sequences, including ones that would take hours to reproduce on a bench: a
+// deep discharge followed by a reconnect, which is where an unconsidered
+// reference would oscillate. Runs on its own PowerState, so it cannot disturb
+// the live detector. Prints one line per case; a FAIL means do not ship.
+#if FILAHA_POWER_SELFTEST
+static bool pwr_case(const char* name, const float* volts, const int* expect, int n) {
+  PowerState st;
+  power_state_init(st);
+  const PowerTuning k = { POWER_DROP_V, POWER_TREND_V, POWER_TREND_WINDOW_MS, 0 };
+  unsigned long t = 1;                    // past the (zeroed) boot grace
+  bool pass = true;
+  int  failed_at = -1;
+  for (int i = 0; i < n; i++) {
+    if (i == 0) {                         // seed the reference as boot would
+      st.mains_ref = volts[0];
+      st.anchor_v  = volts[0];
+      st.anchor_ms = t;
+    }
+    const bool got = power_decide(st, k, volts[i], t);
+    if (expect[i] >= 0 && got != (expect[i] != 0)) {
+      if (pass) failed_at = i;
+      pass = false;
+    }
+    t += POWER_POLL_MS;
+  }
+  Serial.print("[pwr-test] ");
+  Serial.print(pass ? "PASS  " : "FAIL  ");
+  Serial.print(name);
+  if (!pass) { Serial.print("   (first wrong verdict at sample "); Serial.print(failed_at); Serial.print(")"); }
+  Serial.println();
+  return pass;
+}
+
+static void power_selftest() {
+  const int M = 1, B = 0, X = -1;         // expect mains / battery / don't care
+
+  // Steady on the charger, with the worst noise excursion seen on a real unit
+  // (4.110 against a 4.121 reference = 11 mV). Must never cry wolf.
+  static const float v1[] = { 4.121f, 4.119f, 4.121f, 4.110f, 4.120f, 4.118f, 4.121f };
+  static const int   e1[] = { M, M, M, M, M, M, M };
+
+  // The charger pulled: the rail steps off the plateau onto the loaded cell.
+  static const float v2[] = { 4.121f, 4.120f, 4.090f, 4.085f, 4.080f };
+  static const int   e2[] = { M, M, B, B, B };
+
+  // Plugged back in with the cell still fairly full — straight back to mains.
+  static const float v3[] = { 4.121f, 4.085f, 4.080f, 4.120f, 4.121f };
+  static const int   e3[] = { M, B, B, M, M };
+
+  // A long cut: the cell drains far below the old plateau and must STAY on
+  // battery the whole way down, never mistaking a slower decline for a charger.
+  static const float v4[] = { 4.121f, 4.080f, 4.000f, 3.900f, 3.820f, 3.760f, 3.700f };
+  static const int   e4[] = { M, B, B, B, B, B, B };
+
+  // Reconnect onto a depleted cell: constant-current charging holds the rail
+  // near the CELL voltage, far below the old plateau, so no step appears — only
+  // a climb. This is the case that oscillates if the reference is not reset.
+  static const float v5[] = { 4.121f, 3.700f, 3.700f, 3.725f, 3.750f, 3.775f, 3.800f, 3.825f };
+  static const int   e5[] = { M, B, B, M, M, M, M, M };
+
+  Serial.println("[pwr-test] verifying the live decision logic…");
+  int ok = 0;
+  ok += pwr_case("steady on charger, worst observed noise", v1, e1, 7);
+  ok += pwr_case("charger pulled -> battery", v2, e2, 5);
+  ok += pwr_case("charger restored (full cell)", v3, e3, 5);
+  ok += pwr_case("long cut, cell draining", v4, e4, 7);
+  ok += pwr_case("reconnect onto a flat cell (no step, only a climb)", v5, e5, 8);
+  Serial.print("[pwr-test] ");
+  Serial.print(ok);
+  Serial.println("/5 passed");
+}
+#endif  // FILAHA_POWER_SELFTEST
+
+static void power_begin() {
+  power_state_init(s_pwr);
+#if FILAHA_POWER_SELFTEST
+  power_selftest();
+#endif
+}
+
+// Bench aid: the detector's own reasoning, one line. The spare-ADC sweep this
+// used to print has done its job — the survey showed pin 33 is simply the 3V3
+// rail while 32/34/36/39 float, so there is no charger-presence pin to find on
+// this revision and the rail itself is the only signal available.
 void power_diag_print() {
 #if FILAHA_POWER_DIAG
-  // Once every few seconds, not on every poll - a line per second buries the
-  // network and telemetry logs it is meant to sit alongside.
   static unsigned long s_last = 0;
   const unsigned long now = millis();
   if (s_last && now - s_last < 4000UL) return;
   s_last = now;
 
-  static const int PINS[] = { 32, 33, 34, 35, 36, 39 };
-  Serial.print("[pwr] ");
-  for (unsigned i = 0; i < sizeof(PINS) / sizeof(PINS[0]); i++) {
-    Serial.print(PINS[i]); Serial.print("=");
-    Serial.print(read_pin_v(PINS[i], 1.0f), 2); Serial.print("V ");
-  }
-  Serial.print("| vbat="); Serial.print(read_vbat(), 3);
-  Serial.print(" ref=");   Serial.print(s_mains_ref, 3);
-  Serial.print(" anchor="); Serial.print(s_anchor_v, 3);
-  Serial.print(" -> ");    Serial.println(s_mains ? "MAINS" : "BATTERY");
+  const float v = read_vbat();
+  Serial.print("[pwr] vbat=");   Serial.print(v, 3);
+  Serial.print(" ref=");         Serial.print(s_pwr.mains_ref, 3);
+  Serial.print(" trip<");        Serial.print(s_pwr.mains_ref - POWER_DROP_V, 3);
+  Serial.print(" -> ");          Serial.println(s_pwr.mains ? "MAINS" : "BATTERY");
 #endif
 }
 

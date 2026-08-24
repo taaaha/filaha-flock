@@ -68,16 +68,23 @@
 
 // ── Power-cut detection (the most safety-critical alert we have) ────
 // How often the mains/battery state is sampled.
-#define POWER_POLL_MS            1000
+#define POWER_POLL_MS            500
 // Consecutive agreeing samples before a change is committed. A single noisy
 // ADC read must never fire a false alarm — nor mask a real one.
-#define POWER_CONFIRM_SAMPLES    5
+#define POWER_CONFIRM_SAMPLES    3
 
 // Mains-vs-battery tuning. See the long comment in sensors.cpp: with a battery
 // permanently fitted the rail voltage is the only signal there is, so the
 // detector works on DIFFERENCES rather than absolute levels — which keeps it
 // immune to the ESP32 ADC's per-chip calibration error.
-#define POWER_DROP_V             0.080f  // fall below the mains high-water mark = cut
+// Measured on a real unit: with the charger connected the rail sits on the
+// charger's constant-voltage plateau at 4.118-4.123 V - stable to about +-5 mV
+// across an hour of normal transmitting. Pulling the charger steps it straight
+// off that plateau onto the cell's loaded voltage in milliseconds, a 25-70 mV
+// fall. So the trigger only has to clear the noise, not wait for the battery to
+// discharge: at 80 mV it took minutes, at 25 mV it fires on the step itself
+// while still sitting 2.5x above the worst sample seen on mains.
+#define POWER_DROP_V             0.025f
 #define POWER_TREND_V            0.020f  // rise/fall that counts as a real direction
 #define POWER_TREND_WINDOW_MS    (120UL * 1000UL)
 
@@ -90,6 +97,13 @@
 // Print every spare ADC pin once a second so a plug/unplug on the bench shows
 // exactly what each one does. Set to 0 for production units.
 #define FILAHA_POWER_DIAG        1
+
+// Run the mains/battery decision logic against scripted voltage sequences at
+// boot and print PASS/FAIL. Costs a few milliseconds once, and proves the
+// shipped logic against cases - a deep discharge and reconnect - that would
+// take hours to reproduce on a bench. Leave it on: a silent regression here
+// means either a missed power cut or an alarm that cries wolf.
+#define FILAHA_POWER_SELFTEST    1
 
 // No power alert may be raised in the first moments after boot: the rail is
 // still settling and the modem has not attached, so anything decided here

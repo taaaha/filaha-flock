@@ -301,19 +301,28 @@ bool modem_recover() {
 bool modem_place_call(const char* number, unsigned long ring_ms) {
   if (!s_attached) {
     s_attached = modem.isNetworkConnected();
-    if (!s_attached) { Serial.println("[call] skipped — not attached"); return false; }
+    if (!s_attached) { Serial.println("[call] skipped - not attached"); return false; }
   }
   // ATD<number>;  — the trailing ';' requests a VOICE call (not data).
-  Serial.printf("[call] dialing %s …\n", number);
+  Serial.print("[call] dialing "); Serial.println(number);
   modem.sendAT(String("D") + number + ";");
   const bool ok = (modem.waitResponse(15000UL) == 1);
-  Serial.printf("[call] dial %s\n", ok ? "accepted" : "REJECTED (module may be data-only)");
-  if (ok) {
-    delay(ring_ms);                 // let it ring so the farmer notices
-    modem.sendAT("H");              // ATH — hang up; the missed call is the alert
-    modem.waitResponse(5000UL);
+  Serial.print("[call] dial ");
+  Serial.println(ok ? "accepted - ringing" : "REJECTED (module may be data-only)");
+  if (!ok) return false;
+
+  // Ring in short slices rather than one long delay(). A 20 s blocking wait
+  // stalls the entire loop — no telemetry, and no power sampling during exactly
+  // the emergency the farmer is being rung about. Feeding the watchdog here
+  // also stops a slow network from looking like a hung loop.
+  const unsigned long until = millis() + ring_ms;
+  while ((long)(millis() - until) < 0) {
+    esp_task_wdt_reset();
+    delay(200);
   }
-  return ok;
+  modem.sendAT("H");              // ATH — hang up; the missed call IS the alert
+  modem.waitResponse(5000UL);
+  return true;
 }
 
 // ── SMS ───────────────────────────────────────────────────────────
