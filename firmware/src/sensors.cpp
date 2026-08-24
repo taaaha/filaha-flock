@@ -262,6 +262,13 @@ float power_vbat_volts() { return read_vbat(); }
 // to it and the heuristic above is bypassed completely.
 void power_diag_print() {
 #if FILAHA_POWER_DIAG
+  // Once every few seconds, not on every poll - a line per second buries the
+  // network and telemetry logs it is meant to sit alongside.
+  static unsigned long s_last = 0;
+  const unsigned long now = millis();
+  if (s_last && now - s_last < 4000UL) return;
+  s_last = now;
+
   static const int PINS[] = { 32, 33, 34, 35, 36, 39 };
   Serial.print("[pwr] ");
   for (unsigned i = 0; i < sizeof(PINS) / sizeof(PINS[0]); i++) {
