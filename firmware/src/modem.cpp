@@ -316,31 +316,98 @@ bool modem_place_call(const char* number, unsigned long ring_ms) {
   return ok;
 }
 
-bool modem_send_sms_u16(const char* number, const char16_t* text, size_t len) {
-  if (!s_attached) {
-    s_attached = modem.isNetworkConnected();
-    if (!s_attached) {
-      Serial.println("[sms] skipped - not attached");
-      return false;
-    }
-  }
-  Serial.print("[sms] -> ");
-  Serial.print(number);
-  Serial.print("  (unicode, ");
-  Serial.print((unsigned)len);
-  Serial.println(" chars)");
+// ── SMS ───────────────────────────────────────────────────────────
+// Two independent paths, because a farmer whose power dies at 2 a.m. must get
+// a message even when the fancy one fails:
+//
+//   1. UCS2 (Unicode) — the only encoding that carries Arabic intact. Written
+//      by hand against the SIMCom AT spec. TinyGSM's sendSMS_UTF16() issues
+//      AT+CSCS="HEX", which the A7670 does not implement: it answers ERROR,
+//      TinyGSM ignores that, the hex digits then travel as literal text under
+//      DCS=8 and every send dies with +CMS ERROR. In UCS2 charset the
+//      DESTINATION NUMBER is hex as well — "+213…" must be encoded like the
+//      body, which is the other half of what went wrong.
+//   2. GSM 7-bit — plain Latin, understood by every modem ever built. Used
+//      automatically whenever path 1 fails, so the lifeline is never silent.
 
-  const bool ok = modem.sendSMS_UTF16(number,
-                                      reinterpret_cast<const uint16_t*>(text),
-                                      len);
+static void put_hex16(uint16_t v) {
+  static const char H[] = "0123456789ABCDEF";
+  MODEM_SERIAL.write(H[(v >> 12) & 0xF]);
+  MODEM_SERIAL.write(H[(v >>  8) & 0xF]);
+  MODEM_SERIAL.write(H[(v >>  4) & 0xF]);
+  MODEM_SERIAL.write(H[ v        & 0xF]);
+}
 
-  // sendSMS_UTF16 leaves the modem in HEX charset / UCS2 data-coding. Put it
-  // back so any later plain-text AT work behaves predictably.
-  modem.sendAT(GF("+CSCS=\"GSM\""));   modem.waitResponse(3000UL);
+static bool sms_ready() {
+  if (s_attached) return true;
+  s_attached = modem.isNetworkConnected();
+  if (!s_attached) Serial.println("[sms] skipped - not attached to a network yet");
+  return s_attached;
+}
+
+// Leave the modem in the plain-text state the rest of the firmware expects.
+static void sms_charset_gsm() {
+  modem.sendAT(GF("+CSCS=\"GSM\""));    modem.waitResponse(3000UL);
   modem.sendAT(GF("+CSMP=17,167,0,0")); modem.waitResponse(3000UL);
+}
 
-  Serial.print("[sms] result: ");
-  Serial.println(ok ? "sent" : "FAILED");
+bool modem_send_sms_ascii(const char* number, const char* text) {
+  if (!sms_ready()) return false;
+  Serial.print("[sms] -> "); Serial.print(number);
+  Serial.print("  (GSM) "); Serial.println(text);
+
+  modem.sendAT(GF("+CMGF=1"));
+  modem.waitResponse(3000UL);
+  sms_charset_gsm();
+  modem.sendAT(GF("+CMGS=\""), number, GF("\""));
+  if (modem.waitResponse(10000UL, GF(">")) != 1) {
+    Serial.println("[sms] no '>' prompt — send aborted");
+    return false;
+  }
+  MODEM_SERIAL.print(text);
+  MODEM_SERIAL.write((char)0x1A);
+  MODEM_SERIAL.flush();
+  const bool ok = modem.waitResponse(60000UL) == 1;
+  Serial.print("[sms] result: "); Serial.println(ok ? "SENT" : "FAILED");
+  return ok;
+}
+
+bool modem_send_sms_u16(const char* number, const char16_t* text, size_t len) {
+  if (!sms_ready()) return false;
+  // One UCS2 SMS carries 140 octets = 70 UTF-16 code units, and the A7670 will
+  // not concatenate for us in text mode. The builders in format.cpp stay inside
+  // that budget; this clamp is the last line of defence.
+  if (len > 70) len = 70;
+
+  Serial.print("[sms] -> "); Serial.print(number);
+  Serial.print("  (UCS2, "); Serial.print((unsigned)len); Serial.println(" chars)");
+
+  modem.sendAT(GF("+CMGF=1"));                       // text mode
+  modem.waitResponse(3000UL);
+  modem.sendAT(GF("+CSCS=\"UCS2\""));                // NOT "HEX" — see above
+  if (modem.waitResponse(3000UL) != 1) {
+    Serial.println("[sms] modem refused the UCS2 charset");
+    sms_charset_gsm();
+    return false;
+  }
+  modem.sendAT(GF("+CSMP=17,167,0,8"));              // DCS 8 = UCS2 body
+  modem.waitResponse(3000UL);
+
+  MODEM_SERIAL.print("AT+CMGS=\"");
+  for (const char* p = number; *p; ++p) put_hex16((uint8_t)*p);
+  MODEM_SERIAL.print("\"\r\n");
+  if (modem.waitResponse(10000UL, GF(">")) != 1) {
+    Serial.println("[sms] no '>' prompt — send aborted");
+    sms_charset_gsm();
+    return false;
+  }
+  for (size_t i = 0; i < len; i++) put_hex16((uint16_t)text[i]);
+  MODEM_SERIAL.write((char)0x1A);
+  MODEM_SERIAL.flush();
+
+  const bool ok = modem.waitResponse(60000UL) == 1;
+  sms_charset_gsm();
+  Serial.print("[sms] result: "); Serial.println(ok ? "SENT" : "FAILED");
   return ok;
 }
 

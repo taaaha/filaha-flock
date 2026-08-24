@@ -154,6 +154,21 @@ static void outbox_pop() {
   s_box_tries = 0;
 }
 
+// Render one queued message in the requested language. Kept separate from the
+// send path so the plain-Latin fallback can rebuild the very same alert in
+// French when the Unicode attempt is refused.
+static size_t build_sms(char16_t* body, const OutMsg& m, int lang) {
+  switch (m.kind) {
+    case MK_PWR_OUT:  return filaha_sms_power_cut (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.bat, lang);
+    case MK_PWR_IN:   return filaha_sms_power_back(body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.bat, lang);
+    case MK_DANGER:   return filaha_sms_danger    (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.danger, m.value, lang);
+    case MK_TEST:     return filaha_sms_test      (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, lang);
+    case MK_SHUTDOWN: return filaha_sms_shutdown  (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, lang);
+    case MK_DAILY:    return filaha_sms_daily     (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.reading, lang);
+  }
+  return 0;
+}
+
 static void outbox_service() {
   if (s_box_count == 0) return;
   const unsigned long now = millis();
@@ -162,26 +177,25 @@ static void outbox_service() {
 
   const OutMsg& m = s_box[s_box_head];
   char16_t body[FILAHA_SMS_MAX_U16];
-  size_t   len = 0;
-
-  switch (m.kind) {
-    case MK_PWR_OUT:
-      len = filaha_sms_power_cut (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.bat, FILAHA_SMS_LANG); break;
-    case MK_PWR_IN:
-      len = filaha_sms_power_back(body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.bat, FILAHA_SMS_LANG); break;
-    case MK_DANGER:
-      len = filaha_sms_danger    (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.danger, m.value, FILAHA_SMS_LANG); break;
-    case MK_TEST:
-      len = filaha_sms_test      (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, FILAHA_SMS_LANG); break;
-    case MK_SHUTDOWN:
-      len = filaha_sms_shutdown  (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, FILAHA_SMS_LANG); break;
-    case MK_DAILY:
-      len = filaha_sms_daily     (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.reading, FILAHA_SMS_LANG); break;
-  }
+  const size_t len = build_sms(body, m, FILAHA_SMS_LANG);
   if (len == 0) { outbox_pop(); return; }
 
 #if CRITICAL_SMS_ENABLED
-  if (!modem_send_sms_u16(FILAHA_FARMER_NUMBER, body, len)) {
+  // Unicode first — Arabic survives no other way. If the modem or the network
+  // refuses it, immediately retry the same alert in plain-Latin French over
+  // GSM 7-bit. A warning must never be lost to an encoding problem.
+  bool sent = modem_send_sms_u16(FILAHA_FARMER_NUMBER, body, len);
+  if (!sent) {
+    char16_t fb[FILAHA_SMS_MAX_U16];
+    const size_t fl = build_sms(fb, m, FILAHA_LANG_FR);
+    if (fl) {
+      char ascii[FILAHA_SMS_MAX_U16 + 1];
+      filaha_u16_to_ascii(fb, fl, ascii, sizeof ascii);
+      Serial.println("[sms] unicode path failed — retrying in plain French");
+      sent = modem_send_sms_ascii(FILAHA_FARMER_NUMBER, ascii);
+    }
+  }
+  if (!sent) {
     if (++s_box_tries >= PENDING_MAX_TRIES) {
       Serial.println("[sms] giving up on this message after repeated failures");
       outbox_pop();
@@ -286,6 +300,12 @@ static void check_power_transition() {
   s_last_power_check_ms = now;
 
   const bool on_usb = power_is_on_usb();
+  power_diag_print();               // no-op unless FILAHA_POWER_DIAG is 1
+
+  // The rail is still settling just after boot and the modem has not attached
+  // yet, so anything decided in this window is a guess. Adopt what we see as
+  // the baseline rather than alarming on it.
+  if (now < POWER_BOOT_GRACE_MS) { s_was_on_usb = on_usb; return; }
 
   // Debounce: require N consecutive agreeing samples before committing a
   // change, so one noisy ADC read can neither raise a false alarm nor (worse)

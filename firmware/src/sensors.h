@@ -15,3 +15,5 @@ int  power_battery_pct();                   // 0..100 estimate, or -1 if unknown
 // settle once the charger is pulled, so this retries briefly instead of
 // returning the "unknown" (-1) that a single immediate read often gives.
 int  power_battery_pct_settled();
+float power_vbat_volts();                   // raw rail voltage (logging/diagnostics)
+void  power_diag_print();                   // bench aid: dump spare ADC pins

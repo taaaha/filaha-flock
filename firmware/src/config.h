@@ -71,7 +71,30 @@
 #define POWER_POLL_MS            1000
 // Consecutive agreeing samples before a change is committed. A single noisy
 // ADC read must never fire a false alarm — nor mask a real one.
-#define POWER_CONFIRM_SAMPLES    2
+#define POWER_CONFIRM_SAMPLES    5
+
+// Mains-vs-battery tuning. See the long comment in sensors.cpp: with a battery
+// permanently fitted the rail voltage is the only signal there is, so the
+// detector works on DIFFERENCES rather than absolute levels — which keeps it
+// immune to the ESP32 ADC's per-chip calibration error.
+#define POWER_DROP_V             0.080f  // fall below the mains high-water mark = cut
+#define POWER_TREND_V            0.020f  // rise/fall that counts as a real direction
+#define POWER_TREND_WINDOW_MS    (120UL * 1000UL)
+
+// If a board revision routes VBUS/charger-presence to a spare ADC pin, put it
+// here and it replaces the heuristic with an instant, unambiguous read.
+// -1 = no such pin on this board.
+#define FILAHA_VBUS_ADC_PIN      -1
+#define FILAHA_VBUS_MIN_V        0.6f
+
+// Print every spare ADC pin once a second so a plug/unplug on the bench shows
+// exactly what each one does. Set to 0 for production units.
+#define FILAHA_POWER_DIAG        1
+
+// No power alert may be raised in the first moments after boot: the rail is
+// still settling and the modem has not attached, so anything decided here
+// would be a guess.
+#define POWER_BOOT_GRACE_MS      (60UL * 1000UL)
 // A power alert MUST reach the farmer, so it is queued and retried until the
 // modem accepts it (survives boot-time registration and network gaps).
 #define PENDING_RETRY_MS         (20UL * 1000UL)

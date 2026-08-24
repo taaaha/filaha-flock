@@ -156,30 +156,137 @@ bool sensors_read(SensorReading& out) {
   return true;
 }
 
-// Hardware truth (verified on this unit): the battery-sense divider only sees
-// the cell while it is DISCHARGING. With USB/charger plugged in, the sense
-// node reads ~0 V. So the signal is INVERTED but reliable:
-//   vbat ≈ 0 V           → external power is feeding the board (USB in)
-//   vbat in 3.0–4.2 V    → running on the battery
-static int s_last_bat_pct = -1;   // last % measured while on battery (-1 = never)
+// ── Mains vs battery ──────────────────────────────────────────────
+// The most safety-critical signal in the product, and it has been wrong twice,
+// so this time it is built on something that cannot drift.
+//
+// The board offers ONE analog node: BATTERY_ADC_PIN, a divider on the BAT rail.
+// With a battery permanently fitted — the normal installation — that node reads
+// 3.3–4.2 V whether or not the charger is connected. v1.0.0 assumed a low
+// reading meant "on battery", so with a battery always fitted it declared a
+// power cut forever.
+//
+// Absolute thresholds cannot fix that either: the ESP32's SAR ADC is nonlinear
+// and under-reads by an amount that varies chip to chip, so "4.13 V means
+// charging" is only ever a guess about a particular unit.
+//
+// What IS reliable is the DIRECTION the rail moves, because every unit's error
+// cancels out of a difference:
+//
+//   • Rising  → something is pushing charge in. Only the charger does that.
+//   • Falling → the cell is being drained. Only happens off mains.
+//   • Flat    → topped off on the charger (constant-voltage), or briefly
+//               ambiguous. Either way: hold the last known state, never invent
+//               a transition.
+//
+// A second, faster path covers the common case: a full battery unplugged from
+// the charger drops away from the charging plateau immediately, so a fall of
+// POWER_DROP_V below the highest level ever seen on mains is treated as a cut
+// at once, without waiting for the trend window.
+//
+// Both tests are differences against a learned reference, so neither depends on
+// the ADC being accurate — only on it being consistent, which it is.
+
+static int           s_last_bat_pct = -1;    // last real cell % (-1 = no battery)
+static bool          s_mains        = true;  // a device is installed plugged in
+static float         s_mains_ref    = 0.0f;  // highest level seen while on mains
+static float         s_anchor_v     = 0.0f;  // trend anchor
+static unsigned long s_anchor_ms    = 0;
+
+static float read_pin_v(int pin, float divider) {
+  int raw = 0;
+  for (int i = 0; i < 3; i++) { raw += analogRead(pin); delay(2); }
+  return (raw / 3.0f / 4095.0f) * 3.3f * divider;
+}
 
 bool power_is_on_usb() {
-  return read_vbat() < 0.5f;
+#if FILAHA_VBUS_ADC_PIN >= 0
+  // Dedicated charger-presence sense — unambiguous and instant.
+  s_mains = read_pin_v(FILAHA_VBUS_ADC_PIN, 2.0f) > FILAHA_VBUS_MIN_V;
+  return s_mains;
+#else
+  const float         v   = read_vbat();
+  const unsigned long now = millis();
+
+  // Rail dark → no battery fitted, so the charger must be feeding the board.
+  if (v < 0.5f) { s_mains = true; return true; }
+
+  // A device is always plugged in when it is switched on, so whatever the rail
+  // reads during the first moments IS what "mains present" looks like on this
+  // unit — this ADC, this divider, this battery. Learn it instead of assuming.
+  if (now < POWER_BOOT_GRACE_MS) {
+    if (v > s_mains_ref) s_mains_ref = v;
+    s_anchor_v  = v;
+    s_anchor_ms = now;
+    s_mains     = true;
+    return true;
+  }
+
+  // Fast path — a charged cell unplugged falls off the charging plateau at once.
+  if (s_mains && s_mains_ref > 0.0f && v < s_mains_ref - POWER_DROP_V) {
+    s_mains     = false;
+    s_anchor_v  = v;
+    s_anchor_ms = now;
+    return false;
+  }
+
+  // Trend path — works in both directions and needs no calibration.
+  if (s_anchor_v <= 0.0f) { s_anchor_v = v; s_anchor_ms = now; }
+
+  if (v >= s_anchor_v + POWER_TREND_V) {          // charge going in
+    s_mains     = true;
+    s_anchor_v  = v;
+    s_anchor_ms = now;
+  } else if (v <= s_anchor_v - POWER_TREND_V) {   // charge coming out
+    s_mains     = false;
+    s_anchor_v  = v;
+    s_anchor_ms = now;
+  } else if (now - s_anchor_ms > POWER_TREND_WINDOW_MS) {
+    s_anchor_v  = v;                              // flat — open a fresh window
+    s_anchor_ms = now;
+  }
+
+  // The mains reference follows the rail up only, so a long cut cannot drag it
+  // down and mask the next one.
+  if (s_mains && v > s_mains_ref) s_mains_ref = v;
+
+  return s_mains;
+#endif
+}
+
+float power_vbat_volts() { return read_vbat(); }
+
+// Bench aid: dump every spare ADC pin plus the detector's own state, so a
+// plug/unplug on the bench shows exactly what this board does. If one of these
+// pins turns out to carry a charger-presence divider, set FILAHA_VBUS_ADC_PIN
+// to it and the heuristic above is bypassed completely.
+void power_diag_print() {
+#if FILAHA_POWER_DIAG
+  static const int PINS[] = { 32, 33, 34, 35, 36, 39 };
+  Serial.print("[pwr] ");
+  for (unsigned i = 0; i < sizeof(PINS) / sizeof(PINS[0]); i++) {
+    Serial.print(PINS[i]); Serial.print("=");
+    Serial.print(read_pin_v(PINS[i], 1.0f), 2); Serial.print("V ");
+  }
+  Serial.print("| vbat="); Serial.print(read_vbat(), 3);
+  Serial.print(" ref=");   Serial.print(s_mains_ref, 3);
+  Serial.print(" anchor="); Serial.print(s_anchor_v, 3);
+  Serial.print(" -> ");    Serial.println(s_mains ? "MAINS" : "BATTERY");
+#endif
 }
 
 int power_battery_pct() {
   const float v = read_vbat();
-  if (v >= 2.5f) {                       // discharging → a real measurement
+  if (v >= 2.5f) {                     // a real cell is present and measurable
     s_last_bat_pct = vbat_to_pct(v);
     return s_last_bat_pct;
   }
-  return s_last_bat_pct;                 // on USB: sense is dark → last known
+  return -1;                           // genuinely no battery fitted
 }
 
 int power_battery_pct_settled() {
-  // Right after the charger is pulled the rail takes a beat to stabilise, so
-  // a single read often lands below the "real measurement" floor and returns
-  // -1 (unknown). Retry for ~300 ms before accepting that.
+  // Just after the charger is pulled the rail takes a beat to settle, so a
+  // single read can land below the measurable floor. Retry for ~300 ms.
   for (int i = 0; i < 6; i++) {
     const float v = read_vbat();
     if (v >= 2.5f) {
@@ -188,5 +295,5 @@ int power_battery_pct_settled() {
     }
     delay(50);
   }
-  return s_last_bat_pct;                 // still unknown → genuinely no battery
+  return s_last_bat_pct;
 }

@@ -11,6 +11,10 @@ bool modem_is_network_attached();
 // intact - the GSM 7-bit alphabet simply cannot represent Arabic letters.
 // `text` is UTF-16 and `len` is the number of code units (see format.h).
 bool modem_send_sms_u16(const char* number, const char16_t* text, size_t len);
+// Plain GSM 7-bit send (Latin only). This path works on every modem and is
+// used automatically when the Unicode path fails, so an alert can never be
+// lost just because the fancy encoding misbehaved on a particular network.
+bool modem_send_sms_ascii(const char* number, const char* text);
 void modem_loop();                                        // periodic housekeeping
 int  modem_rssi_dbm();                                    // signal strength (0 if unknown)
 

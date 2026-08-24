@@ -50,3 +50,9 @@ size_t filaha_sms_daily(char16_t* out, size_t cap, const char* device_id,
                         const SensorReading& r, int lang);
 size_t filaha_sms_test(char16_t* out, size_t cap, const char* device_id, int lang);
 size_t filaha_sms_shutdown(char16_t* out, size_t cap, const char* device_id, int lang);
+
+// Flatten a UTF-16 message into plain ASCII for the GSM 7-bit fallback path.
+// Anything outside ASCII becomes '?' — which is why the fallback is always
+// built from the FRENCH text, deliberately written without accents so it
+// survives this trip unchanged. Returns the number of chars written.
+size_t filaha_u16_to_ascii(const char16_t* in, size_t len, char* out, size_t cap);

@@ -170,3 +170,13 @@ size_t filaha_sms_shutdown(char16_t* out, size_t cap, const char* device_id, int
   }
   return s.n;
 }
+
+size_t filaha_u16_to_ascii(const char16_t* in, size_t len, char* out, size_t cap) {
+  size_t n = 0;
+  for (size_t i = 0; i < len && n + 1 < cap; i++) {
+    const char16_t ch = in[i];
+    out[n++] = (ch >= 0x20 && ch < 0x7F) ? (char)ch : '?';
+  }
+  out[n] = 0;
+  return n;
+}
