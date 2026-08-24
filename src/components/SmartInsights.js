@@ -38,7 +38,7 @@ function InsightCard({ ins, t, onPress, styles }) {
         </View>
       </View>
 
-      <Text style={styles.cardBody}>{ins.body}</Text>
+      <Text style={styles.cardBody} numberOfLines={4}>{ins.body}</Text>
 
       {actionable ? (
         <View style={[styles.cta, { backgroundColor: tint + '14', borderColor: tint + '40' }]}>
