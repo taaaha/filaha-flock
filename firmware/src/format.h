@@ -1,7 +1,13 @@
 // ════════════════════════════════════════════════════════════════
-//  format.h — FILAHA SMS encoding
-//  Produces strings that match the app's parser BYTE-FOR-BYTE.
-//  Keep in lockstep with src/utils/smsParser.js on the app side.
+//  format.h — the messages the farmer actually reads
+//
+//  Every SMS this device sends is written for a farmer, not an
+//  engineer: short, plain words, no jargon, no codes to decode.
+//
+//  Messages are built as UTF-16 so they can be sent as Unicode (UCS2)
+//  SMS, which is the only way Arabic survives the trip. A Unicode SMS
+//  carries 70 CHARACTERS, not 160 - so every template below is written
+//  to fit well inside that. Keep new messages short for the same reason.
 // ════════════════════════════════════════════════════════════════
 #pragma once
 #include <Arduino.h>
@@ -14,27 +20,33 @@ struct SensorReading {
   bool   has_bat;   int   bat_pct;
 };
 
-// "FILAHA|DEV01|CO2:850|NH3:4.2|T:28.4|H:60|BAT:87|OK"
-// Fields are omitted when their `has_*` flag is false.
-String filaha_data_sms(const char* device_id, const SensorReading& r);
+// Farmer-facing SMS language (set FILAHA_SMS_LANG in config.h).
+#define FILAHA_LANG_AR 0
+#define FILAHA_LANG_FR 1
 
-// "FILAHA|DEV01|ALERT|<payload>"
-String filaha_alert_sms(const char* device_id, const String& payload);
+// A Unicode SMS holds 70 characters. Buffers are sized with a little slack.
+#define FILAHA_SMS_MAX_U16 80
 
-// "FILAHA|DEV01|CLEAR|<payload>"
-String filaha_clear_sms(const char* device_id, const String& payload);
+// What went wrong, kept language-neutral so the wording is chosen at send
+// time rather than baked in when the danger is detected.
+enum FilahaDanger {
+  FD_CO2_HIGH = 0,
+  FD_NH3_HIGH,
+  FD_TEMP_HIGH,
+  FD_TEMP_LOW,
+  FD_HUM_HIGH,
+  FD_HUM_LOW,
+};
 
-// Common payload builders:
-String alert_payload_sensor(const char* key, float value, const char* unit);
-String alert_payload_power_cut();          // assembles "POWER_CUT|running on battery"
-
-// ── Human-readable SMS (NEW path) — the farmer reads these with their eyes;
-//    the app never parses SMS anymore (Google Play forbids READ_SMS). ASCII
-//    only, so they encode cleanly in the GSM 7-bit charset.
-String filaha_critical_sms(const char* device_id, const char* what,
-                           float value, const char* unit);
-String filaha_heartbeat_sms(const char* device_id, const SensorReading& r);
-
-// "FILAHA [DEV01] Courant retabli. Batterie 82%." — sent once when mains
-// power comes back after a cut, so the farmer knows the outage is over.
-String filaha_power_restored_sms(const char* device_id, int bat_pct);
+// Each builder writes UTF-16 code units into `out` and returns how many it
+// wrote. None of them ever overflow `cap`.
+size_t filaha_sms_danger(char16_t* out, size_t cap, const char* device_id,
+                         FilahaDanger kind, float value, int lang);
+size_t filaha_sms_power_cut(char16_t* out, size_t cap, const char* device_id,
+                            int bat_pct, int lang);
+size_t filaha_sms_power_back(char16_t* out, size_t cap, const char* device_id,
+                             int bat_pct, int lang);
+size_t filaha_sms_daily(char16_t* out, size_t cap, const char* device_id,
+                        const SensorReading& r, int lang);
+size_t filaha_sms_test(char16_t* out, size_t cap, const char* device_id, int lang);
+size_t filaha_sms_shutdown(char16_t* out, size_t cap, const char* device_id, int lang);

@@ -7,7 +7,10 @@
 
 bool modem_begin();                                       // power, init, network attach
 bool modem_is_network_attached();
-bool modem_send_sms(const char* number, const String& body);
+// Send a Unicode (UCS2) SMS. This is the ONLY way Arabic reaches the phone
+// intact - the GSM 7-bit alphabet simply cannot represent Arabic letters.
+// `text` is UTF-16 and `len` is the number of code units (see format.h).
+bool modem_send_sms_u16(const char* number, const char16_t* text, size_t len);
 void modem_loop();                                        // periodic housekeeping
 int  modem_rssi_dbm();                                    // signal strength (0 if unknown)
 

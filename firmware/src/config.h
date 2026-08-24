@@ -11,6 +11,12 @@
 // The Djezzy / farmer SIM running the Filaha Flock app (intl. format).
 #define FILAHA_FARMER_NUMBER     "+213781103304"
 
+// Language of every SMS the DEVICE sends to the farmer.
+//   FILAHA_LANG_AR = Arabic   (sent as Unicode/UCS2)
+//   FILAHA_LANG_FR = French
+// Set this per unit to match the farmer who will read the messages.
+#define FILAHA_SMS_LANG          FILAHA_LANG_AR
+
 // SIM PIN — leave empty "" if your SIM has no PIN, or you've already
 // removed it via a normal phone. If Djezzy gave you a PIN, put it here.
 #define FILAHA_SIM_PIN           ""
@@ -51,6 +57,14 @@
 // command hangs on a dying network), the ESP32 reboots itself. Essential for
 // an unattended box in a remote coop.
 #define WATCHDOG_TIMEOUT_S       180
+
+// ── Self-healing escalation ────────────────────────────────────────
+// An unattended box in a remote coop must recover without a human. If no
+// reading has reached the cloud for this long, rebuild the modem link; if it
+// is STILL silent after the second threshold, reboot the whole board. Both
+// are generous enough never to fire during normal weak-signal operation.
+#define NET_STALE_RECOVER_MS     (10UL * 60UL * 1000UL)
+#define NET_STALE_REBOOT_MS      (30UL * 60UL * 1000UL)
 
 // ── Power-cut detection (the most safety-critical alert we have) ────
 // How often the mains/battery state is sampled.
@@ -139,6 +153,7 @@
 // Flip to 0 the moment your real STCC4 is connected.
 #define FILAHA_TEST_MODE         0
 
-// Pipe every modem AT command through Serial for debugging.
-// Set to 0 for a slightly tighter production loop once the unit is happy.
-#define FILAHA_MODEM_DEBUG       1
+// Pipe every modem AT command through Serial. Invaluable while bringing a
+// unit up, and unreadable in production - it buries the real status lines
+// under thousands of AT echoes. Ship at 0; set to 1 only to debug a unit.
+#define FILAHA_MODEM_DEBUG       0

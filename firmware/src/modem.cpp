@@ -316,18 +316,31 @@ bool modem_place_call(const char* number, unsigned long ring_ms) {
   return ok;
 }
 
-bool modem_send_sms(const char* number, const String& body) {
+bool modem_send_sms_u16(const char* number, const char16_t* text, size_t len) {
   if (!s_attached) {
-    // Try a quick re-attach before giving up — networks drop and come back.
     s_attached = modem.isNetworkConnected();
     if (!s_attached) {
-      Serial.println("[sms] skipped — not attached");
+      Serial.println("[sms] skipped - not attached");
       return false;
     }
   }
-  Serial.printf("[sms] → %s  body=%s\n", number, body.c_str());
-  const bool ok = modem.sendSMS(number, body);
-  Serial.printf("[sms] result: %s\n", ok ? "OK" : "FAIL");
+  Serial.print("[sms] -> ");
+  Serial.print(number);
+  Serial.print("  (unicode, ");
+  Serial.print((unsigned)len);
+  Serial.println(" chars)");
+
+  const bool ok = modem.sendSMS_UTF16(number,
+                                      reinterpret_cast<const uint16_t*>(text),
+                                      len);
+
+  // sendSMS_UTF16 leaves the modem in HEX charset / UCS2 data-coding. Put it
+  // back so any later plain-text AT work behaves predictably.
+  modem.sendAT(GF("+CSCS=\"GSM\""));   modem.waitResponse(3000UL);
+  modem.sendAT(GF("+CSMP=17,167,0,0")); modem.waitResponse(3000UL);
+
+  Serial.print("[sms] result: ");
+  Serial.println(ok ? "sent" : "FAILED");
   return ok;
 }
 

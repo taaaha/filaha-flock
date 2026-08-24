@@ -1,16 +1,16 @@
 // ════════════════════════════════════════════════════════════════
 //  Filaha Flock — firmware entry point  (data + hybrid-SMS architecture)
 //
-//  Loop:
-//   1. read STCC4 (+ MiCS when flagged) + battery
-//   2. pack 5 metrics into 8 bytes, PUBLISH over MQTT (2G data) every 60 s
-//   3. on confirmed danger → human-readable emergency SMS + ring the farmer
-//   4. once a day (HEARTBEAT_HOUR) → one plain-text report SMS
-//   5. watch USB → battery transitions → POWER_CUT SMS
+//  Every cycle it reads the sensors, publishes an 8-byte packet to the cloud
+//  over the mobile network, and checks for danger and for mains power loss.
 //
-//  SMS/calls originate from the DEVICE and are read by the farmer directly.
-//  The app no longer reads SMS (Google Play forbids it) — it pulls data from
-//  the cloud REST API instead.
+//  Two independent paths reach the farmer:
+//    - CLOUD  : telemetry -> MQTT -> server -> the phone app (needs data)
+//    - DIRECT : SMS + voice call straight from this device (needs NO internet)
+//  The direct path is the safety lifeline and is never fire-and-forget: every
+//  critical message is queued in the outbox and retried until it is delivered.
+//
+//  Messages are written in the farmer's own language (see FILAHA_SMS_LANG).
 // ════════════════════════════════════════════════════════════════
 #include <Arduino.h>
 extern "C" {
@@ -36,6 +36,10 @@ static int           s_streak_co2          = 0;
 static int           s_streak_nh3          = 0;
 static int           s_streak_temp         = 0;
 static int           s_streak_hum          = 0;
+// Self-healing bookkeeping (see self_heal_tick below). Declared here because
+// setup() seeds the grace period before the function itself is defined.
+static unsigned long s_last_cloud_ok_ms    = 0;
+static unsigned long s_last_recover_ms     = 0;
 
 // ── Boot banner ──────────────────────────────────────────────────
 static void log_banner() {
@@ -52,7 +56,17 @@ static void log_banner() {
 #else
   Serial.println(  "  NH3 sensor:  disabled (flip FILAHA_HAS_NH3 when MiCS arrives)");
 #endif
+  Serial.print   (  "  SMS lang  :  ");
+  Serial.println (FILAHA_SMS_LANG == FILAHA_LANG_AR ? "Arabic" : "French");
   Serial.println(F("──────────────────────────────────────────────"));
+
+  // Catch the two deployment mistakes that silently break a unit in the field.
+  if (sizeof(FILAHA_MQTT_PASS) <= 1) {
+    Serial.println("  !! MQTT password is empty - this unit cannot reach the cloud");
+  }
+  if (FILAHA_FARMER_NUMBER[0] != '+') {
+    Serial.println("  !! Farmer number is not in +countrycode form - SMS/calls may fail");
+  }
 }
 
 void setup() {
@@ -90,130 +104,180 @@ void setup() {
     Serial.println("[boot] net_begin (GPRS+MQTT) not up yet — net_loop() will retry");
   }
 
+  s_last_cloud_ok_ms = millis();            // grace period starts now, not at 0
   delay(SENSOR_WARMUP_MS);                  // let the STCC4 settle
 }
 
+// ════════════════════════════════════════════════════════════════
+//  Outbox — guaranteed delivery of everything the farmer must read
+//
+//  A danger or power-cut SMS is the most important thing this device ever
+//  sends, so nothing here is fire-and-forget. Sending fails outright while
+//  the modem is unregistered (during boot, a network gap, a tower hiccup),
+//  which previously lost the message for good. Messages now sit in this
+//  small outbox and are retried until the modem accepts them.
+// ════════════════════════════════════════════════════════════════
+enum MsgKind : uint8_t { MK_PWR_OUT, MK_PWR_IN, MK_DANGER, MK_TEST, MK_SHUTDOWN, MK_DAILY };
+
+struct OutMsg {
+  MsgKind       kind;
+  FilahaDanger  danger;
+  float         value;
+  int           bat;
+  SensorReading reading;     // MK_DAILY only
+  bool          ring;        // also ring the farmer once the SMS is away
+};
+
+#define OUTBOX_SLOTS 4
+static OutMsg        s_box[OUTBOX_SLOTS];
+static int           s_box_head    = 0;
+static int           s_box_count   = 0;
+static unsigned long s_box_next_ms = 0;
+static int           s_box_tries   = 0;
+
+static void outbox_push(const OutMsg& m) {
+  if (s_box_count >= OUTBOX_SLOTS) {
+    // Full: drop the OLDEST. A fresh danger matters more than a stale report.
+    Serial.println("[sms] outbox full - dropping oldest queued message");
+    s_box_head = (s_box_head + 1) % OUTBOX_SLOTS;
+    s_box_count--;
+    s_box_tries = 0;
+  }
+  s_box[(s_box_head + s_box_count) % OUTBOX_SLOTS] = m;
+  s_box_count++;
+  s_box_next_ms = millis();          // first attempt immediately
+}
+
+static void outbox_pop() {
+  s_box_head = (s_box_head + 1) % OUTBOX_SLOTS;
+  if (s_box_count > 0) s_box_count--;
+  s_box_tries = 0;
+}
+
+static void outbox_service() {
+  if (s_box_count == 0) return;
+  const unsigned long now = millis();
+  if ((long)(now - s_box_next_ms) < 0) return;
+  s_box_next_ms = now + PENDING_RETRY_MS;
+
+  const OutMsg& m = s_box[s_box_head];
+  char16_t body[FILAHA_SMS_MAX_U16];
+  size_t   len = 0;
+
+  switch (m.kind) {
+    case MK_PWR_OUT:
+      len = filaha_sms_power_cut (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.bat, FILAHA_SMS_LANG); break;
+    case MK_PWR_IN:
+      len = filaha_sms_power_back(body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.bat, FILAHA_SMS_LANG); break;
+    case MK_DANGER:
+      len = filaha_sms_danger    (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.danger, m.value, FILAHA_SMS_LANG); break;
+    case MK_TEST:
+      len = filaha_sms_test      (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, FILAHA_SMS_LANG); break;
+    case MK_SHUTDOWN:
+      len = filaha_sms_shutdown  (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, FILAHA_SMS_LANG); break;
+    case MK_DAILY:
+      len = filaha_sms_daily     (body, FILAHA_SMS_MAX_U16, FILAHA_DEVICE_ID, m.reading, FILAHA_SMS_LANG); break;
+  }
+  if (len == 0) { outbox_pop(); return; }
+
+#if CRITICAL_SMS_ENABLED
+  if (!modem_send_sms_u16(FILAHA_FARMER_NUMBER, body, len)) {
+    if (++s_box_tries >= PENDING_MAX_TRIES) {
+      Serial.println("[sms] giving up on this message after repeated failures");
+      outbox_pop();
+    } else {
+      Serial.println("[sms] no network yet - message stays queued, will retry");
+    }
+    return;
+  }
+#endif
+
+#if CRITICAL_CALL_ENABLED
+  if (m.ring) modem_place_call(FILAHA_FARMER_NUMBER, CRITICAL_RING_MS);
+#endif
+  // Tell the cloud too, now that the link is evidently alive. The server
+  // ignores a duplicate, so re-announcing here is safe.
+  if (m.kind == MK_PWR_OUT) net_publish_event("PWR_OUT");
+  if (m.kind == MK_PWR_IN)  net_publish_event("PWR_IN");
+  outbox_pop();
+}
+
+static void queue_power(bool cut, int bat_pct) {
+  OutMsg m{}; m.kind = cut ? MK_PWR_OUT : MK_PWR_IN; m.bat = bat_pct; m.ring = cut;
+  outbox_push(m);
+}
+static void queue_danger(FilahaDanger d, float v) {
+  OutMsg m{}; m.kind = MK_DANGER; m.danger = d; m.value = v; m.ring = true;
+  outbox_push(m);
+}
+static void queue_simple(MsgKind k) {
+  OutMsg m{}; m.kind = k; m.ring = false;
+  outbox_push(m);
+}
+static void queue_daily(const SensorReading& r) {
+  OutMsg m{}; m.kind = MK_DAILY; m.reading = r; m.ring = false;
+  outbox_push(m);
+}
+
 // Sustained-danger debouncer. Bumps the relevant streak; once a streak reaches
-// DANGER_CONFIRM_SAMPLES (and not more often than ALERT_REFIRE_MS) it fires the
-// emergency: a human-readable SMS to the farmer AND a voice call (the lifeline,
-// works with no internet/server). A single noisy spike never triggers it.
+// DANGER_CONFIRM_SAMPLES (and not more often than ALERT_REFIRE_MS) it raises
+// the emergency: local buzzer, then an SMS + voice call queued for guaranteed
+// delivery. A single noisy sample never triggers it.
 static void evaluate_critical(const SensorReading& r) {
-  const char* what = nullptr;
-  float       value = 0;
-  const char* unit  = "";
+  bool         hit   = false;
+  FilahaDanger kind  = FD_CO2_HIGH;
+  float        value = 0;
 
   if (r.has_co2 && r.co2_ppm >= CO2_DANGER_PPM) {
-    if (++s_streak_co2 >= DANGER_CONFIRM_SAMPLES) { what = "CO2 eleve";      value = r.co2_ppm; unit = " ppm"; }
+    if (++s_streak_co2 >= DANGER_CONFIRM_SAMPLES) { hit = true; kind = FD_CO2_HIGH; value = r.co2_ppm; }
   } else { s_streak_co2 = 0; }
 
   if (r.has_nh3 && r.nh3_ppm >= NH3_DANGER_PPM) {
-    if (++s_streak_nh3 >= DANGER_CONFIRM_SAMPLES) { what = "Ammoniac eleve"; value = r.nh3_ppm; unit = " ppm"; }
+    if (++s_streak_nh3 >= DANGER_CONFIRM_SAMPLES) { hit = true; kind = FD_NH3_HIGH; value = r.nh3_ppm; }
   } else { s_streak_nh3 = 0; }
 
   if (r.has_temp && (r.temp_c >= TEMP_HIGH_C || r.temp_c <= TEMP_LOW_C)) {
     if (++s_streak_temp >= DANGER_CONFIRM_SAMPLES) {
-      what  = (r.temp_c >= TEMP_HIGH_C) ? "Temperature haute" : "Temperature basse";
-      value = r.temp_c; unit = " C";
+      hit = true;
+      kind = (r.temp_c >= TEMP_HIGH_C) ? FD_TEMP_HIGH : FD_TEMP_LOW;
+      value = r.temp_c;
     }
   } else { s_streak_temp = 0; }
 
   if (r.has_hum && (r.hum_pct >= HUM_HIGH_PCT || r.hum_pct <= HUM_LOW_PCT)) {
     if (++s_streak_hum >= DANGER_CONFIRM_SAMPLES) {
-      what  = (r.hum_pct >= HUM_HIGH_PCT) ? "Humidite haute" : "Humidite basse";
-      value = r.hum_pct; unit = " %";
+      hit = true;
+      kind = (r.hum_pct >= HUM_HIGH_PCT) ? FD_HUM_HIGH : FD_HUM_LOW;
+      value = r.hum_pct;
     }
   } else { s_streak_hum = 0; }
 
-  if (!what) return;
+  if (!hit) return;
 
   const unsigned long now = millis();
   if (now - s_last_alert_ms < ALERT_REFIRE_MS) return;
   s_last_alert_ms = now;
 
-  buzzer_pulse(LOCAL_BUZZER_MS);                       // local audible cue, respects mute
-#if CRITICAL_SMS_ENABLED
-  modem_send_sms(FILAHA_FARMER_NUMBER, filaha_critical_sms(FILAHA_DEVICE_ID, what, value, unit));
-#endif
-#if CRITICAL_CALL_ENABLED
-  modem_place_call(FILAHA_FARMER_NUMBER, CRITICAL_RING_MS);
-#endif
+  buzzer_pulse(LOCAL_BUZZER_MS);      // local audible cue, respects mute
+  queue_danger(kind, value);          // SMS + call, retried until delivered
 }
 
-// One plain-text report a day, at HEARTBEAT_HOUR local time. Uses the network
-// clock; if the modem hasn't synced time yet we simply skip until it has.
+// One report a day at HEARTBEAT_HOUR local time. Uses the network clock; if
+// the modem has not synced time yet we simply skip until it has.
 static void maybe_send_heartbeat(const SensorReading& r) {
 #if HEARTBEAT_ENABLED
   const unsigned long now = millis();
-  if (now - s_last_clock_ms < 60000UL) return;        // poll the clock at most once a minute
+  if (now - s_last_clock_ms < 60000UL) return;   // poll the clock at most once a minute
   s_last_clock_ms = now;
 
   int hour; long day;
   if (!net_get_clock(hour, day)) return;
   if (hour == HEARTBEAT_HOUR && day != s_last_heartbeat_day) {
     s_last_heartbeat_day = day;
-    Serial.println("[hb] sending daily report SMS");
-    modem_send_sms(FILAHA_FARMER_NUMBER, filaha_heartbeat_sms(FILAHA_DEVICE_ID, r));
+    Serial.println("[hb] queueing daily report SMS");
+    queue_daily(r);
   }
 #endif
-}
-
-// ── Guaranteed delivery of power alerts ──────────────────────────
-// A power-cut SMS/call is the most important thing this device ever sends, so
-// it is NEVER fire-and-forget. modem_send_sms() fails immediately when the
-// modem isn't registered (boot-time registration window, a network gap, a
-// tower hiccup) — previously that silently lost the alert forever. Now the
-// alert is queued here and retried until the modem accepts it.
-enum PendingAlert { PENDING_NONE = 0, PENDING_PWR_OUT, PENDING_PWR_IN };
-static PendingAlert  s_pending_kind    = PENDING_NONE;
-static int           s_pending_bat     = -1;
-static unsigned long s_pending_next_ms = 0;
-static int           s_pending_tries   = 0;
-
-static void queue_power_alert(PendingAlert kind, int bat_pct) {
-  s_pending_kind    = kind;
-  s_pending_bat     = bat_pct;
-  s_pending_tries   = 0;
-  s_pending_next_ms = millis();          // attempt immediately
-}
-
-static void service_pending_alert() {
-  if (s_pending_kind == PENDING_NONE) return;
-  const unsigned long now = millis();
-  if ((long)(now - s_pending_next_ms) < 0) return;
-  s_pending_next_ms = now + PENDING_RETRY_MS;
-
-  if (++s_pending_tries > PENDING_MAX_TRIES) {
-    Serial.printf("[power] gave up delivering alert after %d tries\n", s_pending_tries - 1);
-    s_pending_kind = PENDING_NONE;
-    return;
-  }
-
-  const bool is_cut = (s_pending_kind == PENDING_PWR_OUT);
-  // An unknown battery reading (-1) must never block the alert — report 0.
-  const int  bat    = (s_pending_bat < 0) ? 0 : s_pending_bat;
-  Serial.printf("[power] delivering %s alert (attempt %d)…\n",
-                is_cut ? "POWER-CUT" : "POWER-RESTORED", s_pending_tries);
-
-#if CRITICAL_SMS_ENABLED
-  const String body = is_cut
-      ? filaha_critical_sms(FILAHA_DEVICE_ID, "Coupure de courant", bat, " % batt")
-      : filaha_power_restored_sms(FILAHA_DEVICE_ID, bat);
-  if (!modem_send_sms(FILAHA_FARMER_NUMBER, body)) {
-    Serial.println("[power] SMS not accepted (no network yet) — keeping queued, will retry");
-    return;                              // stay queued
-  }
-#endif
-
-#if CRITICAL_CALL_ENABLED
-  if (is_cut) modem_place_call(FILAHA_FARMER_NUMBER, CRITICAL_RING_MS);
-#endif
-
-  // Re-announce to the cloud now that the link is evidently alive. The server
-  // ignores a duplicate (it checks the current status first), so this is safe.
-  net_publish_event(is_cut ? "PWR_OUT" : "PWR_IN");
-
-  Serial.println("[power] alert delivered");
-  s_pending_kind = PENDING_NONE;
 }
 
 static void check_power_transition() {
@@ -245,13 +309,13 @@ static void check_power_transition() {
     Serial.printf("[power] MAINS LOST — on battery (%d%%) — buzzer + cloud + queued SMS/call\n", batt);
     buzzer_pulse(LOCAL_BUZZER_MS);
     net_publish_event("PWR_OUT");        // instant, best-effort
-    queue_power_alert(PENDING_PWR_OUT, batt);
+    queue_power(true, batt);            // SMS + call, guaranteed delivery
   } else {
     // ── MAINS RESTORED ──
     const int batt = power_battery_pct();
     Serial.printf("[power] MAINS RESTORED (batt %d%%) — cloud + queued SMS\n", batt);
     net_publish_event("PWR_IN");         // instant, best-effort
-    queue_power_alert(PENDING_PWR_IN, batt);
+    queue_power(false, batt);           // confirmation SMS
   }
   s_was_on_usb = on_usb;
 }
@@ -265,14 +329,13 @@ static void handle_button_events() {
     case BTN_TEST_ALARM: {
       Serial.println("[btn] TEST ALARM — sending test SMS");
       buzzer_pulse(400);
-      modem_send_sms(FILAHA_FARMER_NUMBER,
-                     filaha_critical_sms(FILAHA_DEVICE_ID, "Test du dispositif", 0, ""));
+      queue_simple(MK_TEST);
       break;
     }
     case BTN_POWER_LONG:
       Serial.println("[btn] POWER long-press — powering down");
-      modem_send_sms(FILAHA_FARMER_NUMBER,
-                     filaha_critical_sms(FILAHA_DEVICE_ID, "Arret manuel du dispositif", 0, ""));
+      queue_simple(MK_SHUTDOWN);
+      outbox_service();          // best effort before the lights go out
       delay(200);
       enter_deep_sleep();                       // never returns
       break;
@@ -288,6 +351,30 @@ static void handle_button_events() {
   }
 }
 
+// ── Self-healing escalation ──────────────────────────────────────
+// Nobody will be standing next to this box in a remote coop. If readings stop
+// reaching the cloud, rebuild the modem link; if that does not help either,
+// reboot the whole board. Both thresholds are far longer than any normal
+// weak-signal gap, so healthy operation never trips them.
+
+static void self_heal_tick() {
+  const unsigned long now    = millis();
+  const unsigned long silent = now - s_last_cloud_ok_ms;
+
+  if (silent > NET_STALE_REBOOT_MS) {
+    Serial.println("[heal] no data reached the cloud for a long time - rebooting board");
+    Serial.flush();
+    delay(200);
+    ESP.restart();                                     // never returns
+  }
+  if (silent > NET_STALE_RECOVER_MS &&
+      now - s_last_recover_ms > NET_STALE_RECOVER_MS) {
+    s_last_recover_ms = now;
+    Serial.println("[heal] cloud silent - rebuilding the modem link");
+    modem_recover();
+  }
+}
+
 void loop() {
   esp_task_wdt_reset();                          // feed the watchdog each pass
   feedback_loop();
@@ -295,7 +382,8 @@ void loop() {
   modem_loop();
   net_loop();                                   // keep MQTT alive / reconnect
   check_power_transition();
-  service_pending_alert();                      // retry any undelivered power alert
+  outbox_service();                             // retry anything undelivered
+  self_heal_tick();                             // recover unattended, no human needed
 
   // Double-chirp the FIRST time the cloud link comes up after boot — audible
   // "we're live" confirmation for demos with no PC attached.
@@ -315,7 +403,7 @@ void loop() {
     if (sensors_read(r)) {
       uint8_t pkt[8];
       const size_t n = pack_telemetry(r, pkt);
-      net_publish(pkt, n);                      // routine data over 2G — no SMS
+      if (net_publish(pkt, n)) s_last_cloud_ok_ms = now;   // proof the link works
       evaluate_critical(r);                     // emergency lifeline (SMS + call)
       maybe_send_heartbeat(r);                  // once-a-day report
     } else {

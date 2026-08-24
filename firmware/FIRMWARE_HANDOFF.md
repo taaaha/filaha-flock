@@ -36,6 +36,12 @@ emergency (works even with no internet). Built for weak rural Algerian 2G.
 - **NH₃ sensor not soldered yet** → firmware already sends NH₃ = 0 and everything
   else works. When the MiCS arrives, wire it to the I²C bus and set
   `FILAHA_HAS_NH3 1` (below) — nothing else changes.
+- **The battery is NOT optional.** The modem draws ~2 A in transmit bursts;
+  the LiPo is what supplies those peaks. Without it the modem browns out
+  mid-scan and stops responding. Always ship with the battery connected.
+- **Use a USB-A charger (5 V / 2 A) with an A-to-C cable.** Many all-USB-C
+  chargers negotiate power in a way this board cannot answer and deliver
+  nothing at all.
 - **Status LEDs (red/green/orange):** wire them up, but note this firmware
   version does **not drive them yet** — the LED status feature ships in the next
   flash (once the module type + pins are finalized). Buttons, buzzer, sensors,
@@ -46,6 +52,7 @@ emergency (works even with no internet). Built for weak rural Algerian 2G.
 #define FILAHA_DEVICE_ID      "DEV011"            // unique per box; MUST match the server
 #define FILAHA_FARMER_NUMBER  "+213781103304"    // the farmer's phone (SMS + calls go here)
 #define FILAHA_SIM_PIN        ""                 // "" if the SIM has no PIN
+#define FILAHA_SMS_LANG       FILAHA_LANG_AR     // language of every SMS: _AR or _FR
 ```
 Already set for you (don't change unless the server moves):
 ```c
