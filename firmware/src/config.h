@@ -85,8 +85,25 @@
 // discharge: at 80 mV it took minutes, at 25 mV it fires on the step itself
 // while still sitting 2.5x above the worst sample seen on mains.
 #define POWER_DROP_V             0.025f
-#define POWER_TREND_V            0.020f  // rise/fall that counts as a real direction
-#define POWER_TREND_WINDOW_MS    (120UL * 1000UL)
+
+// The restore is judged on a different signal from the cut, and deliberately
+// slower. Level cannot prove the charger is back: once the cell is full the
+// charger terminates and the rail simply IS the cell's resting voltage, so
+// plugged and unplugged read the same. Worse, the cut is tripped by the sag of
+// a transmit burst and the cell springs back the moment that burst ends - which
+// is exactly why a "power is back" SMS used to follow every real cut within
+// seconds.
+//
+// What does separate them is how QUIET the rail is. The modem transmits every
+// telemetry cycle; on mains the charger absorbs that burst (13 mV peak-to-peak
+// measured across an hour on a real unit) while on battery the same current is
+// pulled through the cell and the rail visibly sags. A restore therefore needs
+// a quiet rail across consecutive windows, after a lockout, AND the level back
+// at the plateau - all three.
+#define POWER_RESTORE_LOCKOUT_MS (30UL * 1000UL)
+#define POWER_RIPPLE_WINDOW_MS   (20UL * 1000UL)   // must span a transmit burst
+#define POWER_RIPPLE_MAINS_MAX   0.035f            // p-p at or below this = charger
+#define POWER_RESTORE_WINDOWS    2                 // consecutive quiet windows
 
 // If a board revision routes VBUS/charger-presence to a spare ADC pin, put it
 // here and it replaces the heuristic with an instant, unambiguous read.

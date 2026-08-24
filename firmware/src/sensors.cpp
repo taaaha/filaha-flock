@@ -205,7 +205,8 @@ static float read_pin_v(int pin, float divider) {
 
 static PowerState        s_pwr;
 static const PowerTuning s_pwr_tuning = {
-  POWER_DROP_V, POWER_TREND_V, POWER_TREND_WINDOW_MS, POWER_BOOT_GRACE_MS
+  POWER_DROP_V, POWER_BOOT_GRACE_MS, POWER_RESTORE_LOCKOUT_MS,
+  POWER_RIPPLE_WINDOW_MS, POWER_RIPPLE_MAINS_MAX, POWER_RESTORE_WINDOWS
 };
 
 bool power_is_on_usb() {
@@ -221,45 +222,58 @@ bool power_is_on_usb() {
 float power_vbat_volts() { return read_vbat(); }
 
 // ── Boot self-test ────────────────────────────────────────────────
-// Drives the REAL decision function (power_logic.h) through scripted voltage
-// sequences, including ones that would take hours to reproduce on a bench: a
-// deep discharge followed by a reconnect, which is where an unconsidered
-// reference would oscillate. Runs on its own PowerState, so it cannot disturb
-// the live detector. Prints one line per case; a FAIL means do not ship.
+// Drives the REAL decision function (power_logic.h) through scripted sequences,
+// including ones that cannot practically be reproduced on a bench: a cut whose
+// rail rebounds the instant the transmit burst ends, and a full cell where the
+// charger has terminated so plugged and unplugged read the same voltage. Runs
+// on its own PowerState with a compressed timebase, so it cannot disturb the
+// live detector. A FAIL means do not ship the unit.
 #if FILAHA_POWER_SELFTEST
+
+// Compressed timing so a case that models minutes stays a handful of samples.
+#define PT_STEP_MS   2000UL
+#define PT_WINDOW_MS 6000UL     // 3 samples per ripple window
+#define PT_LOCKOUT   6000UL
+
 static bool pwr_case(const char* name, const float* volts, const int* expect, int n) {
   PowerState st;
   power_state_init(st);
-  const PowerTuning k = { POWER_DROP_V, POWER_TREND_V, POWER_TREND_WINDOW_MS, 0 };
-  unsigned long t = 1;                    // past the (zeroed) boot grace
+  const PowerTuning k = {
+    POWER_DROP_V, 0 /* no boot grace */, PT_LOCKOUT,
+    PT_WINDOW_MS, POWER_RIPPLE_MAINS_MAX, POWER_RESTORE_WINDOWS
+  };
+  unsigned long t = 1;                      // past the (zeroed) boot grace
+  st.mains_ref = volts[0];                  // seed as the boot window would
+  st.win_min = st.win_max = volts[0];
+  st.win_ms  = t;
+
   bool pass = true;
   int  failed_at = -1;
   for (int i = 0; i < n; i++) {
-    if (i == 0) {                         // seed the reference as boot would
-      st.mains_ref = volts[0];
-      st.anchor_v  = volts[0];
-      st.anchor_ms = t;
-    }
     const bool got = power_decide(st, k, volts[i], t);
     if (expect[i] >= 0 && got != (expect[i] != 0)) {
       if (pass) failed_at = i;
       pass = false;
     }
-    t += POWER_POLL_MS;
+    t += PT_STEP_MS;
   }
   Serial.print("[pwr-test] ");
   Serial.print(pass ? "PASS  " : "FAIL  ");
   Serial.print(name);
-  if (!pass) { Serial.print("   (first wrong verdict at sample "); Serial.print(failed_at); Serial.print(")"); }
+  if (!pass) {
+    Serial.print("   (first wrong verdict at sample ");
+    Serial.print(failed_at);
+    Serial.print(")");
+  }
   Serial.println();
   return pass;
 }
 
 static void power_selftest() {
-  const int M = 1, B = 0, X = -1;         // expect mains / battery / don't care
+  const int M = 1, B = 0;                   // expect mains / battery
 
-  // Steady on the charger, with the worst noise excursion seen on a real unit
-  // (4.110 against a 4.121 reference = 11 mV). Must never cry wolf.
+  // Steady on the charger, including the worst noise excursion seen on a real
+  // unit (4.110 against a 4.121 reference = 11 mV). Must never cry wolf.
   static const float v1[] = { 4.121f, 4.119f, 4.121f, 4.110f, 4.120f, 4.118f, 4.121f };
   static const int   e1[] = { M, M, M, M, M, M, M };
 
@@ -267,28 +281,43 @@ static void power_selftest() {
   static const float v2[] = { 4.121f, 4.120f, 4.090f, 4.085f, 4.080f };
   static const int   e2[] = { M, M, B, B, B };
 
-  // Plugged back in with the cell still fairly full — straight back to mains.
-  static const float v3[] = { 4.121f, 4.085f, 4.080f, 4.120f, 4.121f };
-  static const int   e3[] = { M, B, B, M, M };
+  // THE REGRESSION. A real cut, then the transmit burst ends and the cell
+  // springs back above the cut threshold. The old symmetric restore fired here
+  // and sent "power is back" seconds after every genuine cut. The rail is still
+  // noisy — bursts keep sagging it — so it must stay on battery throughout.
+  static const float v3[] = {
+    4.121f, 4.121f,                          // on the charger
+    4.088f,                                  // burst sag trips the cut
+    4.115f, 4.112f, 4.060f,                  // rebound, then the next burst
+    4.114f, 4.110f, 4.055f,                  // and again
+    4.112f, 4.108f, 4.050f
+  };
+  static const int   e3[] = { M, M, B, B, B, B, B, B, B, B, B, B };
 
-  // A long cut: the cell drains far below the old plateau and must STAY on
-  // battery the whole way down, never mistaking a slower decline for a charger.
-  static const float v4[] = { 4.121f, 4.080f, 4.000f, 3.900f, 3.820f, 3.760f, 3.700f };
-  static const int   e4[] = { M, B, B, B, B, B, B };
+  // A genuine restore: the charger is back, so the bursts stop moving the rail
+  // and it goes quiet at the plateau. Allowed to lag — the lockout plus two
+  // quiet windows is the price of never crying wolf on the way back.
+  static const float v4[] = {
+    4.121f, 4.088f,                          // cut
+    4.115f, 4.060f, 4.112f,                  // on battery: noisy
+    4.120f, 4.121f, 4.120f,                  // charger back: quiet window 1
+    4.121f, 4.120f, 4.121f,                  // quiet window 2
+    4.121f, 4.120f, 4.121f
+  };
+  static const int   e4[] = { M, B, B, B, B, B, B, B, B, B, B, B, M, M };
 
-  // Reconnect onto a depleted cell: constant-current charging holds the rail
-  // near the CELL voltage, far below the old plateau, so no step appears — only
-  // a climb. This is the case that oscillates if the reference is not reset.
-  static const float v5[] = { 4.121f, 3.700f, 3.700f, 3.725f, 3.750f, 3.775f, 3.800f, 3.825f };
-  static const int   e5[] = { M, B, B, M, M, M, M, M };
+  // A long cut: the cell drains far below the old plateau and must stay on
+  // battery the whole way down, never mistaking a slow decline for a charger.
+  static const float v5[] = { 4.121f, 4.080f, 4.000f, 3.900f, 3.820f, 3.760f, 3.700f };
+  static const int   e5[] = { M, B, B, B, B, B, B };
 
   Serial.println("[pwr-test] verifying the live decision logic…");
   int ok = 0;
   ok += pwr_case("steady on charger, worst observed noise", v1, e1, 7);
   ok += pwr_case("charger pulled -> battery", v2, e2, 5);
-  ok += pwr_case("charger restored (full cell)", v3, e3, 5);
-  ok += pwr_case("long cut, cell draining", v4, e4, 7);
-  ok += pwr_case("reconnect onto a flat cell (no step, only a climb)", v5, e5, 8);
+  ok += pwr_case("cut, then burst rebound (no false 'power back')", v3, e3, 12);
+  ok += pwr_case("charger genuinely restored -> rail goes quiet", v4, e4, 14);
+  ok += pwr_case("long cut, cell draining", v5, e5, 7);
   Serial.print("[pwr-test] ");
   Serial.print(ok);
   Serial.println("/5 passed");
@@ -302,10 +331,10 @@ static void power_begin() {
 #endif
 }
 
-// Bench aid: the detector's own reasoning, one line. The spare-ADC sweep this
-// used to print has done its job — the survey showed pin 33 is simply the 3V3
-// rail while 32/34/36/39 float, so there is no charger-presence pin to find on
-// this revision and the rail itself is the only signal available.
+// Bench aid: the detector's own reasoning, one line. The ripple figure is the
+// one number still worth watching on real hardware — it is what the restore
+// decision rests on, and the threshold should be checked against what a genuine
+// battery period actually produces on this unit.
 void power_diag_print() {
 #if FILAHA_POWER_DIAG
   static unsigned long s_last = 0;
@@ -313,10 +342,11 @@ void power_diag_print() {
   if (s_last && now - s_last < 4000UL) return;
   s_last = now;
 
-  const float v = read_vbat();
-  Serial.print("[pwr] vbat=");   Serial.print(v, 3);
+  Serial.print("[pwr] vbat=");   Serial.print(read_vbat(), 3);
   Serial.print(" ref=");         Serial.print(s_pwr.mains_ref, 3);
   Serial.print(" trip<");        Serial.print(s_pwr.mains_ref - POWER_DROP_V, 3);
+  Serial.print(" ripple=");      Serial.print(s_pwr.ripple, 3);
+  Serial.print(" quiet=");       Serial.print(s_pwr.quiet_runs);
   Serial.print(" -> ");          Serial.println(s_pwr.mains ? "MAINS" : "BATTERY");
 #endif
 }
