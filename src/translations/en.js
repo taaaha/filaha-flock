@@ -612,4 +612,8 @@ export default {
   gulfHeatTitle: "Tuned for heat",
   gulfHeatBody: "In closed houses the biggest danger is cooling failure. Filaha reports a power cut immediately.",
   limitsForCountry: "Limits set for {country}",
+
+  enterOwnPrices: "Enter the prices you actually pay — we do not have a verified local reference for your country yet.",
+  marketNoLocalTitle: "No local price reference yet",
+  marketNoLocalBody: "The prices we publish are surveyed figures for Algeria, so showing them here would be misleading. Use the profit estimator with your own feed and market prices — everything else in the guide applies to your flock as normal.",
 };

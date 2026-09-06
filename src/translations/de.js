@@ -610,4 +610,8 @@ export default {
   gulfHeatTitle: 'Auf Hitze eingestellt',
   gulfHeatBody: 'In geschlossenen Ställen ist der Ausfall der Kühlung die größte Gefahr. Filaha meldet einen Stromausfall sofort.',
   limitsForCountry: 'Grenzwerte für {country} übernommen',
+
+  enterOwnPrices: "Tragen Sie die Preise ein, die Sie tatsächlich zahlen — für Ihr Land liegt uns noch keine geprüfte Referenz vor.",
+  marketNoLocalTitle: "Noch keine lokale Preisreferenz",
+  marketNoLocalBody: "Die von uns veröffentlichten Preise stammen aus Erhebungen in Algerien; sie hier zu zeigen wäre irreführend. Nutzen Sie die Ertragsschätzung mit Ihren eigenen Futter- und Verkaufspreisen — alles Übrige im Leitfaden gilt für Ihren Bestand wie gewohnt.",
 };

@@ -612,4 +612,8 @@ export default {
   gulfHeatTitle: "Réglé pour la chaleur",
   gulfHeatBody: "Dans un bâtiment fermé, le plus grand danger est la panne de refroidissement. Filaha signale immédiatement une coupure de courant.",
   limitsForCountry: "Limites définies pour {country}",
+
+  enterOwnPrices: "Saisissez les prix que vous payez réellement — nous n’avons pas encore de référence locale vérifiée pour votre pays.",
+  marketNoLocalTitle: "Pas encore de référence locale",
+  marketNoLocalBody: "Les prix que nous publions proviennent d’enquêtes menées en Algérie ; les afficher ici serait trompeur. Utilisez l’estimateur de rentabilité avec vos propres prix d’aliment et de vente — le reste du guide s’applique normalement à votre élevage.",
 };
