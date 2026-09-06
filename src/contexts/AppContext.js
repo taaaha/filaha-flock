@@ -23,6 +23,7 @@ import {
 } from '../services/SmsService';
 import { computeFarmHealth } from '../utils/farmHealth';
 import { generateInsights } from '../services/Insights';
+import { DEFAULT_COUNTRY, thresholdsForCountry } from '../utils/regions';
 import { actionFor } from '../utils/actionSteps';
 import { startRemoteContentRefresh } from '../services/RemoteContent';
 import { makePhoneCall, makeDirectCall } from '../services/CallService';
@@ -37,6 +38,14 @@ import { DEFAULT_LANG, isRTL, makeT } from '../translations';
 
 const DEFAULT_SETTINGS = {
   farmerName: '',
+  // Where the farm is. Country drives language, currency and - importantly -
+  // which air-quality limits apply, since Germany is bound by EU 2007/43/EC
+  // while Algeria and Qatar are not. Region drives climate-aware advice.
+  country: DEFAULT_COUNTRY,
+  region: '',
+  // The farmer's own number, in full international form. Distinct from
+  // emergencyContact: this is the number the coop device itself rings.
+  farmerPhone: '',
   farmName: '',
   alertSound: true,
   vibrate: true,
@@ -175,6 +184,14 @@ export function AppProvider({ children }) {
       if (cancelled) return;
 
       const finalSettings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+      // Existing installs picked a wilaya on a settings row that nothing read.
+      // That choice is still the farmer's real answer to "where is the farm",
+      // so carry it into the region field the app now actually uses rather
+      // than making him answer the same question twice.
+      if (!finalSettings.region && finalSettings.wilaya) {
+        finalSettings.region = finalSettings.wilaya;
+        finalSettings.country = finalSettings.country || 'dz';
+      }
 
       // Sync emergency contact to native prefs on boot so SmsReceiver has it
       if (finalSettings.emergencyContact) {
@@ -955,9 +972,34 @@ export function AppProvider({ children }) {
     dispatch({ type: 'SET_THEME', payload: theme });
   }, []);
 
-  const completeOnboarding = useCallback(async () => {
+  // Setup hands the whole profile over at once. The country also decides the
+  // starting thresholds - a German farmer must open the app already holding the
+  // binding EU limits rather than Algeria's more permissive numbers - so both
+  // are written together instead of leaving a window where they disagree.
+  const completeOnboarding = useCallback(async (profile) => {
+    if (profile) {
+      const s = stateRef.current;
+      const next = { ...s.settings, ...profile };
+      await Storage.setSettings(next);
+      dispatch({ type: 'SET_SETTINGS', payload: next });
+
+      if (profile.country) {
+        const limits = thresholdsForCountry(profile.country);
+        await Storage.setThresholds(limits);
+        dispatch({ type: 'SET_THRESHOLDS', payload: limits });
+      }
+    }
     await Storage.setOnboardingDone(true);
     dispatch({ type: 'SET_ONBOARDING_DONE', payload: true });
+  }, []);
+
+  // Changing country later re-applies that country's limits, because the old
+  // ones are no longer either the right law or the right climate.
+  const applyCountryDefaults = useCallback(async (countryId) => {
+    const limits = thresholdsForCountry(countryId);
+    await Storage.setThresholds(limits);
+    dispatch({ type: 'SET_THRESHOLDS', payload: limits });
+    return limits;
   }, []);
 
   const addDevice = useCallback(async ({ name, deviceId, farmId, chickAgeDays, breed, strain }) => {
@@ -1084,9 +1126,13 @@ export function AppProvider({ children }) {
     dispatch({ type: 'SET_THRESHOLDS', payload: next });
   }, []);
 
+  // "Default" means the default FOR THIS FARMER'S COUNTRY. Resetting a German
+  // farm to the Algerian baseline would quietly drop it out of EU compliance.
   const resetThresholds = useCallback(async () => {
-    await Storage.setThresholds(DEFAULT_THRESHOLDS);
-    dispatch({ type: 'SET_THRESHOLDS', payload: { ...DEFAULT_THRESHOLDS } });
+    const s = stateRef.current;
+    const limits = thresholdsForCountry(s.settings.country || DEFAULT_COUNTRY);
+    await Storage.setThresholds(limits);
+    dispatch({ type: 'SET_THRESHOLDS', payload: limits });
   }, []);
 
   const callEmergency = useCallback(async () => {
@@ -1123,6 +1169,7 @@ export function AppProvider({ children }) {
     acknowledgeAlert,
     clearAllAlerts,
     updateSettings,
+    applyCountryDefaults,
     updateThresholds,
     resetThresholds,
     callEmergency,
@@ -1133,7 +1180,7 @@ export function AppProvider({ children }) {
     setLanguage, setTheme, completeOnboarding,
     addDevice, updateDevice, removeDevice,
     acknowledgeAlert, clearAllAlerts,
-    updateSettings, updateThresholds, resetThresholds,
+    updateSettings, applyCountryDefaults, updateThresholds, resetThresholds,
     callEmergency, injectMessage, lastReadingFor,
   ]);
 

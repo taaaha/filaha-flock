@@ -8,7 +8,6 @@ import { colors, useTheme, barStyle } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
 import Icon from '../components/Icon';
 import CoopMascot from '../components/CoopMascot';
-import { WilayaPicker } from '../components/GuideExtras';
 import HelpButton from '../components/HelpButton';
 import { LANGS } from '../translations';
 import {
@@ -28,11 +27,17 @@ import ThresholdSlider from '../components/ThresholdSlider';
 import PrimaryButton from '../components/PrimaryButton';
 import SmsMuteGuide from '../components/SmsMuteGuide';
 import { showToast } from '../components/Toast';
+import {
+  COUNTRIES, COUNTRY_IDS, getCountry, countryName, regionLabel,
+  regionsOf, regionName, isValidPhone, fullPhone, splitPhone, digitsOnly,
+} from '../utils/regions';
+import RegionPicker from '../components/RegionPicker';
 
 export default function SettingsScreen({ navigation }) {
   const {
     t, language, theme, settings, thresholds,
-    setLanguage, setTheme, updateSettings, updateThresholds, resetThresholds,
+    setLanguage, setTheme, updateSettings, applyCountryDefaults,
+    updateThresholds, resetThresholds,
   } = useApp();
   const styles = useStyles(makeStyles);
   const { installed, status: updateStatus, checkNow } = useUpdates();
@@ -55,6 +60,52 @@ export default function SettingsScreen({ navigation }) {
   const [editProfile, setEditProfile] = useState(false);
   const [editContact, setEditContact] = useState(false);
   const [smsGuideOpen, setSmsGuideOpen] = useState(false);
+
+  // Location block. The phone is stored in full international form but edited
+  // as a national number behind a fixed dial code, which is how people actually
+  // think of their own number.
+  const [editLocation, setEditLocation] = useState(false);
+  const [country, setCountry] = useState(settings.country || 'dz');
+  const [region, setRegion] = useState(settings.region || '');
+  const [phone, setPhone] = useState(splitPhone(settings.farmerPhone).national || '');
+  const [regionOpen, setRegionOpen] = useState(false);
+
+  useEffect(() => { setCountry(settings.country || 'dz'); }, [settings.country]);
+  useEffect(() => { setRegion(settings.region || ''); }, [settings.region]);
+  useEffect(() => {
+    setPhone(splitPhone(settings.farmerPhone).national || '');
+  }, [settings.farmerPhone]);
+
+  const countryCfg = getCountry(country);
+  const activeRegion = regionsOf(country).find((r) => r.id === region);
+  const phoneBad = !!phone && !isValidPhone(country, phone);
+
+  const onSaveLocation = async () => {
+    if (phoneBad) return;
+    const countryChanged = country !== (settings.country || 'dz');
+    await updateSettings({
+      country,
+      region,
+      farmerPhone: phone ? fullPhone(country, phone) : '',
+    });
+    // Moving country moves the law and the climate with it, so the alert
+    // limits have to follow. Saying so out loud beats silently rewriting the
+    // farmer's thresholds underneath him.
+    if (countryChanged) {
+      await applyCountryDefaults(country);
+      showToast(t('limitsForCountry', { country: countryName(country, language) }), 'success');
+    } else {
+      showToast(t('saved'), 'success');
+    }
+    setEditLocation(false);
+  };
+
+  const cancelLocation = () => {
+    setCountry(settings.country || 'dz');
+    setRegion(settings.region || '');
+    setPhone(splitPhone(settings.farmerPhone).national || '');
+    setEditLocation(false);
+  };
 
   useEffect(() => { setFarmerName(settings.farmerName || ''); }, [settings.farmerName]);
   useEffect(() => { setFarmName(settings.farmName || ''); }, [settings.farmName]);
@@ -301,6 +352,115 @@ export default function SettingsScreen({ navigation }) {
           </>
         )}
 
+        {/* Location — country, region and the number the coop device rings */}
+        <View style={styles.sectionHead}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0, marginTop: 0 }]}>{t('yourCountry')}</Text>
+          {!editLocation ? (
+            <Pressable
+              onPress={() => setEditLocation(true)}
+              android_ripple={{ color: colors.accent + '22' }}
+              style={styles.editBtn}
+              accessibilityRole="button"
+            >
+              <Text style={styles.editBtnText}>{t('edit')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {!editLocation ? (
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>{t('country')}</Text>
+              <Text style={styles.infoValue} numberOfLines={1}>
+                {countryCfg.flag + '  ' + countryName(country, language)}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>{regionLabel(country, language)}</Text>
+              <Text style={styles.infoValue} numberOfLines={1}>
+                {activeRegion ? regionName(activeRegion, language) : t('notSet')}
+              </Text>
+            </View>
+            <View style={[styles.infoRow, styles.infoRowLast]}>
+              <Text style={styles.infoLabel}>{t('phone')}</Text>
+              <Text style={styles.infoValue} numberOfLines={1}>
+                {settings.farmerPhone || t('notSet')}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={styles.countryRow}>
+              {COUNTRY_IDS.map((id) => (
+                <Pressable
+                  key={id}
+                  onPress={() => { setCountry(id); setRegion(''); }}
+                  android_ripple={{ color: colors.accent + '22' }}
+                  style={[styles.countryChip, country === id && styles.countryChipActive]}
+                >
+                  <Text style={styles.countryChipFlag}>{COUNTRIES[id].flag}</Text>
+                  <Text style={[styles.countryChipText, country === id && styles.countryChipTextActive]}>
+                    {countryName(id, language)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>{regionLabel(country, language)}</Text>
+            <Pressable style={styles.selectRow} onPress={() => setRegionOpen(true)}>
+              <Text style={[styles.selectText, !activeRegion && styles.selectPlaceholder]}>
+                {activeRegion
+                  ? regionName(activeRegion, language)
+                  : t('pickRegionLabel', { label: regionLabel(country, language) })}
+              </Text>
+              <Text style={styles.selectChevron}>▾</Text>
+            </Pressable>
+
+            <Text style={styles.fieldLabel}>{t('phone')}</Text>
+            <View style={styles.phoneRow}>
+              <View style={styles.dialBox}>
+                <Text style={styles.countryChipFlag}>{countryCfg.flag}</Text>
+                <Text style={styles.dialText}>{countryCfg.dial}</Text>
+              </View>
+              <View style={styles.phoneFieldWrap}>
+                <Field
+                  label=""
+                  value={phone}
+                  onChangeText={(v) => setPhone(digitsOnly(v))}
+                  placeholder={countryCfg.phoneExample}
+                  keyboardType="phone-pad"
+                />
+              </View>
+            </View>
+            {phoneBad ? <Text style={styles.fieldError}>{t('phoneInvalid')}</Text> : null}
+
+            <View style={styles.editActions}>
+              <PrimaryButton
+                title={t('cancel')}
+                variant="subtle"
+                onPress={cancelLocation}
+                style={{ flex: 1 }}
+              />
+              <PrimaryButton
+                title={t('save')}
+                icon="✓"
+                variant="primary"
+                onPress={onSaveLocation}
+                disabled={phoneBad}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </>
+        )}
+
+        <RegionPicker
+          visible={regionOpen}
+          onClose={() => setRegionOpen(false)}
+          country={country}
+          value={region}
+          onSelect={(id) => { setRegion(id); setRegionOpen(false); }}
+        />
+
         {/* Language */}
         <Text style={styles.sectionTitle}>{t('language')}</Text>
         <View style={styles.langGrid}>
@@ -356,14 +516,6 @@ export default function SettingsScreen({ navigation }) {
           </Pressable>
         </View>
 
-        {/* Wilaya (region) */}
-        <Text style={styles.sectionTitle}>{t('wilaya')}</Text>
-        <Text style={styles.wilayaHint}>{t('wilayaHint')}</Text>
-        <WilayaPicker
-          t={t}
-          current={settings.wilaya}
-          onPick={(w) => { updateSettings({ wilaya: w }); showToast(t('saved'), 'success'); }}
-        />
 
         {/* Thresholds */}
         <View style={{ marginTop: 16 }}>
@@ -610,6 +762,39 @@ function PermissionRow({ label, granted, grantedLabel, deniedLabel, hint, onPres
 }
 
 const makeStyles = () => ({
+  countryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  countryChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    paddingHorizontal: 13, paddingVertical: 10,
+    backgroundColor: colors.card, borderRadius: 999,
+    borderWidth: 2, borderColor: colors.border,
+  },
+  countryChipActive: { borderColor: colors.accent, backgroundColor: colors.cardElevated },
+  countryChipFlag: { fontSize: 17 },
+  countryChipText: { color: colors.textSecondary, fontSize: 14.5, fontWeight: '700' },
+  countryChipTextActive: { color: colors.textPrimary },
+  fieldLabel: {
+    color: colors.textSecondary, fontSize: 13.5, fontWeight: '700',
+    marginBottom: 6, marginTop: 2,
+  },
+  selectRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12,
+  },
+  selectText: { color: colors.textPrimary, fontSize: 15.5, fontWeight: '700', flex: 1 },
+  selectPlaceholder: { color: colors.textTertiary, fontWeight: '600' },
+  selectChevron: { color: colors.textTertiary, fontSize: 15, marginStart: 8 },
+  phoneRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
+  dialBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 13, paddingVertical: 13,
+    backgroundColor: colors.cardElevated,
+    borderWidth: 1, borderColor: colors.border, borderRadius: 12,
+  },
+  dialText: { color: colors.textPrimary, fontSize: 15.5, fontWeight: '800' },
+  phoneFieldWrap: { flex: 1 },
+  fieldError: { color: colors.danger, fontSize: 13, fontWeight: '600', marginTop: -4, marginBottom: 8 },
   safe: { flex: 1, backgroundColor: colors.bg },
   screenTitle: {
     color: colors.textPrimary,

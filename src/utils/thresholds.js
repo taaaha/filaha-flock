@@ -25,16 +25,17 @@ export const OFFLINE_THRESHOLD_MS = 60 * 1000; // 1 minute
 // temperature threshold alone misses (28°C at 85% humidity can be lethal to
 // birds while 28°C reads only "warn"). Inlined here — same formula/cutoffs as
 // poultryData.heatStressTHI — so deviceStatus stays a leaf module with no
-// import cycle. Tiers: safe / alert(≥70) / danger(≥75) / emergency(≥83).
+// import cycle. Tiers follow the poultry four-zone chart: safe <70, alert 70-75,
+// danger 76-81, emergency >81.
 export function thiTier(tempC, humidityPct) {
   if (tempC == null || typeof tempC !== 'number' || isNaN(tempC)) return 'safe';
   const rh = (humidityPct == null || isNaN(humidityPct)) ? 60 : humidityPct;
   // Poultry THI is in FAHRENHEIT — convert first (matches poultryData.heatStressTHI).
   const tf = 1.8 * tempC + 32;
-  const thi = tf - (0.55 - 0.0055 * rh) * (tf - 58);
+  const thi = tf - (0.55 - 0.0055 * rh) * (tf - 58.8);
   if (isNaN(thi)) return 'safe';
-  if (thi >= 83) return 'emergency';
-  if (thi >= 75) return 'danger';
+  if (thi > 81) return 'emergency';
+  if (thi >= 76) return 'danger';
   if (thi >= 70) return 'alert';
   return 'safe';
 }
