@@ -1,3 +1,5 @@
+import { isEquipmentFailure } from './farmContext';
+
 // ─────────────────────────────────────────────────────────────────────
 // recommendations — turns a farm's measured state into the one thing its
 // owner should actually do next.
@@ -196,6 +198,80 @@ function tempRecommendation(ctx, t, airTookOver) {
   };
 }
 
+// ── Climate runaway: the house is failing, not merely uncomfortable ──
+// This outranks every other rule, because it is the only one that buys the
+// farmer time rather than describing his present. Ryu et al. (2020) took laying
+// hens from THI 24 to 32 in an hour and passed 95% mortality by hour five; the
+// same THI reached gradually over six hours killed none in three. A house that
+// is MOVING fast is a different emergency from a house that is merely hot, and
+// only equipment failure moves one this fast.
+function runawayRecommendation(ctx, t) {
+  const { runaway, thi, device, tempTarget, sensors, isBrooding } = ctx;
+  if (!runaway) return null;
+
+  const cold = !runaway.rising;
+
+  // A slow drift is just weather. Speak only when the rate is one no weather
+  // produces, or the deadline is close enough to act on. A Gulf house warming
+  // gently from THI 70 across a summer morning is technically "hours from
+  // lethal" every single day - warning on that would bury the one morning the
+  // cooling has actually stopped.
+  const eta = cold ? runaway.coldEtaHours : runaway.etaHours;
+  if (!isEquipmentFailure(runaway)) return null;
+
+  const rateTxt = `${runaway.speed.toFixed(1)} THI/${t('unitHour') || 'h'}`;
+  const nowTxt = sensors.temp ? `${sensors.temp.value.toFixed(1)} °C` : '';
+  const fact = [
+    nowTxt,
+    thi ? `THI ${thi.thi}` : null,
+    `${cold ? '↓' : '↑'} ${rateTxt}`,
+    eta != null ? `${t('recWithin') || 'within'} ${fmtDuration(eta, t)}` : null,
+  ].filter(Boolean).join(' • ');
+
+  let title;
+  let sentence;
+  let why;
+
+  if (cold && isBrooding) {
+    title = t('recHeatFailTitle') || 'The house is losing heat fast';
+    sentence = t('recHeatFailBody') ||
+      'Check the brooder or heater NOW - this is how a heating failure looks, not how weather behaves. Chicks this young cannot make their own heat.';
+    why = (t('recFailEta') || 'At this rate the house is dangerously cold in about {time}.')
+      .replace('{time}', fmtDuration(eta, t) || '—');
+  } else if (cold) {
+    title = t('recColdDropTitle') || 'Temperature falling quickly';
+    sentence = t('recColdDropBody') ||
+      'Close the inlets on the windward side and check the heating is running. A fall this fast is usually a door, a curtain or a failed heater rather than the weather.';
+    why = null;
+  } else {
+    title = t('recCoolFailTitle') || 'The house is heating up fast';
+    sentence = t('recCoolFailBody') ||
+      'Check the fans, the cooling pads and the water pump NOW. A rise this quick is equipment failure, not weather - and it does not stop on its own.';
+    why = eta != null
+      ? (t('recFailEta') || 'At this rate the house reaches the lethal band in about {time}.')
+          .replace('{time}', fmtDuration(eta, t) || '—')
+      : (t('recFailAcute') || 'This is the speed at which birds start dying within hours, not days.');
+  }
+
+  // Power is the usual root cause of both, and the farmer can check it in
+  // seconds, so it is worth naming ahead of anything more elaborate.
+  const power = t('recCheckPower') ||
+    'Check the power first - a cut or a tripped breaker stops fans and heaters together.';
+
+  return {
+    id: `runaway_${device.id}`,
+    icon: cold ? 'thermometer' : 'sun',
+    // Acute movement is a danger in its own right even before a limit is
+    // crossed; that is the entire lesson of the acute-versus-gradual result.
+    severity: runaway.acute || (eta != null && eta < 2) ? 'danger' : 'warn',
+    title: `${device.name} — ${title}`,
+    body: body(fact, sentence, why, power),
+    deviceId: device.id,
+    topicId: cold ? 'temperature' : 'summer',
+    sensorKey: 'temp',
+  };
+}
+
 // ── Heat stress (temperature and humidity together) ──────────────────
 function heatStressRecommendation(ctx, t) {
   const { thi, sensors, device, hour, tempGap } = ctx;
@@ -284,19 +360,27 @@ export function deviceRecommendations(ctx, t) {
   if (!ctx || !ctx.hasData) return [];
   const out = [];
 
+  // A failing house comes first. If the cooling has stopped, "open the vents
+  // step by step" is not the instruction anyone needs.
+  const runaway = runawayRecommendation(ctx, t);
+  if (runaway) out.push(runaway);
+  const failing = !!runaway && runaway.severity === 'danger';
+
   const air = airRecommendation(ctx, t);
   if (air) out.push(air);
   // Once the air rule has issued a ventilation instruction it owns the house;
   // anything that would contradict it is suppressed rather than stacked on top.
   const airTookOver = !!air && air.severity !== 'info';
 
-  const heat = heatStressRecommendation(ctx, t);
+  // While the house is running away, a second card restating the temperature
+  // is noise competing with the one instruction that matters.
+  const heat = failing ? null : heatStressRecommendation(ctx, t);
   if (heat) out.push(heat);
 
   // A heat-stress warning already tells the farmer the house is too hot and
   // what to do about it; repeating that as a second card is noise.
   const heatOwnsTemp = !!heat && heat.severity !== 'info';
-  const temp = tempRecommendation(ctx, t, airTookOver);
+  const temp = failing ? null : tempRecommendation(ctx, t, airTookOver);
   if (temp && !(heatOwnsTemp && temp.id.indexOf('temp_') === 0 && ctx.tempGap > 0)) out.push(temp);
 
   const hum = humidityRecommendation(ctx, t, airTookOver);

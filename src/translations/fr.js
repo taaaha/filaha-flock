@@ -616,4 +616,15 @@ export default {
   enterOwnPrices: "Saisissez les prix que vous payez réellement — nous n’avons pas encore de référence locale vérifiée pour votre pays.",
   marketNoLocalTitle: "Pas encore de référence locale",
   marketNoLocalBody: "Les prix que nous publions proviennent d’enquêtes menées en Algérie ; les afficher ici serait trompeur. Utilisez l’estimateur de rentabilité avec vos propres prix d’aliment et de vente — le reste du guide s’applique normalement à votre élevage.",
+
+  // Climate runaway / equipment failure
+  recCoolFailTitle: "Le bâtiment se réchauffe vite",
+  recCoolFailBody: "Vérifiez MAINTENANT les ventilateurs, les pads de refroidissement et la pompe. Une hausse aussi rapide est une panne d’équipement, pas la météo — et elle ne s’arrête pas toute seule.",
+  recHeatFailTitle: "Le bâtiment perd sa chaleur vite",
+  recHeatFailBody: "Vérifiez MAINTENANT l’éleveuse ou le chauffage. C’est l’allure d’une panne de chauffage, pas de la météo — et des poussins de cet âge ne produisent pas leur propre chaleur.",
+  recColdDropTitle: "La température chute rapidement",
+  recColdDropBody: "Fermez les entrées côté vent et vérifiez que le chauffage tourne. Une chute aussi rapide vient presque toujours d’une porte, d’un rideau ou d’un chauffage en panne.",
+  recFailEta: "À ce rythme, le bâtiment atteint la zone létale dans environ {time}.",
+  recFailAcute: "C’est la vitesse à laquelle les animaux meurent en heures, pas en jours.",
+  recCheckPower: "Vérifiez d’abord le courant — une coupure ou un disjoncteur arrête ventilateurs et chauffage en même temps.",
 };

@@ -616,4 +616,15 @@ export default {
   enterOwnPrices: "Enter the prices you actually pay — we do not have a verified local reference for your country yet.",
   marketNoLocalTitle: "No local price reference yet",
   marketNoLocalBody: "The prices we publish are surveyed figures for Algeria, so showing them here would be misleading. Use the profit estimator with your own feed and market prices — everything else in the guide applies to your flock as normal.",
+
+  // Climate runaway / equipment failure
+  recCoolFailTitle: "The house is heating up fast",
+  recCoolFailBody: "Check the fans, the cooling pads and the water pump NOW. A rise this quick is equipment failure, not weather — and it does not stop on its own.",
+  recHeatFailTitle: "The house is losing heat fast",
+  recHeatFailBody: "Check the brooder or heater NOW. This is how a heating failure looks, not how weather behaves — and chicks this young cannot make their own heat.",
+  recColdDropTitle: "Temperature falling quickly",
+  recColdDropBody: "Close the inlets on the windward side and check the heating is running. A fall this fast is usually a door, a curtain or a failed heater rather than the weather.",
+  recFailEta: "At this rate the house reaches the lethal band in about {time}.",
+  recFailAcute: "This is the speed at which birds start dying within hours, not days.",
+  recCheckPower: "Check the power first — a cut or a tripped breaker stops fans and heaters together.",
 };

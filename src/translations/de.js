@@ -614,4 +614,15 @@ export default {
   enterOwnPrices: "Tragen Sie die Preise ein, die Sie tatsächlich zahlen — für Ihr Land liegt uns noch keine geprüfte Referenz vor.",
   marketNoLocalTitle: "Noch keine lokale Preisreferenz",
   marketNoLocalBody: "Die von uns veröffentlichten Preise stammen aus Erhebungen in Algerien; sie hier zu zeigen wäre irreführend. Nutzen Sie die Ertragsschätzung mit Ihren eigenen Futter- und Verkaufspreisen — alles Übrige im Leitfaden gilt für Ihren Bestand wie gewohnt.",
+
+  // Climate runaway / equipment failure
+  recCoolFailTitle: "Der Stall heizt sich schnell auf",
+  recCoolFailBody: "Prüfen Sie JETZT Ventilatoren, Kühlpads und Pumpe. Ein so schneller Anstieg ist ein Anlagenausfall, kein Wetter — und er hört nicht von allein auf.",
+  recHeatFailTitle: "Der Stall verliert schnell Wärme",
+  recHeatFailBody: "Prüfen Sie JETZT die Wärmequelle. So sieht ein Heizungsausfall aus, nicht das Wetter — und so junge Küken erzeugen keine eigene Wärme.",
+  recColdDropTitle: "Die Temperatur fällt schnell",
+  recColdDropBody: "Schließen Sie die Zuluft auf der Wetterseite und prüfen Sie, ob die Heizung läuft. Ein so schneller Abfall kommt meist von einer Tür, einem Vorhang oder einer defekten Heizung.",
+  recFailEta: "In diesem Tempo erreicht der Stall den tödlichen Bereich in etwa {time}.",
+  recFailAcute: "Das ist die Geschwindigkeit, bei der Tiere in Stunden sterben, nicht in Tagen.",
+  recCheckPower: "Prüfen Sie zuerst den Strom — ein Ausfall oder ein ausgelöster Schutzschalter legt Lüftung und Heizung gleichzeitig still.",
 };

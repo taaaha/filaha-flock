@@ -24,6 +24,7 @@ import {
 import { computeFarmHealth } from '../utils/farmHealth';
 import { generateInsights } from '../services/Insights';
 import { DEFAULT_COUNTRY, thresholdsForCountry } from '../utils/regions';
+import { buildFarmContext, isEquipmentFailure } from '../services/farmContext';
 import { actionFor } from '../utils/actionSteps';
 import { startRemoteContentRefresh } from '../services/RemoteContent';
 import { makePhoneCall, makeDirectCall } from '../services/CallService';
@@ -472,6 +473,80 @@ export function AppProvider({ children }) {
       } else {
         devState.battery = { status: STATUS.OK, firedAt: 0 };
       }
+    }
+
+    // ── Climate runaway — equipment failure, caught by SPEED not level ──
+    // Every rule above describes the house as it is now. This one is the only
+    // alarm that fires while the numbers still look survivable, because the
+    // house is moving toward lethal fast enough that waiting for a threshold
+    // wastes the hour the farmer needs. Ryu et al. (2020): laying hens taken
+    // from THI 24 to 32 within an hour passed 95% mortality by hour five; the
+    // same THI reached gradually killed none in three. Speed is the hazard.
+    //
+    // Unlike heat stress, this DOES auto-call. Heat stress defers to the plain
+    // temperature threshold because extreme heat trips that anyway - but a
+    // failure caught early has, by definition, not tripped anything yet.
+    try {
+      const hist = (s.readings && s.readings[device.id]) || [];
+      const withLatest = hist.length && hist[hist.length - 1] === reading
+        ? hist
+        : [...hist, { ...reading, timestamp: reading.timestamp || now }];
+      const ctx = buildFarmContext({
+        device, readings: { [device.id]: withLatest }, thresholds: s.thresholds, now,
+      });
+      if (isEquipmentFailure(ctx.runaway)) {
+        const prevR = devState.runaway || { status: STATUS.OK, firedAt: 0 };
+        const isNew = prevR.status !== STATUS.DANGER;
+        const cooledDown = now - (prevR.firedAt || 0) > DANGER_REFIRE_MS;
+        if (isNew || cooledDown) {
+          const ra = ctx.runaway;
+          const rising = ra.rising;
+          const farm = s.farms.find((f) => f.id === device.farmId);
+          const farmName = farm ? farm.name : (s.settings.farmName || '');
+          const titleKey = rising ? 'recCoolFailTitle'
+                         : (ctx.isBrooding ? 'recHeatFailTitle' : 'recColdDropTitle');
+          newAlerts.push({
+            id: uid('a_'),
+            deviceId: device.id,
+            deviceName: device.name,
+            farmName,
+            type: 'ALERT',
+            subType: 'CLIMATE_FAILURE',
+            // Language-neutral, like every other alert: the rate and the
+            // countdown are numbers, rendered in whatever language is active
+            // when the farmer actually looks at them.
+            detail: {
+              kind: 'runaway',
+              value: Math.round(ra.speed * 10) / 10,
+              rising,
+              etaHours: rising ? ra.etaHours : ra.coldEtaHours,
+            },
+            message: tRef.current(titleKey),
+            timestamp: reading.timestamp || now,
+            acknowledged: false,
+          });
+          devState.runaway = { status: STATUS.DANGER, firedAt: now };
+          firedAny = true;
+          if (!silent) {
+            if (s.settings.vibrate) vibrateDanger();
+            const eta = rising ? ra.etaHours : ra.coldEtaHours;
+            const etaTxt = eta != null
+              ? tRef.current('recFailEta').replace('{time}',
+                  eta < 1 ? `${Math.round(eta * 60)} ${tRef.current('unitMin')}`
+                          : `${eta.toFixed(1)} ${tRef.current('unitHour')}`)
+              : tRef.current('recFailAcute');
+            showAlertNotification(
+              `🚨 ${device.name} — ${tRef.current(titleKey)}`,
+              `${etaTxt}\n\n${tRef.current('recCheckPower')}`,
+              true
+            ).catch(() => {});
+          }
+        }
+      } else if (devState.runaway && devState.runaway.status === STATUS.DANGER) {
+        devState.runaway = { status: STATUS.OK, firedAt: 0 };
+      }
+    } catch (e) {
+      // Never let the predictive layer break the threshold alarms beneath it.
     }
 
     if (newAlerts.length > 0) {

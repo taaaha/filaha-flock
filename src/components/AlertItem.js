@@ -23,6 +23,10 @@ function alertTitle(alert, t) {
     case 'POWER_CUT': return t('powerCut');
     case 'BATTERY': return t('lowBattery');
     case 'HEAT_STRESS': return t('heatStress');
+    case 'CLIMATE_FAILURE':
+      // The stored message is the already-chosen title key's text; falling back
+      // to a generic label would lose which failure it was.
+      return alert.message || t('recCoolFailTitle');
     default: return t('danger');
   }
 }
@@ -37,6 +41,17 @@ function alertDetail(alert) {
   if (d.kind === 'value') return `${d.value} ${d.unit || ''}`.trim();
   if (d.kind === 'thi')   return `THI ${d.value}`;
   if (d.kind === 'pct')   return `${d.value}%`;
+  // Climate runaway: the rate is the point, and the countdown is what makes it
+  // actionable. Both are numbers, so they read correctly in any language.
+  if (d.kind === 'runaway') {
+    const arrow = d.rising ? '↑' : '↓';
+    const rate = `${arrow} ${d.value} THI/h`;
+    if (d.etaHours == null) return rate;
+    const eta = d.etaHours < 1
+      ? `${Math.round(d.etaHours * 60)} min`
+      : `${d.etaHours.toFixed(1)} h`;
+    return `${rate} • ${eta}`;
+  }
   return null;
 }
 
