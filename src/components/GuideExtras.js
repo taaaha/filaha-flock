@@ -3,9 +3,8 @@ import { View, Text, Pressable, ScrollView, TextInput } from 'react-native';
 import Svg, { Path, Line, Circle, Text as SvgText, G } from 'react-native-svg';
 import { colors, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
-import { useApp } from '../contexts/AppContext';
-import { getCountry } from '../utils/regions';
 import Icon from './Icon';
+import { useApp } from '../contexts/AppContext';
 import {
   STRAINS, STRAINS_BY_BREED, targetWeightAt, targetFCRAt,
   DISEASES, MARKET_REF, WILAYAS, heatStressTHI, FEED_PROFILE, strainLabel,
@@ -191,22 +190,6 @@ export function DiseaseWatchlist({ t, language }) {
 
 export function MarketPrices({ t }) {
   const styles = useStyles(makeStyles);
-  const { settings } = useApp();
-  const country = getCountry(settings.country);
-
-  // These are surveyed Algerian figures with a date on them. Showing them to a
-  // German or Qatari farmer under the heading "market reference" would be
-  // presenting one country's prices as his own. Until real local data exists,
-  // say so plainly instead.
-  if (!country.hasMarketData) {
-    return (
-      <View style={{ gap: 8 }}>
-        <Text style={styles.marketEmptyTitle}>{t('marketNoLocalTitle')}</Text>
-        <Text style={styles.marketEmptyBody}>{t('marketNoLocalBody')}</Text>
-      </View>
-    );
-  }
-
   const items = [
     { key: 'priceDocBroiler', range: MARKET_REF.doc_broiler_dec2025, unit: 'DZD' },
     { key: 'priceLivePerKg',  range: MARKET_REF.broiler_live_dec2025, unit: 'DZD/kg' },
@@ -231,10 +214,150 @@ export function MarketPrices({ t }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Wilaya picker — full searchable dropdown of all 58 Algerian wilayas
+// ─────────────────────────────────────────────────────────────────────
+
+import { Modal as RNModal } from 'react-native';
+
+export function WilayaPicker({ t, current, onPick }) {
+  const styles = useStyles(makeStyles);
+  const { language } = useApp();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const currentWilaya = WILAYAS.find((w) => w.id === current);
+  const list = WILAYAS.filter((w) => {
+    if (!query.trim()) return true;
+    const q = query.trim().toLowerCase();
+    return w.name.toLowerCase().includes(q)
+      || wilayaName(w, 'ar').includes(q)
+      || String(w.code).startsWith(q);
+  });
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        android_ripple={{ color: colors.accent + '22' }}
+        style={styles.wilayaDropdown}
+      >
+        <Icon name="mapPin" size={16} color={colors.accent} />
+        <Text style={[styles.wilayaDropdownText, !currentWilaya && { color: colors.textTertiary }]}>
+          {currentWilaya ? `${currentWilaya.code}. ${wilayaName(currentWilaya, language)}` : t('pickWilaya')}
+        </Text>
+        <Icon name="chevronDown" size={16} color={colors.textTertiary} />
+      </Pressable>
+
+      <RNModal
+        visible={open}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setOpen(false)}
+      >
+        <View style={styles.wilayaModalBackdrop}>
+          <View style={styles.wilayaModalCard}>
+            <View style={styles.wilayaModalHandle} />
+            <Text style={styles.wilayaModalTitle}>{t('pickWilaya')}</Text>
+            <View style={styles.wilayaSearch}>
+              <Icon name="search" size={16} color={colors.textTertiary} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={t('searchCoops')}
+                placeholderTextColor={colors.textTertiary}
+                style={styles.wilayaSearchInput}
+                autoFocus
+              />
+              {query ? (
+                <Pressable onPress={() => setQuery('')} hitSlop={10}>
+                  <Icon name="x" size={14} color={colors.textSecondary} />
+                </Pressable>
+              ) : null}
+            </View>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 460 }}
+            >
+              {list.length === 0 ? (
+                <Text style={styles.wilayaNoResults}>{t('noResults')}</Text>
+              ) : null}
+              {list.map((w) => (
+                <Pressable
+                  key={w.id}
+                  onPress={() => { onPick(w.id); setOpen(false); setQuery(''); }}
+                  android_ripple={{ color: colors.accent + '22' }}
+                  style={[styles.wilayaItem, current === w.id && styles.wilayaItemActive]}
+                >
+                  <Text style={styles.wilayaItemCode}>{String(w.code).padStart(2, '0')}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[
+                      styles.wilayaItemName,
+                      current === w.id && { color: colors.accent },
+                    ]}>{wilayaName(w, language)}</Text>
+                    <Text style={styles.wilayaItemMeta}>
+                      {w.region} • {w.climate}
+                    </Text>
+                  </View>
+                  {current === w.id ? <Icon name="check" size={16} color={colors.accent} /> : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable
+              onPress={() => setOpen(false)}
+              style={styles.wilayaCloseBtn}
+              android_ripple={{ color: '#ffffff22' }}
+            >
+              <Text style={styles.wilayaCloseBtnText}>{t('cancel')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </RNModal>
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Feed phase table
+// ─────────────────────────────────────────────────────────────────────
+
+export function FeedPhaseTable({ t, breed = 'broiler' }) {
+  const styles = useStyles(makeStyles);
+  const profile = FEED_PROFILE[breed] || FEED_PROFILE.broiler;
+  return (
+    <View>
+      {profile.phases.map((p, i) => (
+        <View key={i} style={styles.phaseRow}>
+          <View style={styles.phaseHeader}>
+            <Text style={styles.phaseName}>{p.name}</Text>
+            <Text style={styles.phaseDays}>{p.days}</Text>
+          </View>
+          <View style={styles.phaseMeta}>
+            <Metric label={t('protein')} value={`${p.cp}%`} />
+            <Metric label={t('energy')} value={`${p.kcal}`} />
+            {p.ca && <Metric label={t('calcium')} value={`${p.ca}%`} />}
+          </View>
+        </View>
+      ))}
+      {profile.formulation && (
+        <Text style={styles.formulaNote}>{profile.formulation}</Text>
+      )}
+    </View>
+  );
+}
+
+function Metric({ label, value }) {
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>{value}</Text>
+    </View>
+  );
+}
 
 const makeStyles = () => ({
-  marketEmptyTitle: { color: colors.textPrimary, fontSize: 15.5, fontWeight: '800' },
-  marketEmptyBody: { color: colors.textSecondary, fontSize: 14, lineHeight: 21 },
   gcWrap: { gap: 6 },
   chip: {
     paddingHorizontal: 10, paddingVertical: 6,

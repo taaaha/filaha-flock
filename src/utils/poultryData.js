@@ -816,18 +816,13 @@ export function heatStressTHI(tempC, humidityPct) {
     const rh = (humidityPct == null || isNaN(humidityPct)) ? 60 : humidityPct;
     // Poultry THI is defined in FAHRENHEIT. Convert first — feeding Celsius into
     // it (the old bug) compressed every value below ~35 so heat stress NEVER
-    // fired. Zones are the poultry four-zone chart (Zulovich & DeShazer 1990;
-    // Xin & Harmon 1998): comfort <70, alert 70-75, danger 76-81, emergency >81.
-    // Emergency previously fired at 83 - a CATTLE-scale number - which left a
-    // two-point band where birds are dying and the app still said "danger".
-    // The 58.8 constant is exact: NRC (1971) uses (1.8T - 26.8), and
-    // 1.8T - 26.8 is precisely tf - 58.8.
+    // fired. tiers: alert≥70, danger≥75, emergency≥83.
     const tf = 1.8 * tempC + 32;
-    const thi = tf - (0.55 - 0.0055 * rh) * (tf - 58.8);
+    const thi = tf - (0.55 - 0.0055 * rh) * (tf - 58);
     if (isNaN(thi)) return null;
     let tier = 'safe';
-    if (thi > 81) tier = 'emergency';
-    else if (thi >= 76) tier = 'danger';
+    if (thi >= 83) tier = 'emergency';
+    else if (thi >= 75) tier = 'danger';
     else if (thi >= 70) tier = 'alert';
     return { thi: Math.round(thi * 10) / 10, tier };
   } catch (e) { return null; }

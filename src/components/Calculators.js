@@ -4,8 +4,6 @@ import {
 } from 'react-native';
 import { colors, shadows } from '../utils/colors';
 import { useStyles } from '../utils/useStyles';
-import { useApp } from '../contexts/AppContext';
-import { getCountry } from '../utils/regions';
 import Icon from './Icon';
 import {
   targetTempAt, DENSITY, FEED_PROFILE, MARKET_REF, VACCINATION, localizeVaccine,
@@ -104,21 +102,11 @@ export function DensityCalc({ t, defaultBreed = 'broiler' }) {
 // ── Profit estimator ──
 export function ProfitCalc({ t, defaultBreed = 'broiler' }) {
   const styles = useStyles(makeStyles);
-  const { settings } = useApp();
-  const country = getCountry(settings.country);
-  const cur = country.currencySymbol;
-
-  // Seed the price fields ONLY where we have researched figures, which today
-  // means Algeria. Pre-filling a German farmer's calculator with Algerian
-  // dinars converted to euros would be an invented number dressed up as a
-  // default, and he would reasonably trust it. Blank fields ask him for the
-  // one thing he definitely knows: what he actually pays.
-  const seeded = country.hasMarketData;
   const [breed, setBreed] = useState(defaultBreed);
   const [birds, setBirds] = useState('1000');
-  const [feedPrice, setFeedPrice] = useState(seeded ? String(MARKET_REF.feedPriceDZD) : '');
+  const [feedPrice, setFeedPrice] = useState(String(MARKET_REF.feedPriceDZD));
   const [marketPrice, setMarketPrice] = useState(
-    seeded ? String(breed === 'beldi' ? MARKET_REF.beldiLiveDZD : MARKET_REF.broilerLiveDZD) : ''
+    String(breed === 'beldi' ? MARKET_REF.beldiLiveDZD : MARKET_REF.broilerLiveDZD)
   );
 
   const profile = FEED_PROFILE[breed] || FEED_PROFILE.broiler;
@@ -146,7 +134,7 @@ export function ProfitCalc({ t, defaultBreed = 'broiler' }) {
         />
       </View>
       <View style={styles.calcRow}>
-        <Text style={styles.calcLabel}>{t('feedCostPerKg')} ({cur})</Text>
+        <Text style={styles.calcLabel}>{t('feedCostPerKg')}</Text>
         <TextInput
           value={feedPrice}
           onChangeText={(v) => setFeedPrice(v.replace(/[^0-9.]/g, ''))}
@@ -155,7 +143,7 @@ export function ProfitCalc({ t, defaultBreed = 'broiler' }) {
         />
       </View>
       <View style={styles.calcRow}>
-        <Text style={styles.calcLabel}>{t('marketPricePerKg')} ({cur})</Text>
+        <Text style={styles.calcLabel}>{t('marketPricePerKg')}</Text>
         <TextInput
           value={marketPrice}
           onChangeText={(v) => setMarketPrice(v.replace(/[^0-9.]/g, ''))}
@@ -175,16 +163,13 @@ export function ProfitCalc({ t, defaultBreed = 'broiler' }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.resultLabel}>{t('estimatedProfit')}</Text>
           <Text style={[styles.resultValue, { color: profit >= 0 ? colors.ok : colors.danger }]}>
-            {profit >= 0 ? '+' : ''}{(profit / 1000).toFixed(1)}k {cur}
+            {profit >= 0 ? '+' : ''}{(profit / 1000).toFixed(1)}k DZD
           </Text>
           <Text style={styles.resultHint}>
-            {profitPerBird.toFixed(0)} {cur} {t('perBird')}
+            {profitPerBird.toFixed(0)} DZD {t('perBird')}
           </Text>
         </View>
       </View>
-      {!seeded ? (
-        <Text style={styles.source}>{t('enterOwnPrices')}</Text>
-      ) : null}
       <Text style={styles.source}>
         {t('sourcedFrom')}{t('basedOn')} {profile.cycleDays} {t('day')} • FCR ~{profile.fcrTarget}
       </Text>
