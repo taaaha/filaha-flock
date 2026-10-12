@@ -420,6 +420,82 @@ bool modem_send_sms_u16(const char* number, const char16_t* text, size_t len) {
   return ok;
 }
 
+// ── Receiving ─────────────────────────────────────────────────────
+// Polled, not interrupt-driven: ask the modem for what it has stored. That
+// needs no unsolicited-result handling, so it cannot disturb the MQTT code,
+// which reads the same serial line one request at a time.
+//
+// Text-mode listing looks like:
+//   +CMGL: 1,"REC UNREAD","+213781103304",,"26/10/08,15:30:00+04"
+//   T 20 32
+//   (blank)
+//   OK
+int modem_poll_sms(InboundSms* out, int max) {
+  if (!out || max <= 0 || !s_attached) return 0;
+
+  modem.sendAT(GF("+CMGF=1"));          modem.waitResponse(2000UL);
+  modem.sendAT(GF("+CSCS=\"GSM\""));    modem.waitResponse(2000UL);
+
+  while (MODEM_SERIAL.available()) MODEM_SERIAL.read();       // stale bytes
+  modem.sendAT(GF("+CMGL=\"ALL\""));
+
+  static char buf[1100];
+  size_t n = 0;
+  const unsigned long t0 = millis();
+  bool done = false;
+  while (!done && millis() - t0 < 4000UL) {
+    while (MODEM_SERIAL.available() && n < sizeof(buf) - 1) buf[n++] = (char)MODEM_SERIAL.read();
+    buf[n] = 0;
+    if (strstr(buf, "\r\nOK\r\n") || strstr(buf, "ERROR")) done = true;
+    else delay(5);
+  }
+  if (n == 0) return 0;
+
+  int count = 0;
+  const char* p = buf;
+  while (count < max && (p = strstr(p, "+CMGL:")) != NULL) {
+    p += 6;
+    const int idx = atoi(p);
+    const char* eol = strstr(p, "\r\n");
+    if (!eol) break;
+
+    // header: index,"status","sender",...  -> the 3rd and 4th quote bound the sender
+    const char* q[4] = { NULL, NULL, NULL, NULL };
+    int qn = 0;
+    for (const char* c = p; c < eol && qn < 4; ++c) if (*c == '"') q[qn++] = c;
+    InboundSms& m = out[count];
+    m.from[0] = 0;
+    if (qn == 4) {
+      size_t fl = (size_t)(q[3] - q[2] - 1);
+      if (fl >= sizeof(m.from)) fl = sizeof(m.from) - 1;
+      memcpy(m.from, q[2] + 1, fl);
+      m.from[fl] = 0;
+    }
+
+    // body: from the line after the header to the next listing / the final OK
+    const char* body = eol + 2;
+    const char* end1 = strstr(body, "\r\n+CMGL:");
+    const char* end2 = strstr(body, "\r\nOK");
+    const char* end  = end1 ? end1 : end2;
+    if (end1 && end2 && end2 < end1) end = end2;
+    if (!end) end = buf + n;
+
+    size_t bl = 0;
+    for (const char* c = body; c < end && bl < sizeof(m.body) - 1; ++c) {
+      m.body[bl++] = (*c == '\r' || *c == '\n') ? ' ' : *c;
+    }
+    while (bl > 0 && m.body[bl - 1] == ' ') bl--;
+    m.body[bl] = 0;
+
+    // delete it so the next poll does not see it again
+    if (idx > 0) { modem.sendAT(GF("+CMGD="), idx); modem.waitResponse(3000UL); }
+
+    if (m.from[0]) count++;
+    p = end;
+  }
+  return count;
+}
+
 void modem_loop() {
   // Cheap state refresh every 30 s — keeps `attached` and `rssi` truthful
   // without spamming AT.

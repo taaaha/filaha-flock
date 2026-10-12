@@ -138,7 +138,18 @@
 #define CRITICAL_CALL_ENABLED    1       // also ring the farmer (0 if module is data-only)
 #define CRITICAL_RING_MS         20000   // how long to ring before hanging up
 
-// ── Local danger thresholds (mirror the app defaults) ──────────────
+// ── Changing the limits by text message ─────────────────────────────
+// The numbers below are only the FACTORY DEFAULTS. The farmer changes them by
+// texting the box (e.g. "T 20 32 H 40 75 C 2500 N 25"), the values are saved
+// in non-volatile memory, and they win over these defaults until "RESET".
+// Only FILAHA_FARMER_NUMBER (and, if set, FILAHA_ADMIN_NUMBER) is obeyed.
+#define FILAHA_SMS_COMMANDS      1
+#define FILAHA_ADMIN_NUMBER      ""          // optional second number, e.g. the installer
+#define SMS_POLL_MS              15000       // how often the box looks for texts
+#define FILAHA_LIMITS_SELFTEST   1           // check the text parser at every boot: leave on
+
+// ── Local danger thresholds: FACTORY DEFAULTS ──────────────────────
+// (the live values come from limits.h; these mirror the app defaults)
 // Used ONLY for the optional explicit ALERT/CLEAR SMS path. The app
 // re-evaluates each reading anyway — this is defence in depth.
 #define CO2_DANGER_PPM           2500.0f
@@ -171,6 +182,17 @@
 #define I2C_SDA                  21
 #define I2C_SCL                  22
 #define I2C_FREQ_HZ              100000               // 100 kHz — gentle for long Gravity cables
+
+// ── Display: 20x4 HD44780 + PCF8574 I2C backpack ───────────────────
+// Shares the I2C bus above, so it costs no pins. Optional by design: if nothing
+// ACKs the firmware logs it once and carries on, and re-probes every 30 s.
+// NOTE the module is a 5 V part - read HARDWARE.md section 6.5 before wiring.
+#define FILAHA_HAS_LCD           1
+#define FILAHA_LCD_ADDR          0                    // 0 = auto (tries 0x27, then 0x3F)
+#define FILAHA_LCD_BACKLIGHT     1
+// The screen shows two status signs (power, network) top-right and the four
+// values on the third row; labels and units are PRINTED ON THE BOX under the window.
+// Layout lives in lcd.cpp (lcd_show).
 
 // ── Buttons (Gravity active-HIGH digital push buttons, DFR0029) ────
 // Wire each button's signal line to its pin and 3V3/GND from the hub.
