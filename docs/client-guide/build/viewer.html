@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>pdf check</title>
+<style>
+  body { margin: 0; padding-top: 26px; background: #888; }
+  canvas { display: block; margin: 6px auto; box-shadow: 0 0 0 1px #000; }
+  body.grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 8px; align-content: flex-start; }
+  body.grid canvas { margin: 4px 0; }
+  #info { position: fixed; top: 0; left: 0; background: #fff; font: 11px monospace; padding: 2px 6px; z-index: 5; }
+</style>
+</head>
+<body>
+<div id="info">loading…</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  const q = new URLSearchParams(location.search);
+  const file = q.get("f");
+  const scale = parseFloat(q.get("s") || "1.05");
+  if (q.get("g")) document.body.classList.add("grid");
+  const only = q.get("p") ? parseInt(q.get("p"), 10) : null;      // a single page
+  const crop = q.get("c") ? q.get("c").split(",").map(Number) : null; // x,y,w,h in PDF points, from top-left
+  (async () => {
+    const pdf = await pdfjsLib.getDocument(file).promise;
+    const fonts = new Set();
+    for (let i = 1; i <= pdf.numPages; i++) {
+      if (only && i !== only) continue;
+      const page = await pdf.getPage(i);
+      const vp = page.getViewport({ scale });
+      const c = document.createElement("canvas");
+      c.id = "p" + i;
+      let transform = null;
+      if (crop) {
+        c.width = Math.round(crop[2] * scale);
+        c.height = Math.round(crop[3] * scale);
+        transform = [1, 0, 0, 1, -crop[0] * scale, -crop[1] * scale];
+      } else { c.width = vp.width; c.height = vp.height; }
+      document.body.appendChild(c);
+      await page.render({ canvasContext: c.getContext("2d"), viewport: vp, transform }).promise;
+      const tc = await page.getTextContent();
+      tc.items.forEach(it => fonts.add(it.fontName));
+    }
+    const names = [];
+    for (const id of fonts) { try { const f = pdf._transport.commonObjs.has(id) ? pdf._transport.commonObjs.get(id) : null; if (f && f.name) names.push(f.name); } catch (e) {} }
+    document.getElementById("info").textContent = file + " · " + pdf.numPages + "p · fonts: " + [...new Set(names)].join(", ");
+    window.__done = pdf.numPages;
+    window.__fonts = [...new Set(names)];
+  })().catch(e => { document.getElementById("info").textContent = "ERROR " + e; window.__done = "error " + e; });
+</script>
+</body>
+</html>

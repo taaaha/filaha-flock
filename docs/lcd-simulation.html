@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Filaha Flock — live LCD simulation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Cairo:wght@600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root { --page:#ebe8df; --ink:#17230f; --ink2:#4a5442; --hair:rgba(23,35,15,.18); --card:#fbf8f1; --leaf:#2f5d1d; --warn:#9a5b00; }
+  @media (prefers-color-scheme: dark) {
+    :root { --page:#161a12; --ink:#f2efe4; --ink2:#bdc4b2; --hair:rgba(242,239,228,.2); --card:#1d2218; --leaf:#7fc25a; --warn:#e9b949; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font-family:"Archivo",system-ui,sans-serif; line-height:1.55; }
+  ::selection { background:#e9b949; color:#1d3a13; }
+  .wrap { max-width:1040px; margin:0 auto; padding:24px 16px 56px; }
+  h1 { font-size:24px; font-weight:800; letter-spacing:-.03em; margin:0 0 4px; }
+  .sub { margin:0 0 16px; color:var(--ink2); font-size:14.5px; max-width:76ch; }
+  .bar { display:flex; flex-wrap:wrap; gap:8px 20px; margin:0 0 12px; align-items:center; }
+  .group { display:flex; flex-wrap:wrap; align-items:stretch; }
+  .glabel { font-size:12px; font-weight:700; color:var(--ink2); margin-inline-end:10px; align-self:center; }
+  button { font:inherit; font-size:13.5px; font-weight:600; color:var(--ink); background:transparent; border:1px solid var(--hair);
+           padding:7px 12px; cursor:pointer; margin-inline-start:-1px; transition:background .12s,color .12s; }
+  .group button:first-of-type { margin-inline-start:0; }
+  button:hover { background:rgba(127,127,127,.12); }
+  button[aria-pressed="true"] { background:var(--leaf); border-color:var(--leaf); color:#fff; position:relative; }
+  button:focus-visible { outline:2px solid var(--leaf); outline-offset:2px; position:relative; z-index:2; }
+  .clock { font-variant-numeric:tabular-nums; font-weight:700; font-size:13.5px; color:var(--ink2); margin-inline-start:auto; }
+
+  .stage { background:var(--card); border:1px solid var(--hair); padding:22px 16px; display:grid; place-items:center; overflow-x:auto; }
+  #unit { --mm:min(6.4px, calc((100vw - 72px) / 140)); --h:57; width:calc(var(--mm) * 140); height:calc(var(--mm) * var(--h)); display:block; }
+  body.actual #unit { --mm:1mm; }
+  #unit text { font-family:"Archivo","Cairo",sans-serif; }
+  #unit .ar { font-family:"Cairo","Archivo",sans-serif; font-weight:800; }
+
+  .panels { display:grid; gap:14px 24px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); margin-top:16px; }
+  .panel { border-top:2px solid var(--ink); padding-top:10px; }
+  .panel h2 { font-size:13px; font-weight:800; margin:0 0 6px; }
+  .panel p { margin:0 0 6px; font-size:13px; color:var(--ink2); }
+  .mono { font-family:ui-monospace,Consolas,monospace; font-size:12px; line-height:1.55; color:var(--ink2); }
+  .log { list-style:none; margin:0; padding:0; font-size:13px; }
+  .log li { padding:3px 0; border-bottom:1px solid var(--hair); font-variant-numeric:tabular-nums; }
+  .log li b { color:var(--warn); }
+  .log li.empty { color:var(--ink2); border:0; }
+  details summary { cursor:pointer; font-size:12.5px; font-weight:700; color:var(--ink2); margin:4px 0; }
+  .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); border:0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h2 class="sr-only">A live simulation of the Filaha Flock box: an emulated character display shows two small status signs and four readings that change over time, with a separate panel for the alerts the box raises.</h2>
+  <h1>The box, running</h1>
+  <p class="sub">This runs. The screen is an emulated HD44780 controller (the chip on your LCD) fed the same commands the firmware sends: cursor addresses for a 20×4 module, eight custom characters loaded at boot, and only the rows that changed rewritten. The readings drift on their own; use the buttons to make things go wrong.</p>
+
+  <div class="bar">
+    <div class="group" role="group" aria-label="Run">
+      <button type="button" id="run" aria-pressed="true">Running</button>
+    </div>
+    <div class="group" role="group" aria-label="Speed">
+      <span class="glabel">Speed</span>
+      <button type="button" data-speed="1" aria-pressed="false">Real time</button>
+      <button type="button" data-speed="15" aria-pressed="true">×15</button>
+      <button type="button" data-speed="60" aria-pressed="false">×60</button>
+    </div>
+    <div class="group" role="group" aria-label="Size">
+      <button type="button" id="size" aria-pressed="false">Actual size</button>
+    </div>
+    <span class="clock" id="clock" aria-live="off"></span>
+  </div>
+  <div class="bar">
+    <div class="group" role="group" aria-label="Make something happen">
+      <span class="glabel">Make it happen</span>
+      <button type="button" id="mains">Cut mains</button>
+      <button type="button" id="net">Drop the network</button>
+      <button type="button" id="air">Choke the ventilation</button>
+    </div>
+  </div>
+
+  <div class="stage"><svg id="unit" viewBox="0 0 140 57" role="img" aria-label="The box faceplate with the LCD window and printed labels"></svg></div>
+
+  <div class="panels">
+    <div class="panel">
+      <h2>What the firmware sent to the screen</h2>
+      <p class="mono" id="bus">—</p>
+      <details><summary>Last update, byte by byte</summary><div class="mono" id="ops"></div></details>
+    </div>
+    <div class="panel">
+      <h2>What the box did (never shown on the screen)</h2>
+      <ul class="log" id="log"><li class="empty">Nothing yet. Choke the ventilation, or cut mains.</li></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+//  1 · an HD44780 character LCD controller, 20x4 module
+// ════════════════════════════════════════════════════════════════
+class HD44780 {
+  constructor() { this.ddram = new Uint8Array(128).fill(0x20); this.cgram = Array.from({ length: 8 }, () => new Uint8Array(8)); this.addr = 0; this.inCG = false; this.on = false; }
+  cmd(c) {
+    if (c === 0x01) { this.ddram.fill(0x20); this.addr = 0; this.inCG = false; }
+    else if (c & 0x80) { this.addr = c & 0x7F; this.inCG = false; }
+    else if (c & 0x40) { this.addr = c & 0x3F; this.inCG = true; }
+    else if ((c & 0xFC) === 0x08) this.on = !!(c & 0x04);        // display control
+  }
+  data(b) {
+    if (this.inCG) { this.cgram[(this.addr >> 3) & 7][this.addr & 7] = b & 0x1F; this.addr = (this.addr + 1) & 0x3F; }
+    else { this.ddram[this.addr] = b; this.addr = (this.addr + 1) & 0x7F; }
+  }
+  // the 2004 module's address map: rows 0..3 start at 0x00, 0x40, 0x14, 0x54
+  cell(row, col) { return this.ddram[[0x00, 0x40, 0x14, 0x54][row] + col]; }
+}
+
+// the part of the ROM font that the screen uses: digits, '.', '-', space  (columns, LSB = top dot)
+const ROM = {
+  0x20: [0,0,0,0,0], 0x2D: [8,8,8,8,8], 0x2E: [0,0x60,0x60,0,0],
+  0x30: [0x3E,0x51,0x49,0x45,0x3E], 0x31: [0,0x42,0x7F,0x40,0], 0x32: [0x42,0x61,0x51,0x49,0x46],
+  0x33: [0x21,0x41,0x45,0x4B,0x31], 0x34: [0x18,0x14,0x12,0x7F,0x10], 0x35: [0x27,0x45,0x45,0x45,0x39],
+  0x36: [0x3C,0x4A,0x49,0x49,0x30], 0x37: [0x01,0x71,0x09,0x05,0x03], 0x38: [0x36,0x49,0x49,0x49,0x36],
+  0x39: [0x06,0x49,0x49,0x29,0x1E],
+};
+const glyphRows = (lcd, code) => {                    // 8 rows x 5 bits for any character code
+  if (code < 8) return Array.from(lcd.cgram[code]);
+  const cols = ROM[code] || ROM[0x20];
+  return Array.from({ length: 8 }, (_, r) => r > 6 ? 0 : cols.reduce((v, c, i) => v | (((c >> r) & 1) << (4 - i)), 0));
+};
+
+// ════════════════════════════════════════════════════════════════
+//  2 · the driver — mirrors firmware/src/lcd.cpp
+//      hw_init, a CGRAM load, and draw_row() that skips rows that did not change
+// ════════════════════════════════════════════════════════════════
+const BYTE_MS = 0.68;   // one byte = two nibbles, each an I2C transaction (~0.3 ms) plus the 40 us settle
+const SIGNS = {         // the 8 custom characters: 8 rows x 5 bits, bit 4 = leftmost dot
+  PL: [0b01010,0b01010,0b11111,0b11111,0b11111,0b01110,0b00100,0b00100],   // plug: mains
+  BF: [0,0b11110,0b11110,0b11111,0b11111,0b11110,0b11110,0],               // battery, horizontal: full
+  BH: [0,0b11110,0b11010,0b11011,0b11011,0b11010,0b11110,0],               //                    half
+  BL: [0,0b11110,0b10010,0b10011,0b10011,0b10010,0b11110,0],               //                    empty
+  S3: [0,0b00001,0b00001,0b00101,0b00101,0b10101,0b10101,0b10101],        // signal: three bars
+  S2: [0,0,0,0b00100,0b00100,0b10100,0b10100,0b10100],                     //          two
+  S1: [0,0,0,0,0,0b10000,0b10000,0b10000],                                 //          one
+  SX: [0,0b10001,0b01010,0b00100,0b01010,0b10001,0,0],                     // cross: cannot reach the servers
+};
+const CG = { PL: 0, BF: 1, BH: 2, BL: 3, S3: 4, S2: 5, S1: 6, SX: 7 };
+
+const lcd = new HD44780();
+const driver = {
+  shadow: [null, null, null, null], ops: [], ms: 0, totalMs: 0, updates: 0,
+  _cmd(c, note) { lcd.cmd(c); this.ops.push({ rs: 0, b: c, note }); this.ms += BYTE_MS; },
+  _data(b) { lcd.data(b); this.ops.push({ rs: 1, b }); this.ms += BYTE_MS; },
+  begin() {                                        // hw_init(), then load the signs into CGRAM
+    this.ops = []; this.ms = 50 + 5 + 0.3 + 3;     // power-up wait, the 0x3 x3 sequence, the clear
+    [0x28, 0x08, 0x01, 0x06, 0x0C].forEach((c) => this._cmd(c, "init"));
+    this._cmd(0x40, "CGRAM address 0");
+    Object.values(SIGNS).forEach((rows) => rows.forEach((r) => this._data(r)));
+    this.totalMs += this.ms; this.shadow = [null, null, null, null];
+    return { boot: true, ms: this.ms };
+  },
+  show(rows) {                                     // draw_row(): rewrite only rows that differ from the shadow
+    this.ops = []; this.ms = 0; const changed = [];
+    rows.forEach((row, r) => {
+      if (this.shadow[r] && this.shadow[r].every((v, i) => v === row[i])) return;
+      this._cmd(0x80 | [0x00, 0x40, 0x14, 0x54][r], `row ${r}`);
+      row.forEach((b) => this._data(b));
+      this.shadow[r] = row.slice(); changed.push(r);
+    });
+    this.totalMs += this.ms; this.updates++;
+    return { changed, ms: this.ms };
+  },
+};
+
+// ════════════════════════════════════════════════════════════════
+//  3 · what the firmware decides to put on the screen
+//      signs on row 0 (top right), the four values on row 2
+// ════════════════════════════════════════════════════════════════
+function compose(s) {
+  const rows = [0, 1, 2, 3].map(() => Array(20).fill(0x20));
+  const sig = !s.net ? "SX" : s.rssi >= -95 ? "S3" : s.rssi >= -105 ? "S2" : "S1";
+  const pow = s.mains ? "PL" : s.bat >= 60 ? "BF" : s.bat >= 25 ? "BH" : "BL";
+  rows[0][17] = CG[sig];                            // network
+  rows[0][19] = CG[pow];                            // power: the very corner
+  const vals = [s.t.toFixed(1), String(Math.round(Math.min(100, s.h))), String(Math.trunc(Math.min(9999, s.c))), s.nh3Fitted ? s.n.toFixed(1) : "--"];
+  vals.forEach((t, i) => {                          // outer two pinned one column in from the edges, inner two centred in their slots
+    let col = i === 0 ? 1 : i === 3 ? 19 - t.length : i * 5 + (i === 1 ? Math.ceil((5 - t.length) / 2) : Math.floor((5 - t.length) / 2));
+    for (const ch of t) rows[2][col++] = ch.charCodeAt(0);
+  });
+  return rows;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  4 · the world: sensors, battery, signal, and the box's alert rules
+// ════════════════════════════════════════════════════════════════
+const LIM = { tlo: 12, thi: 38, hlo: 25, hhi: 85, co2: 2500, nh3: 35 };
+const S = { clock: 14 * 3600, mains: true, net: true, bat: 100, rssi: -80, t: 32.1, h: 58, c: 830, n: 12.4, nh3Fitted: true, poor: false,
+            streak: { c: 0, n: 0, t: 0, h: 0 }, lastAlert: -1e9 };
+const rnd = (a) => (Math.random() * 2 - 1) * a;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const hms = (t) => [Math.floor(t / 3600) % 24, Math.floor(t / 60) % 60, t % 60].map((x) => String(x).padStart(2, "0")).join(":");
+const log = [];
+function note(msg) { log.unshift(`<li><span>${hms(S.clock)}</span> ${msg}</li>`); if (log.length > 9) log.pop(); drawLog(); }
+
+function step() {                                   // one 15-second reading cycle
+  S.clock += 15;
+  S.t = clamp(S.t + (32.3 - S.t) * 0.04 + rnd(0.18) + (S.poor ? 0.05 : 0), 8, 48);
+  S.h = clamp(S.h + (58 - S.h) * 0.03 + rnd(0.5), 20, 100);
+  S.c = clamp(S.c + ((S.poor ? 3400 : 820) - S.c) * (S.poor ? 0.035 : 0.05) + rnd(14), 400, 5000);
+  S.n = clamp(S.n + ((S.poor ? 48 : 12) - S.n) * (S.poor ? 0.03 : 0.05) + rnd(0.25), 0, 100);
+  S.rssi = clamp(S.rssi + rnd(2.2) + (-80 - S.rssi) * 0.05, -112, -62);
+  S.bat = S.mains ? Math.min(100, S.bat + 0.125) : Math.max(0, S.bat - 0.05);
+  // the box's own rules: two readings in a row past a limit, then at most one alert per 10 minutes
+  const hit = (k, bad) => (S.streak[k] = bad ? S.streak[k] + 1 : 0) >= 2;
+  const trig = [];
+  if (hit("c", S.c >= LIM.co2)) trig.push(`CO₂ ${Math.round(S.c)} ppm`);
+  if (hit("n", S.nh3Fitted && S.n >= LIM.nh3)) trig.push(`NH₃ ${S.n.toFixed(1)} ppm`);
+  if (hit("t", S.t >= LIM.thi || S.t <= LIM.tlo)) trig.push(`temperature ${S.t.toFixed(1)} °C`);
+  if (hit("h", S.h >= LIM.hhi || S.h <= LIM.hlo)) trig.push(`humidity ${Math.round(S.h)} %`);
+  if (trig.length && S.clock - S.lastAlert >= 600) {
+    S.lastAlert = S.clock;
+    note(`<b>DANGER</b>: ${trig.join(", ")} → buzzer sounds, SMS sent, phone rings. The screen shows nothing different.`);
+  }
+  refresh();
+}
+function refresh() {
+  const r = driver.show(compose(S));
+  lastUpdate = r;
+  render();
+}
+let lastUpdate = driver.begin();
+
+// ════════════════════════════════════════════════════════════════
+//  5 · drawing: the real-looking faceplate and the LCD behind it
+// ════════════════════════════════════════════════════════════════
+const G = { pitchX: 3.55, pitchY: 5.94, dotX: 0.6, dotY: 0.66, dot: 0.52, viewW: 76, padX: 2.8, padY: 1.3, charH: 4.75 };
+const PIX = "#14210a", GHOST = "rgba(32,50,4,.09)";
+function cellDots(code, cx, cy) {
+  let out = "";
+  const rows = glyphRows(lcd, code);
+  for (let row = 0; row < 8; row++) for (let col = 0; col < 5; col++) {
+    const on = (rows[row] >> (4 - col)) & 1;
+    out += `<rect x="${(cx + col * G.dotX).toFixed(3)}" y="${(cy + row * G.dotY).toFixed(3)}" width="${G.dot}" height="${(G.dot + .08).toFixed(3)}" rx=".05" fill="${on ? PIX : GHOST}" ${on ? 'opacity=".93"' : ""}/>`;
+  }
+  return out;
+}
+const LABELS = [
+  { ar: "الحرارة", en: "TEMP", unit: "°C", icon: "temp" }, { ar: "الرطوبة", en: "HUM", unit: "%", icon: "drop" },
+  { ar: "الكربون", en: "CO₂", unit: "ppm", icon: "cloud" }, { ar: "الأمونيا", en: "NH₃", unit: "ppm", icon: "flask" },
+];
+function icon(kind, x, y) {
+  const s = 'fill="none" stroke="#17230f" stroke-width=".36" stroke-linecap="round" stroke-linejoin="round"';
+  if (kind === "temp")  return `<g transform="translate(${x},${y})" ${s}><path d="M1.7 .4h.6v2.2a1.3 1.3 0 1 1-.6 0z"/><path d="M2 1.3v1.6"/></g>`;
+  if (kind === "drop")  return `<g transform="translate(${x},${y})" ${s}><path d="M2 .3C1.1 1.5.5 2.2.5 2.9a1.5 1.5 0 0 0 3 0C3.5 2.2 2.9 1.5 2 .3z"/></g>`;
+  if (kind === "cloud") return `<g transform="translate(${x},${y})" ${s}><path d="M1 3.3a1 1 0 0 1-.1-2 1.4 1.4 0 0 1 2.6-.2 1.1 1.1 0 0 1 .1 2.2z"/></g>`;
+  return `<g transform="translate(${x},${y})" ${s}><path d="M1.5.4h1M1.7.4v1.2L.5 3.4h3L2.3 1.6V.4"/></g>`;
+}
+
+const W = 140, winX = (W - G.viewW) / 2, bez = 1.6, chX = winX + G.padX;
+const visY = 16, visH = 2 * G.pitchY + G.charH + 2 * G.padY;           // the window shows rows 0..2
+const H = visY + visH + bez + 20;
+
+function staticArt() {
+  let s = `<defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3f0e8"/><stop offset="1" stop-color="#e4e0d5"/></linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d4f26a"/><stop offset=".07" stop-color="#b9df3d"/><stop offset=".5" stop-color="#a7cf2c"/><stop offset=".93" stop-color="#b9df3d"/><stop offset="1" stop-color="#d4f26a"/></linearGradient>
+    <linearGradient id="recess" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".4"/><stop offset=".16" stop-color="#000" stop-opacity="0"/><stop offset=".86" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></linearGradient>
+    <linearGradient id="glare" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".2"/><stop offset=".4" stop-color="#fff" stop-opacity=".03"/><stop offset=".41" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <filter id="soft" x="-3%" y="-3%" width="106%" height="106%"><feGaussianBlur stdDeviation=".045"/></filter>
+    <filter id="drop" x="-3%" y="-3%" width="106%" height="112%"><feDropShadow dx="0" dy=".8" stdDeviation=".9" flood-color="#000" flood-opacity=".25"/></filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/><feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .5 -.2"/></filter>
+    <clipPath id="vis"><rect x="${winX}" y="${visY}" width="${G.viewW}" height="${visH}" rx=".3"/></clipPath>
+  </defs>`;
+  s += `<rect width="${W}" height="${H}" rx="4" fill="url(#plate)" stroke="rgba(0,0,0,.16)" stroke-width=".25" filter="url(#drop)"/>`;
+  s += `<rect width="${W}" height="${H}" rx="4" filter="url(#grain)" opacity=".12" style="mix-blend-mode:multiply"/>`;
+  s += `<rect x=".3" y=".3" width="${W - .6}" height="${H - .6}" rx="3.7" fill="none" stroke="rgba(255,255,255,.7)" stroke-width=".35"/>`;
+  [[4.5, 4.5], [W - 4.5, 4.5], [4.5, H - 4.5], [W - 4.5, H - 4.5]].forEach(([x, y]) =>
+    s += `<circle cx="${x}" cy="${y}" r="1.4" fill="#d9d5c9" stroke="rgba(0,0,0,.3)" stroke-width=".18"/><circle cx="${x - .25}" cy="${y - .25}" r=".5" fill="rgba(255,255,255,.55)"/><path d="M${x - .85} ${y + .1}h1.7" stroke="rgba(0,0,0,.45)" stroke-width=".22"/>`);
+  s += `<text x="${winX}" y="10" font-size="3.6" font-weight="800" letter-spacing="-.06" fill="#17230f">FILAHA <tspan fill="#2f5d1d">FLOCK</tspan></text>`;
+  // the window: a bevelled cut in the plate, then the module's black bezel
+  s += `<rect x="${winX - bez - .5}" y="${visY - bez - .5}" width="${G.viewW + 2 * (bez + .5)}" height="${visH + 2 * (bez + .5)}" rx="1.1" fill="#cfcbbf"/>`;
+  s += `<rect x="${winX - bez}" y="${visY - bez}" width="${G.viewW + 2 * bez}" height="${visH + 2 * bez}" rx=".9" fill="#0f120c"/>`;
+  s += `<rect x="${winX}" y="${visY}" width="${G.viewW}" height="${visH}" rx=".3" fill="url(#edge)"/>`;
+  LABELS.forEach((Lb, i) => {
+    const cx = chX + (i * 5 + 2.5) * G.pitchX - (G.pitchX - 2.95) / 2, top = visY + visH + bez;
+    s += `<path d="M${cx} ${top + .4}v1.6" stroke="rgba(23,35,15,.35)" stroke-width=".22"/>`;
+    s += icon(Lb.icon, cx - 2, top + 3.2);
+    s += `<text class="ar" x="${cx}" y="${top + 10.6}" font-size="3.3" text-anchor="middle" direction="rtl" fill="#17230f">${Lb.ar}</text>`;
+    s += `<text x="${cx}" y="${top + 14.2}" font-size="2.7" font-weight="800" text-anchor="middle" fill="#17230f">${Lb.en}<tspan font-weight="600" fill="#4a5442" dx=".6">${Lb.unit}</tspan></text>`;
+  });
+  return s;
+}
+const ART = staticArt();
+
+function render() {
+  let dots = "";
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 20; c++) dots += cellDots(lcd.cell(r, c), chX + c * G.pitchX, visY + G.padY + r * G.pitchY);
+  const u = document.getElementById("unit");
+  u.setAttribute("viewBox", `0 0 ${W} ${H}`); u.style.setProperty("--h", H);
+  u.innerHTML = ART + `<g clip-path="url(#vis)"><g filter="url(#soft)">${dots}</g>
+    <rect x="${winX}" y="${visY}" width="${G.viewW}" height="${visH}" fill="url(#recess)"/>
+    <rect x="${winX}" y="${visY}" width="${G.viewW}" height="${visH}" fill="url(#glare)"/></g>
+    <rect x="${winX}" y="${visY}" width="${G.viewW}" height="${visH}" rx=".3" fill="none" stroke="rgba(0,0,0,.4)" stroke-width=".3"/>`;
+  document.getElementById("clock").textContent = `Simulated time ${hms(S.clock)}   ·   battery ${Math.round(S.bat)} %   ·   signal ${Math.round(S.rssi)} dBm`;
+  drawBus();
+}
+function drawBus() {
+  const u = lastUpdate, el = document.getElementById("bus");
+  const upd = driver.updates;
+  el.innerHTML = u.boot
+    ? `Boot: hw_init, then the 8 signs loaded into CGRAM: ${Math.round(u.ms)} ms on the I²C bus.`
+    : `Update ${upd}: ${u.changed.length ? "rewrote row " + u.changed.join(", ") : "nothing changed, nothing sent"} · ${u.ms.toFixed(1)} ms on the bus.<br>Total since boot ${(driver.totalMs / 1000).toFixed(2)} s of ${S.clock - 14 * 3600 + 0 || 0} s simulated: the screen uses ${((driver.totalMs / 1000) / Math.max(1, S.clock - 14 * 3600) * 100).toFixed(3)} % of the bus.`;
+  const ops = driver.ops.slice(0, 26).map((o) => o.rs ? `DATA ${o.b < 8 ? "custom " + o.b : "0x" + o.b.toString(16).toUpperCase().padStart(2, "0")}` : `CMD  0x${o.b.toString(16).toUpperCase().padStart(2, "0")}${o.note ? "  (" + o.note + ")" : ""}`);
+  document.getElementById("ops").innerHTML = ops.length ? ops.join("<br>") + (driver.ops.length > 26 ? `<br>… ${driver.ops.length - 26} more bytes` : "") : "No bytes sent.";
+}
+function drawLog() {
+  document.getElementById("log").innerHTML = log.length ? log.join("") : '<li class="empty">Nothing yet. Choke the ventilation, or cut mains.</li>';
+}
+
+// ════════════════════════════════════════════════════════════════
+//  6 · controls
+// ════════════════════════════════════════════════════════════════
+let timer = null, speed = 15;
+function startTimer() { clearInterval(timer); if (document.getElementById("run").getAttribute("aria-pressed") === "true") timer = setInterval(step, 15000 / speed); }
+document.getElementById("run").addEventListener("click", (e) => { const on = e.target.getAttribute("aria-pressed") !== "true"; e.target.setAttribute("aria-pressed", String(on)); e.target.textContent = on ? "Running" : "Paused"; startTimer(); });
+document.querySelectorAll("[data-speed]").forEach((b) => b.addEventListener("click", () => { speed = +b.dataset.speed; document.querySelectorAll("[data-speed]").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); startTimer(); }));
+document.getElementById("size").addEventListener("click", (e) => { const on = e.target.getAttribute("aria-pressed") !== "true"; e.target.setAttribute("aria-pressed", String(on)); document.body.classList.toggle("actual", on); });
+document.getElementById("mains").addEventListener("click", (e) => {
+  S.mains = !S.mains; e.target.textContent = S.mains ? "Cut mains" : "Restore mains";
+  note(S.mains ? "Mains restored. A confirmation SMS follows about a minute later, on purpose." : "<b>MAINS LOST</b> → running on the battery; buzzer sounds, SMS sent, phone rings.");
+  refresh();
+});
+document.getElementById("net").addEventListener("click", (e) => {
+  S.net = !S.net; e.target.textContent = S.net ? "Drop the network" : "Restore the network";
+  note(S.net ? "Cloud link back." : "Cloud link down. Readings queue; SMS and call alerts still work if the phone network is up.");
+  refresh();
+});
+document.getElementById("air").addEventListener("click", (e) => {
+  S.poor = !S.poor; e.target.textContent = S.poor ? "Restore the ventilation" : "Choke the ventilation";
+  note(S.poor ? "Ventilation choked: CO₂ and ammonia start to climb." : "Ventilation restored: the air clears.");
+});
+
+refresh();
+startTimer();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
+</script>
+</body>
+</html>

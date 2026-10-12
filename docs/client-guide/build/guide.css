@@ -1,0 +1,246 @@
+:root {
+  --ink: #17230f;
+  --ink-2: #4a5442;
+  --leaf: #2f5d1d;
+  --wheat: #b97e1d;
+  --paper: #fbf8f1;
+  --hair: rgba(23, 35, 15, 0.2);
+}
+
+@page { size: A4; margin: 0; }
+
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: "Archivo", "Segoe UI", sans-serif;
+  font-size: 10pt;
+  line-height: 1.7;
+  font-variant-numeric: tabular-nums;
+}
+body.ar { font-family: "Cairo", "Archivo", "Segoe UI", sans-serif; line-height: 1.9; }
+bdi { unicode-bidi: isolate; }
+sub { font-size: 0.72em; line-height: 0; }
+
+/* ── the sheet ───────────────────────────────────────────────── */
+.page {
+  width: 210mm;
+  height: 297mm;
+  padding: 14mm 18mm 11mm;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  overflow: hidden;
+  break-after: page;
+  page-break-after: always;
+}
+.page:last-child { break-after: auto; page-break-after: auto; }
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 3mm;
+  margin-bottom: 9mm;
+  border-bottom: 1.6pt solid var(--ink);
+}
+.brand {
+  font-family: "Archivo", sans-serif;
+  font-weight: 800;
+  font-size: 12.5pt;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  direction: ltr;
+}
+.brand b { color: var(--leaf); font-weight: 800; }
+.docname { font-size: 9pt; color: var(--ink-2); }
+.ar .docname { font-size: 10pt; }
+
+.foot {
+  margin-top: auto;
+  padding-top: 2.5mm;
+  border-top: 0.6pt solid var(--hair);
+  display: flex;
+  justify-content: space-between;
+  font-size: 8.5pt;
+  color: var(--ink-2);
+}
+
+/* ── type ────────────────────────────────────────────────────── */
+h1 {
+  margin: 0 0 3mm;
+  max-width: 15em;
+  font-family: "Archivo", sans-serif;
+  font-weight: 900;
+  font-size: 28pt;
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.ar h1 { font-family: "Cairo", sans-serif; font-size: 27pt; line-height: 1.32; letter-spacing: 0; }
+.for {
+  margin: 0 0 5mm;
+  padding-bottom: 4mm;
+  border-bottom: 0.6pt solid var(--hair);
+  color: var(--ink-2);
+  font-size: 10.5pt;
+}
+
+h2 {
+  margin: 8mm 0 2.6mm;
+  font-family: "Archivo", sans-serif;
+  font-weight: 800;
+  font-size: 15pt;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  break-after: avoid;
+}
+.ar h2 { font-family: "Cairo", sans-serif; font-size: 16pt; letter-spacing: 0; line-height: 1.45; }
+h2.top { margin-top: 0; }
+
+p { margin: 0 0 3mm; max-width: 64ch; }
+.note { font-size: 9pt; color: var(--ink-2); line-height: 1.6; }
+.ar .note { font-size: 9.6pt; }
+.note.first { margin-bottom: 5mm; }
+
+ul { list-style: none; margin: 0; padding: 0; max-width: 64ch; }
+li { position: relative; margin: 0 0 2.2mm; padding-inline-start: 5.2mm; }
+ul li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0.62em;
+  width: 1.8mm;
+  height: 1.8mm;
+  background: var(--wheat);
+}
+.ar ul li::before { top: 0.85em; }
+
+/* three-step sequence: the order is the information */
+.steps {
+  list-style: none;
+  counter-reset: s;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  border-top: 1.2pt solid var(--ink);
+}
+.steps li {
+  counter-increment: s;
+  margin: 0;
+  padding: 3.5mm 5mm 1mm 0;
+}
+.steps li + li { padding-inline-start: 5mm; border-inline-start: 0.6pt solid var(--hair); }
+.steps li::before {
+  content: counter(s);
+  position: static;
+  display: block;
+  width: auto;
+  height: auto;
+  margin-bottom: 1mm;
+  background: none;
+  font-family: "Archivo", sans-serif;
+  font-weight: 900;
+  font-size: 24pt;
+  line-height: 1;
+  color: var(--wheat);
+}
+
+/* definition rows */
+dl { margin: 0; border-top: 1.2pt solid var(--ink); }
+.def {
+  display: grid;
+  grid-template-columns: 38mm 1fr;
+  gap: 7mm;
+  padding: 3.4mm 0;
+  border-bottom: 0.6pt solid var(--hair);
+}
+.def dt { font-weight: 700; font-size: 10.5pt; }
+.def dd { margin: 0; }
+dl.contact .def dd { font-weight: 600; }
+
+/* tables */
+table { width: 100%; border-collapse: collapse; border-top: 1.2pt solid var(--ink); margin-bottom: 3mm; }
+thead th {
+  padding: 2mm 4mm 2mm 0;
+  text-align: start;
+  font-size: 8.5pt;
+  font-weight: 700;
+  color: var(--ink-2);
+  border-bottom: 0.6pt solid var(--ink);
+}
+.ar thead th { font-size: 9.5pt; padding: 2mm 0 2mm 4mm; }
+tbody th, tbody td {
+  padding: 2.6mm 4mm 2.6mm 0;
+  text-align: start;
+  vertical-align: top;
+  border-bottom: 0.6pt solid var(--hair);
+  font-size: 9.6pt;
+  line-height: 1.55;
+}
+.ar tbody th, .ar tbody td { padding: 2.6mm 0 2.6mm 4mm; line-height: 1.8; }
+tbody th { font-weight: 700; font-size: 10pt; }
+.limits th:nth-child(1) { width: 25%; } .limits th:nth-child(2) { width: 31%; }
+.buttons th:nth-child(1) { width: 29%; }
+.fix th:nth-child(1) { width: 31%; }
+
+/* the app page */
+.app { display: grid; grid-template-columns: 1fr 54mm; gap: 11mm; align-items: start; }
+figure { margin: 0; }
+figure img { display: block; width: 100%; border: 0.6pt solid var(--hair); }
+figcaption { margin-top: 2mm; font-size: 8.5pt; color: var(--ink-2); }
+
+/* the record: made to be written on */
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm 11mm; margin-bottom: 7mm; }
+.field { display: flex; align-items: flex-end; gap: 3mm; }
+.field span { font-weight: 600; font-size: 9.5pt; white-space: nowrap; }
+.field i { flex: 1; height: 8mm; border-bottom: 0.8pt solid var(--ink); }
+.field.choice { margin-bottom: 7mm; }
+.field.choice em { font-style: normal; display: flex; gap: 9mm; }
+.field.choice b { display: inline-flex; align-items: center; gap: 2mm; font-weight: 600; font-size: 9.8pt; }
+.field.choice u { display: inline-block; width: 3.6mm; height: 3.6mm; border: 1pt solid var(--ink); text-decoration: none; }
+.field.notes { display: block; }
+.field.notes span { display: block; margin-bottom: 1mm; }
+.field.notes i { display: block; flex: none; height: 9mm; }
+
+/* at-a-glance: tighter rows, wider label column */
+.glance .def { grid-template-columns: 46mm 1fr; padding: 2.3mm 0; }
+.glance .def dt { font-size: 10pt; }
+
+/* installation day: the order is the information */
+.timeline { list-style: none; counter-reset: t; margin: 0; padding: 0; max-width: none; border-top: 1.2pt solid var(--ink); }
+.timeline li {
+  counter-increment: t;
+  display: grid;
+  grid-template-columns: 9mm 1fr;
+  gap: 3mm;
+  margin: 0;
+  padding: 2.1mm 0;
+  border-bottom: 0.6pt solid var(--hair);
+}
+.timeline li::before {
+  content: counter(t);
+  font-family: "Archivo", sans-serif;
+  font-weight: 900;
+  font-size: 14pt;
+  line-height: 1.3;
+  color: var(--wheat);
+}
+
+/* age page */
+.agetable th:nth-child(1) { width: 34%; }
+
+.agetable tbody th, .agetable tbody td { padding-top: 1.8mm; padding-bottom: 1.8mm; }
+.page .note.first[style] { margin-top: 5mm !important; }
+
+/* sms commands page */
+.smscmds th:nth-child(1) { width: 26%; }
+.smscmds tbody th { font-family: 'Archivo', sans-serif; font-weight: 800; letter-spacing: 0.04em; }
+
+/* sms page: tighter, it carries a lot */
+.smscmds tbody th, .smscmds tbody td { padding-top: 1.7mm; padding-bottom: 1.7mm; }
+.ranges .def { padding: 1.9mm 0; grid-template-columns: 34mm 1fr; }
+.ranges .def dt { font-size: 10pt; }
