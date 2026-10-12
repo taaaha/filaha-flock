@@ -43,6 +43,7 @@ Companion docs:
                  ├─► ESP32 ──► A7670G modem ──┬── 2G/LTE data ──► MQTT ──► our server ──► phone app
  battery (ADC) ──┘        │                   └── SMS + voice call ─────────────────────► farmer's phone
                           │                                                   (works with NO internet)
+                          ├─► 20×4 LCD (local readout, shares the I²C bus)
                           ├─► buzzer (local alarm)
                           └─◄ 4 buttons (test / mute / power / reset)
 ```
@@ -51,7 +52,10 @@ Companion docs:
   packet → publish to `filaha/<DEVICE_ID>/telemetry`.
 - Offline? Readings queue in RAM (60 slots ≈ 15 min) and flush when the link
   returns. Nothing is lost to a signal gap.
-- **Danger** (CO₂ / NH₃ / temp / humidity past threshold for 2 readings in a row):
+- **Limits are set by text message.** The numbers in `config.h` are only the factory
+  defaults; the farmer texts the box to change them (see 6.6). They are saved on the chip
+  and survive a reboot or a power cut.
+- **Danger** (CO₂ / NH₃ / temp / humidity past the limit for 2 readings in a row):
   buzzer + SMS + a voice call to the farmer, retried until delivered.
 - **Mains cut**: buzzer + instant `PWR_OUT` event + SMS + call.
 - **Daily report** SMS at 20:00 local time.
@@ -72,6 +76,7 @@ currently **1.0.3**) and printed in the boot banner.
 | NH₃ | **MiCS-4514** (DFRobot Gravity SEN0377) | I²C 0x75 — **not fitted yet**, gated behind `FILAHA_HAS_NH3` |
 | Buttons ×4 | DFRobot Gravity DFR0029 | **active-HIGH** digital push buttons |
 | Buzzer | DFRobot Gravity DFR0032 | active-HIGH digital buzzer |
+| Display | 2004 (20×4) HD44780 LCD, green backlight, **PCF8574 I²C backpack** | bought at binarytech-dz.com (ref. SC2U529947, 2,250 DZD). I²C **0x27**, or 0x3F on the PCF8574**A** variant. **It is a 5 V part** — read 6.5 before wiring |
 | Wiring | Gravity **I²C HUB** + 3-pin cables | keeps the bus tidy over long cable runs |
 | Power | LiPo cell + 5 V/2 A USB-A charger | see rule 1 |
 | SIM | Algerian data SIM (Mobilis / Ooredoo / Djezzy) | APN auto-detected from the operator |
@@ -102,6 +107,7 @@ guesses about the board.
 |---|---|---|
 | `I2C_SDA` | **21** | shared bus, 100 kHz (gentle for long Gravity cables) |
 | `I2C_SCL` | **22** | every new I²C sensor goes here — **no new pins needed** |
+| 20×4 LCD | **21 / 22** | the same bus, address **0x27** (or 0x3F). No pin of its own — see 6.5 |
 | `BATTERY_ADC_PIN` | **35** | VBAT ÷2 divider, ADC1, input-only. Averaged over 5 reads |
 
 ### User interface
@@ -265,6 +271,151 @@ Divider maths: the ADC sees 0–3.3 V, and `read_pin_v(pin, divider)` multiplies
 your divider ratio — a 100 k / 100 k pair on 5 V VBUS gives 2.5 V at the pin, so
 `divider = 2.0f`. **Never feed 5 V into a GPIO directly.**
 
+### 6.5 The 20×4 display — and why it needs a little care
+
+Firmware: `src/lcd.cpp` / `lcd.h`, switched by `FILAHA_HAS_LCD` in `config.h`. No
+library is needed; it is a ~200-line HD44780-over-PCF8574 driver, so there is no
+dependency to break the build.
+
+**What it shows** — two small signs and four numbers, nothing else. The labels and units are
+**printed on the box** under the window; the screen never carries words. It is redrawn after every
+reading, and instantly when mains changes.
+```
+row 0                         [network][ ][power]      ← two signs, top-right corner
+row 1                                                  (blank)
+row 2   32.4      58       837      12.5               ← temperature · humidity · CO₂ · NH₃
+row 3                                                  (blank)
+```
+- **Power sign** (the corner): a plug on mains; on battery a horizontal battery that is full (60 %+),
+  half (25–59 %) or empty (under 25 %).
+- **Network sign**: three bars (good), two (fair, about −95 dBm and worse), one (weak, about −105 dBm
+  and worse), or a cross when the box cannot reach the servers.
+- **Values** (row 2): temperature °C · humidity % · CO₂ ppm · NH₃ ppm. The outer two sit one column in from
+  the edges and the inner two are centred in their own slots, so the margins stay equal whatever the digit
+  counts. A missing reading shows `--`, and so does NH₃ until the sensor is fitted.
+- **Dangers are not marked on the screen.** The buzzer, the SMS and the call raise those, against the
+  live limits (see 6.6).
+- The signs are the controller's eight user-defined characters, loaded at start-up (`SIGNS` in `lcd.cpp`).
+  `docs/lcd-simulation.html` is a live emulation of exactly this layout.
+
+**Making the printed labels line up.** Cut the window to show **rows 0–2** and print each label under
+its value column. A label that is half a column off makes the farmer read the wrong number against
+the wrong word, so print a **1:1 paper template of the label strip and hold it against the real screen
+before printing the box**. The HD44780 character ROM has **no Arabic**, so the Arabic names and the
+icons live on the printed strip, not on the glass.
+
+**Wiring** — four wires, no new GPIO:
+
+| LCD backpack | Goes to |
+|---|---|
+| GND | GND |
+| VCC | **5 V** (see below — not 3V3) |
+| SDA | GPIO **21** |
+| SCL | GPIO **22** |
+
+**First power-up.** A row of solid blocks, or a blank screen with the backlight
+on, is normal: turn the small blue **contrast trimmer** on the backpack until the
+characters appear. That is the single most common "my display is dead" and it is
+not.
+
+**Address.** The boot scan prints it. Most backpacks are **0x27**; the "A" chip
+is **0x3F**; the three solder pads A0–A2 change it. The firmware tries 0x27 then
+0x3F; set `FILAHA_LCD_ADDR` if yours is something else.
+
+#### The 5 V problem (read this before you wire it)
+
+The LCD module needs **5 V** for the controller and the backlight; the ESP32's
+pins are **3.3 V only and not 5 V tolerant**. Most of these backpacks carry two
+small pull-up resistors from SDA and SCL to **their own VCC**. Powered at 5 V,
+they hold both lines at 5 V and push that into GPIO 21/22 — and into every Gravity
+sensor on the same hub. That is the bus carrying the CO₂ reading and the mains
+detection, so this is the one place we cannot afford flakiness.
+
+Check it, don't assume it: with the LCD powered from 5 V and the board running,
+measure SDA to GND with a multimeter. **About 5 V** means the pull-ups are on the
+5 V side. About 3.3 V means you are fine.
+
+Fixes, in order of preference:
+1. **Remove the two pull-up resistors on the backpack** (the small SMD parts
+   between SDA/SCL and VCC). The sensors' own boards already pull the bus up to
+   3.3 V — confirm by checking the bus idles at ~3.3 V with the LCD unplugged.
+2. A **bidirectional level shifter** (BSS138-type) between the board and the LCD.
+3. Not recommended: run the module on 3.3 V. Many 2004 modules are dim or
+   unreadable there.
+
+Plenty of people wire it straight to 5 V and it appears to work. It is out of
+spec for the ESP32, and the failure mode — a slowly damaged pin, or sensor reads
+that drop out for no visible reason — is exactly the kind that costs a bring-up day.
+
+**Power.** The backlight alone draws on the order of 100–200 mA at 5 V (measure
+yours); `FILAHA_LCD_BACKLIGHT 0` turns it off. If your 5 V comes from the board's
+USB/charger side, the screen will be **dark during a power cut** while the box
+carries on alerting as normal — worth knowing before you explain it to a farmer.
+Confirm where your 5 V actually comes from; do not assume.
+
+**What protects the safety path.** The display is optional and cannot stall the
+loop: if nothing ACKs at boot it logs one line and moves on; the first NACK during
+a redraw aborts it (no retries inside a draw); and while absent it is re-probed
+every 30 s, so a loose wire or a late hot-plug recovers by itself. The screen is
+redrawn **after** the SMS/call/telemetry work in each cycle, never before. And it
+takes the mains verdict from `main.cpp` rather than asking again —
+`power_is_on_usb()` is stateful and must only ever be sampled by its owner.
+
+If sensor reads ever start failing for no reason, set `FILAHA_HAS_LCD 0` first.
+It is the newest thing on that bus and the first suspect.
+
+### 6.6 Changing the limits by text message
+
+The alert limits are **not** fixed. Text the box's SIM from the registered farmer
+number and it replies with what it saved. Code: `limits_logic.h` (the language and
+the hard ranges), `limits.cpp` (storage), `smscmd.cpp` (receiving, replying),
+`modem_poll_sms()` in `modem.cpp` (reading the SIM).
+
+```
+T 20 32      temperature  low high   (°C)
+H 40 75      humidity     low high   (%)
+C 2500       CO2          max        (ppm)
+N 25         NH3          max        (ppm)
+LIMITS  (or ?)   → the box replies with what is set now
+RESET            → back to the config.h defaults
+```
+Combine freely: `T 20 32 H 40 75 C 2500 N 25`. Case, spacing and punctuation do not
+matter (`t20 32,h40 75` works). Decimals use a dot; the comma is a separator. Reply
+example: `Filaha DEV01 OK: T20-32 H40-75 C2500 N25`.
+
+**Rules the box enforces — by design, so a typo can never silence an alarm**
+- **All or nothing.** If any part of a message is wrong, nothing changes and the reply
+  says what to fix.
+- **Hard ranges:** temperature low 0–40 and high 10–50, at least 3 apart; humidity low
+  0–60 and high 40–100, at least 10 apart; CO₂ max 800–5000; NH₃ max 5–50.
+- **Only the registered number is obeyed** (`FILAHA_FARMER_NUMBER`, plus the optional
+  `FILAHA_ADMIN_NUMBER`, matched on the last 9 digits). Texts from anyone else are
+  ignored **without a reply**, so the box cannot be used to bounce SMS at strangers.
+  Caveat: caller-ID on SMS can be forged, so this is a sensible lock, not a vault. The
+  hard ranges are what stop a forged text from doing real harm.
+- An **alert always goes first**: the box does not look for texts while a critical
+  message is still waiting to be delivered.
+- Changing the limits restarts the danger counters, so the next two readings are judged
+  against the new numbers.
+
+**Not tested on a real SIM yet — check these on the first flash**
+1. Text `LIMITS` from the farmer phone. Within ~15 s the monitor should show
+   `[cmd] from the farmer: LIMITS` and the phone should receive the reply. If nothing
+   happens, look for `[cmd]` and `[modem]` lines.
+2. The listing format of `AT+CMGL="ALL"` was written from the SIMCom spec and has not been
+   seen on this A7670G. If the sender or body comes out wrong, fix the parsing in
+   `modem_poll_sms()` — it is the only place that knows the format.
+3. Messages are deleted after reading. If the SIM fills up with old texts and new ones are
+   refused, check `AT+CPMS?`.
+4. A message sent as **Unicode** (typed with Arabic letters) arrives as hex and is answered
+   with "unknown word". Commands must be written with Latin letters and digits.
+5. Boot must print `[limits-test] PASS  20/20`. Anything else: do not ship that unit.
+
+**What it does not do (yet)**: the box does not know the age of the flock. Someone has to
+send new numbers as the flock grows — the app already shows the right target for each day,
+so the farmer can read it there and text the box. A "send to the box" button in the app, or a
+schedule held on the box, would remove that step.
+
 ---
 
 ## 7. Build, flash, watch
@@ -292,8 +443,12 @@ pio device list
   MQTT      :  134.209.242.192:1883  topic filaha/DEV01/telemetry
 [pwr-test] PASS  steady on charger, worst observed noise
 [pwr-test] 5/5 passed
+  Limits    :  T12-38 H25-85 C2500 N35
+[limits-test] PASS  20/20
+[i2c]   device found at 0x27          ← the LCD backpack
 [i2c]   device found at 0x64
 [sensors] STCC4 detected
+[lcd] 20x4 display at 0x27
 [modem] REGISTERED on auto (any)
 [modem] attached=1  rssi=-71dBm  op=Mobilis
 [net] MQTT OK (CMQTTCONNECT r=1)
@@ -313,6 +468,8 @@ pio device list
 | `FILAHA_MODEM_DEBUG` | `0` | `1` echoes every AT command — essential for a modem bug, unreadable otherwise |
 | `FILAHA_POWER_DIAG` | `1` | one `[pwr] vbat=… ripple=… → MAINS` line every 4 s |
 | `FILAHA_POWER_SELFTEST` | `1` | leave on — a silent regression here is a missed power cut |
+| `FILAHA_SMS_COMMANDS` | `1` | `0` removes the text-message limit changes entirely |
+| `FILAHA_LIMITS_SELFTEST` | `1` | leave on — checks the text parser against 20 cases at every boot |
 | `FILAHA_TEST_MODE` | `0` | `1` = synthetic sensor values; lets you test modem→SMS→app with just the board and a SIM |
 
 ---
@@ -355,8 +512,10 @@ cd ~/server && ./add-device.sh DEV02 +2135XXXXXXXX
 
 | Test | How | Expected |
 |---|---|---|
-| Boot | power on with the battery connected | one chirp, banner, `[pwr-test] 5/5 passed` |
-| I²C | watch the boot scan | `device found at 0x64` |
+| Boot | power on with the battery connected | one chirp, banner, `[pwr-test] 5/5 passed`, `[limits-test] PASS  20/20` |
+| I²C | watch the boot scan | `device found at 0x64`, and `0x27` (or `0x3F`) if the LCD is fitted |
+| Limits by text | text `T 20 32` from the farmer phone, then `LIMITS`; reboot the box; text `LIMITS` again; then `RESET` | a reply to each; the new numbers **survive the reboot**; a text from another phone gets **no reply**; `T 99 5` is refused with a reason and changes nothing |
+| Display | power on; later unplug the LCD for a minute, then plug it back | readings on the glass; unplugged → one `[lcd] lost the display` line and **telemetry carries on unchanged**; replugged → back within 30 s |
 | Cloud | watch the monitor | two chirps, then `[net] publish OK (queue 0)` every 15 s |
 | SMS | press the **red** button | test SMS arrives on the farmer's phone |
 | Voice | trigger any danger alert | `[call] dial accepted` (a `REJECTED` here means the module is data-only — SMS still covers it) |
@@ -388,6 +547,10 @@ farmer's trust in every alert the box sends.
 | STCC4 not found | the address is **0x64**, not 0x62 | found via the boot-time `i2c_scan()` |
 | "No serial data received" on upload | phantom COM1 | port glob in `platformio.ini` |
 | Permanent power-cut alarm | v1.0.0 read a low absolute voltage as "on battery"; with a battery always fitted that is always true | rewritten as difference-based logic in `power_logic.h` |
+| LCD shows a row of solid blocks, or nothing | the contrast trimmer on the backpack is off — or the module is on 3.3 V | turn the blue trimmer; feed VCC from 5 V |
+| `[lcd] no display on the I2C bus` at boot | loose SDA/SCL/VCC, or an address that is neither 0x27 nor 0x3F | read the `[i2c]` scan lines; set `FILAHA_LCD_ADDR` |
+| A text to the box gets no reply | wrong sender (only `FILAHA_FARMER_NUMBER` is obeyed), box not attached to the network, an alert still queued, or the text was typed with Arabic letters (Unicode) | look for `[cmd]` lines; confirm the number in `config.h`; see 6.6 |
+| Sensor reads flaky after fitting the LCD | the backpack's pull-ups are holding the bus at 5 V | see 6.5 — remove them or level-shift |
 
 ---
 
@@ -398,6 +561,10 @@ farmer's trust in every alert the box sends.
 | add or move a pin | `src/config.h` — **only here** |
 | touch buttons, buzzer, LEDs, deep sleep | `src/feedback.cpp` / `.h` |
 | touch sensors, battery, mains detection | `src/sensors.cpp` / `.h` |
+| change the text-message commands or the hard ranges | `src/limits_logic.h` (the parser, the ranges and its self-test) |
+| change how limits are saved or defaulted | `src/limits.cpp`, defaults in `config.h` |
+| change who may text the box, or how it replies | `src/smscmd.cpp` |
+| change what the display shows | `src/lcd.cpp` (layout is `lcd_show()`; nothing else knows about it) |
 | touch the mains-vs-battery *decision* | `src/power_logic.h` (pure logic, self-tested at boot) |
 | touch the modem, SMS, voice calls | `src/modem.cpp` / `.h` |
 | touch GPRS, MQTT, store-and-forward | `src/net.cpp` / `.h` |

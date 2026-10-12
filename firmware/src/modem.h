@@ -33,3 +33,15 @@ bool modem_place_call(const char* number, unsigned long ring_ms);
 // Recover a wedged modem: soft restart → re-attach; hard power-cycle if that
 // fails. Called by net.cpp after repeated connect failures. Returns attached.
 bool modem_recover();
+
+// ── Receiving text messages ───────────────────────────────────────
+// Used to change the alert limits by text (smscmd.cpp).
+struct InboundSms {
+  char from[24];     // sender, as the network reports it ("+213...")
+  char body[161];    // message text, line breaks flattened to spaces
+};
+// Reads up to `max` stored messages and DELETES each one it returns, so the
+// SIM never fills up. Plain text only: a message sent as Unicode arrives as
+// hex and will simply be answered with "unknown word".
+// Returns how many were read (0 when there is nothing, or no network).
+int modem_poll_sms(InboundSms* out, int max);

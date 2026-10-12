@@ -24,6 +24,9 @@ extern "C" {
 #include "pack.h"
 #include "sensors.h"
 #include "feedback.h"
+#include "lcd.h"
+#include "limits.h"
+#include "smscmd.h"
 
 // ── State ────────────────────────────────────────────────────────
 static unsigned long s_last_send_ms        = 0;
@@ -40,6 +43,10 @@ static int           s_streak_hum          = 0;
 // setup() seeds the grace period before the function itself is defined.
 static unsigned long s_last_cloud_ok_ms    = 0;
 static unsigned long s_last_recover_ms     = 0;
+// Most recent reading, kept so the display can be redrawn the instant mains
+// changes instead of waiting up to a full cycle to say so.
+static SensorReading s_last_reading{};
+static bool          s_have_reading        = false;
 
 // ── Boot banner ──────────────────────────────────────────────────
 static void log_banner() {
@@ -74,6 +81,19 @@ void setup() {
   delay(300);
   log_banner();
 
+  limits_begin();                           // factory defaults, or what the farmer last set by text
+  {
+    char cur[56];
+    limits_format(limits_get(), cur, sizeof cur);
+    Serial.printf("  Limits    :  %s\n", cur);
+#if FILAHA_LIMITS_SELFTEST
+    int total = 0, first_fail = 0;
+    const int ok = limits_selftest(&total, &first_fail);
+    if (ok == total) Serial.printf("[limits-test] PASS  %d/%d\n", ok, total);
+    else Serial.printf("[limits-test] FAIL  %d/%d  (first failure: check %d) - do not ship this unit\n", ok, total, first_fail);
+#endif
+  }
+
   // Hardware watchdog: if the loop ever stalls (a blocking AT command hanging
   // on a dying tower), the chip reboots itself and comes back alone.
   esp_task_wdt_init(WATCHDOG_TIMEOUT_S, true);   // (timeout seconds, panic→reboot)
@@ -92,6 +112,9 @@ void setup() {
   if (!sensors_begin()) {
     Serial.println("[boot] sensors_begin reported failure — will keep trying in loop()");
   }
+
+  // Display shares the I2C bus that sensors_begin() just brought up.
+  if (lcd_begin()) lcd_message("Filaha Flock", "Firmware v" FILAHA_FIRMWARE_VERSION, "Starting...");
 
   // Seed the power state from the actual hardware so booting on battery isn't
   // mistaken for a fresh power cut (the static default assumed USB).
@@ -242,26 +265,28 @@ static void evaluate_critical(const SensorReading& r) {
   FilahaDanger kind  = FD_CO2_HIGH;
   float        value = 0;
 
-  if (r.has_co2 && r.co2_ppm >= CO2_DANGER_PPM) {
+  const Limits& LM = limits_get();      // the limits in force right now (text-message editable)
+
+  if (r.has_co2 && r.co2_ppm >= LM.co2_hi) {
     if (++s_streak_co2 >= DANGER_CONFIRM_SAMPLES) { hit = true; kind = FD_CO2_HIGH; value = r.co2_ppm; }
   } else { s_streak_co2 = 0; }
 
-  if (r.has_nh3 && r.nh3_ppm >= NH3_DANGER_PPM) {
+  if (r.has_nh3 && r.nh3_ppm >= LM.nh3_hi) {
     if (++s_streak_nh3 >= DANGER_CONFIRM_SAMPLES) { hit = true; kind = FD_NH3_HIGH; value = r.nh3_ppm; }
   } else { s_streak_nh3 = 0; }
 
-  if (r.has_temp && (r.temp_c >= TEMP_HIGH_C || r.temp_c <= TEMP_LOW_C)) {
+  if (r.has_temp && (r.temp_c >= LM.temp_hi || r.temp_c <= LM.temp_lo)) {
     if (++s_streak_temp >= DANGER_CONFIRM_SAMPLES) {
       hit = true;
-      kind = (r.temp_c >= TEMP_HIGH_C) ? FD_TEMP_HIGH : FD_TEMP_LOW;
+      kind = (r.temp_c >= LM.temp_hi) ? FD_TEMP_HIGH : FD_TEMP_LOW;
       value = r.temp_c;
     }
   } else { s_streak_temp = 0; }
 
-  if (r.has_hum && (r.hum_pct >= HUM_HIGH_PCT || r.hum_pct <= HUM_LOW_PCT)) {
+  if (r.has_hum && (r.hum_pct >= LM.hum_hi || r.hum_pct <= LM.hum_lo)) {
     if (++s_streak_hum >= DANGER_CONFIRM_SAMPLES) {
       hit = true;
-      kind = (r.hum_pct >= HUM_HIGH_PCT) ? FD_HUM_HIGH : FD_HUM_LOW;
+      kind = (r.hum_pct >= LM.hum_hi) ? FD_HUM_HIGH : FD_HUM_LOW;
       value = r.hum_pct;
     }
   } else { s_streak_hum = 0; }
@@ -292,6 +317,19 @@ static void maybe_send_heartbeat(const SensorReading& r) {
     queue_daily(r);
   }
 #endif
+}
+
+// Redraw the local display from the last reading plus the live link/mains state.
+// Called after every reading AND the instant mains changes, so the screen says
+// "BATTERY" when the power is cut, not up to a cycle later.
+static void refresh_lcd() {
+  if (!s_have_reading) return;
+  LcdStatus st;
+  st.on_mains = s_was_on_usb;
+  st.bat_pct  = (s_last_reading.has_bat && s_last_reading.bat_pct != 255) ? s_last_reading.bat_pct : -1;
+  st.cloud_ok = net_connected();
+  st.rssi_dbm = modem_rssi_dbm();
+  lcd_show(s_last_reading, st);
 }
 
 static void check_power_transition() {
@@ -338,6 +376,7 @@ static void check_power_transition() {
     queue_power(false, batt);           // confirmation SMS
   }
   s_was_on_usb = on_usb;
+  refresh_lcd();                    // show the change at once
 }
 
 // ── Button events ────────────────────────────────────────────────
@@ -357,6 +396,7 @@ static void handle_button_events() {
       queue_simple(MK_SHUTDOWN);
       outbox_service();          // best effort before the lights go out
       delay(200);
+      lcd_off();                 // the PCF8574 latches: without this the backlight stays lit asleep
       enter_deep_sleep();                       // never returns
       break;
     case BTN_RESET:
@@ -403,6 +443,10 @@ void loop() {
   net_loop();                                   // keep MQTT alive / reconnect
   check_power_transition();
   outbox_service();                             // retry anything undelivered
+  if (smscmd_tick(s_box_count > 0)) {           // limits changed by text message
+    s_streak_co2 = s_streak_nh3 = s_streak_temp = s_streak_hum = 0;   // judge afresh against the new limits
+    refresh_lcd();
+  }
   self_heal_tick();                             // recover unattended, no human needed
 
   // Double-chirp the FIRST time the cloud link comes up after boot — audible
@@ -426,6 +470,9 @@ void loop() {
       if (net_publish(pkt, n)) s_last_cloud_ok_ms = now;   // proof the link works
       evaluate_critical(r);                     // emergency lifeline (SMS + call)
       maybe_send_heartbeat(r);                  // once-a-day report
+      s_last_reading = r;                       // display last: never delay the safety path
+      s_have_reading = true;
+      refresh_lcd();
     } else {
       Serial.println("[loop] no usable sensor reading this cycle");
     }
