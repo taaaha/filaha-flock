@@ -1,0 +1,34 @@
+SUBJECT
+Filaha Flock: your client guide
+
+ATTACH
+Filaha-Flock-Client-Guide-International-EN.pdf
+(and -FR.pdf / -AR.pdf if they prefer French or Arabic)
+
+---------------------------------------------------------------
+
+Hello [Name],
+
+Thank you for your interest in Filaha Flock. Your client guide is attached: it shows how the system works day to day, and how to get the most from it.
+
+What it does for you:
+A sealed box in your poultry house measures temperature, humidity, CO2 and ammonia, and watches the mains power. The moment something goes wrong, it sounds a buzzer in the house, texts you and rings your phone. It does this over the mobile network, so it works with no internet on the farm, and it keeps going through a power cut on its own battery.
+
+The app (Arabic, French and English) shows live readings, history and reports, with the right target for your flock's age. And you set the box's alert limits yourself, by text message, as your flock grows.
+
+Good to know: alert messages are in Arabic or French, and before you order we confirm that your country's mobile networks are supported.
+
+To get started, reply with:
+  1. your country and region,
+  2. the number of houses, the approximate number of birds and the breed,
+  3. the mobile operator you use on the farm.
+
+We will come back to you with whether your network is supported, what it would cost, and the next steps.
+
+Kind regards,
+
+[Your name]
+Filaha Flock
+filahaflock.com
+WhatsApp / phone: +213 541 78 76 99
+support@filahaflock.com
