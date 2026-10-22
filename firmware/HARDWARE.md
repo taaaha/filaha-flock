@@ -63,7 +63,7 @@ Companion docs:
   repeated failures, full reboot if the cloud has been silent for 30 min.
 
 Firmware version is set in `platformio.ini` (`FILAHA_FIRMWARE_VERSION`,
-currently **1.0.3**) and printed in the boot banner.
+currently **1.1.0**) and printed in the boot banner.
 
 ---
 
@@ -438,7 +438,7 @@ pio device list
 
 ### A healthy boot looks like this
 ```
-  Filaha Flock firmware v1.0.3
+  Filaha Flock firmware v1.1.0
   Device ID :  DEV01
   MQTT      :  134.209.242.192:1883  topic filaha/DEV01/telemetry
 [pwr-test] PASS  steady on charger, worst observed noise
